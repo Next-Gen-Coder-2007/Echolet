@@ -1,8 +1,27 @@
 import logoImg from './assets/logo.png';
+import { healthCheck } from './api/api';
+import { useState, useEffect } from 'react';
 
 function App() {
+  const [status, setStatus] = useState<string>("");
+  const [loading, setLodaing] = useState(true);
+
+  useEffect(() => {
+    const checkServer = async () => {
+      try{
+        const data = await healthCheck();
+        setStatus(data.status);
+      }catch(e){
+        setStatus("Server Not Responding");
+      }finally{
+        setLodaing(false);
+      }
+    }
+    checkServer();
+  })
+
   return (
-    <main className="relative min-h-screen overflow-hidden bg-white flex items-center justify-center px-6">
+    <main className="relative min-h-screen overflow-hidden bg-white flex items-center justify-center px-6 flex-col">
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-purple-400/20 rounded-full blur-3xl" />
       <div className="relative z-10 flex flex-col items-center text-center">
@@ -46,7 +65,10 @@ function App() {
         >
           Coming Soon
         </button>
-
+      </div>
+      <div className='mt-6 flex items-center gap-2 text-sm'>
+        <span className={`w-2 h-2 rounded full ${loading ? "bg-yellow-400" : status == "OK" ? "bg-green-500" : "bg-red-500"}`}/>
+        <span className='text-gray-400'>{loading ? "Connecting to server..." : status === "OK" ? "All systems operational" : "Server unavailable"}</span>
       </div>
     </main>
   );
