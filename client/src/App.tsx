@@ -1,6 +1,6 @@
 import logoImg from './assets/logo.png';
-import { healthCheck } from './api/api';
 import { useState, useEffect } from 'react';
+import api from './api/api';
 
 function App() {
   const [status, setStatus] = useState<string>("");
@@ -9,8 +9,8 @@ function App() {
   useEffect(() => {
     const checkServer = async () => {
       try{
-        const data = await healthCheck();
-        setStatus(data.status);
+        const res = await api.get('/');
+        setStatus(res.data.status);
       }catch(e){
         setStatus("Server Not Responding");
       }finally{

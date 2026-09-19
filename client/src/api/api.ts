@@ -10,9 +10,4 @@ const api = axios.create({
   },
 });
 
-export const healthCheck = async() => {
-  const res = await api.get('health');
-  return res.data;
-}
-
 export default api;
