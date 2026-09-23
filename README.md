@@ -17,3 +17,26 @@
 
 ### A modern social platform designed to foster meaningful connections, conversations, and community-driven interactions beyond the traditional social media feed.
 
+
+## Features
+
+| Sl No | Feature | Includes |
+|---|---|---|
+| 1 | **Authentication** | Register, Login, Logout, JWT auth, HTTP-only cookies, Google OAuth, Forgot/reset password, Email verification, Account deletion, Account settings |
+| 2 | **User Profiles** | Username, display name, profile picture, cover image, bio, followers/following, posts, reels, tagged posts, liked posts, saved posts, follow/unfollow, block/unblock, mute/unmute |
+| 3 | **Home Feed** | Following feed, For You feed, text/image/video/GIF posts, polls, reposts, hashtags, mentions, likes, comments, shares, bookmarks |
+| 4 | **Posts** | *Types:* text, image, multi-image, video, GIF, poll, link · *Actions:* like, comment, repost, share, bookmark, edit, delete, pin, report |
+| 5 | **Comments** | Comments, nested replies, like/edit/delete comments, user mentions, comment notifications |
+| 6 | **Stories** | Image/video/text stories, music, GIFs, stickers, polls, questions, story views, reactions, replies, 24-hour expiration |
+| 7 | **Reels / Short Videos** | Upload, vertical feed, likes, comments, shares, reposts, bookmarks, views, captions, hashtags, music/audio, recommended reels |
+| 8 | **Explore** | Trending posts/reels, popular users, popular hashtags, visual content grid, personalized recommendations |
+| 9 | **Trending** | Trending hashtags/posts/reels/topics, ranked by engagement + engagement growth + recency + views + shares |
+| 10 | **Hashtags** | Create, follow, hashtag pages, trending hashtags, posts by hashtag, search hashtags |
+| 11 | **Search** | *Now:* users, posts, reels, hashtags · *Later:* full-text search, semantic search |
+| 12 | **Messaging** | *1-to-1:* text, images, video, GIFs, stickers, voice messages, replies, reactions, edit/delete, typing indicator, online status, read receipts · *Group (WhatsApp-style):* create, add/remove members, name/image, admins, roles, media sharing, reactions, mentions, message search, settings, leave · *Global:* public real-time chatroom, online count, reactions, replies, mentions, rate limiting, spam detection, content filtering, reporting, block/mute, moderation — built with WebSockets + Redis Pub/Sub + PostgreSQL |
+| 13 | **Notifications** | Likes, comments, replies, follows, mentions, reposts, shares, messages, group invitations, story reactions — delivered in real time via WebSockets |
+| 14 | **Bookmarks** | Save posts, reels, images, videos into custom collections (e.g. Memes, Movies, Programming, Funny, Other) |
+| 15 | **Reactions** | Love, Funny, Fire, Wow, Sad, Dead, Applause — applicable to posts, comments, messages, and reels |
+| 16 | **Polls** | Can be created in posts, stories, and group chats |
+| 17 | **Fun Features** | **Surprise Me** — randomly discover a post, user, reel, or topic for a natural rabbit-hole browsing experience |
+| 18 | **AI Features** | **Recommendations** (activity → interests → ranking → personalized feed) · **Moderation** (spam, toxic-content, NSFW, suspicious-account detection) · **Meme Generator** (upload → AI captions → select → post) · **Search** (semantic queries, e.g. "show me funny programming memes") |
