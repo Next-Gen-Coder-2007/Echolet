@@ -1,1 +1,18 @@
 @import 'tailwindcss';
+
+@layer base {
+  * {
+    font-family: 'Cosmic Sans', 'Comic Sans MS', 'Comic Neue', 'Comic Sans', cursive, sans-serif;
+  }
+
+  body {
+    font-family: 'Cosmic Sans', 'Comic Sans MS', 'Comic Neue', 'Comic Sans', cursive, sans-serif;
+    color: #1e293b;
+    background-color: #ffffff;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.custom-card-shadow {
+  box-shadow: rgba(0, 0, 0, 0.16) 0px 3px 6px, rgba(0, 0, 0, 0.23) 0px 3px 6px;
+}
