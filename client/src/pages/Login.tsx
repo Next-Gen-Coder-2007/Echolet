@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import logoImg from '../assets/logo.png';
-import authImg from '../assets/auth.jpeg';
+import Logo from '../components/Logo';
+import authImg from '../assets/auth.png';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -45,71 +45,79 @@ export default function Login() {
     }, 400);
   };
 
-  const cardShadowStyle = {
-    boxShadow: 'rgba(0, 0, 0, 0.16) 0px 3px 6px, rgba(0, 0, 0, 0.23) 0px 3px 6px',
-  };
-
   return (
     <div className="min-h-screen bg-white text-slate-800 flex flex-col relative overflow-hidden selection:bg-purple-600 selection:text-white">
       <div className="absolute -left-20 sm:-left-28 top-1/2 -translate-y-1/2 w-64 h-64 sm:w-84 sm:h-84 rounded-full bg-[#00A3FF] pointer-events-none z-0" />
       <div className="absolute left-1/3 sm:left-[35%] top-10 sm:top-12 w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-[#8B5CF6] pointer-events-none z-0" />
 
-      <header className="w-full max-w-7xl mx-auto px-6 py-4 flex items-center relative z-10">
-        <Link to="/" className="flex items-center gap-2.5">
-          <img src={logoImg} alt="Echolet" className="w-9 h-9 object-contain" />
-          <span className="text-2xl font-bold tracking-tight text-slate-900">
-            Echo<span className="bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] bg-clip-text text-transparent">let</span>
-          </span>
-        </Link>
+      <header className="w-full max-w-7xl mx-auto px-6 pt-5 pb-2 flex items-center justify-between relative z-10">
+        <Logo />
       </header>
 
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center py-4 relative z-10">
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
-          <div className="lg:col-span-7 flex items-center justify-center">
-            <div
-              style={cardShadowStyle}
-              className="w-full max-w-[460px] sm:max-w-[480px] bg-white rounded-lg p-2 sm:p-2.5 border border-slate-200"
-            >
-              <img
-                src={authImg}
-                alt="Authentication"
-                className="w-full aspect-[4/3] object-cover rounded-md block"
-              />
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center pt-9 pb-4 sm:pb-8 relative z-10">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center -translate-y-2 sm:-translate-y-5">
+          <div className="lg:col-span-7 flex flex-col items-center justify-center">
+            <div className="group w-full max-w-[440px] sm:max-w-[465px] bg-white rounded-[26px] p-3 sm:p-3.5 border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_16px_36px_rgba(0,0,0,0.35)] transition-all duration-300 ease-out hover:-translate-y-1">
+              <div className="overflow-hidden rounded-[20px] relative border border-slate-100">
+                <img
+                  src={authImg}
+                  alt="Authentication"
+                  className="w-full aspect-[4/3] object-cover block rounded-[20px] transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/35 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-[20px]" />
+              </div>
+
+              <div className="pt-3 pb-1 px-3 text-center">
+                <div className="flex justify-center mb-1.5">
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-purple-50 text-purple-600 transition-transform duration-300 group-hover:scale-110 shadow-xs">
+                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                      <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
+                    </svg>
+                  </span>
+                </div>
+                <blockquote className="text-slate-700 font-medium italic text-xs sm:text-sm leading-relaxed">
+                  “Connect seamlessly, communicate effortlessly. Where every voice finds its echo.”
+                </blockquote>
+                <div className="mt-2 flex justify-center">
+                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-purple-50 text-[10px] font-semibold tracking-wider uppercase text-purple-600 border border-purple-100/60">
+                    The Echolet Community
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
           <div className="lg:col-span-5 flex justify-center w-full">
-            <div
-              style={cardShadowStyle}
-              className="w-full max-w-[400px] bg-white rounded-lg p-6 sm:p-7 border border-slate-200"
-            >
-              <div className="text-center mb-5">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            <div className="w-full max-w-[430px] sm:max-w-[445px] bg-white rounded-[28px] p-7 sm:p-8 border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_16px_36px_rgba(0,0,0,0.4)] transition-all duration-300 ease-out">
+              <div className="text-center mb-6">
+                <h1 className="text-2xl sm:text-[28px] font-bold tracking-tight text-slate-900">
                   Welcome Back
                 </h1>
-                <p className="mt-1 text-xs sm:text-sm text-slate-500">
+                <p className="mt-1.5 text-xs sm:text-sm text-slate-500">
                   Please sign in to your Echolet account
                 </p>
               </div>
 
               {submitMessage && (
                 <div
-                  className={`mb-3.5 p-2.5 rounded-md text-xs flex items-center gap-2 ${
+                  className={`mb-4 p-3 rounded-2xl text-xs flex items-center gap-2.5 transition-all duration-300 ${
                     submitMessage.type === 'success'
                       ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                       : 'bg-rose-50 text-rose-800 border border-rose-200'
                   }`}
                 >
-                  <span className="font-bold">{submitMessage.type === 'success' ? '✓' : '!'}</span>
+                  <span className="w-4 h-4 rounded-full bg-white flex items-center justify-center font-bold text-[10px] shadow-xs shrink-0">
+                    {submitMessage.type === 'success' ? '✓' : '!'}
+                  </span>
                   <span>{submitMessage.text}</span>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-3.5">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label
                     htmlFor="username"
-                    className="block text-xs font-semibold text-slate-700 mb-1"
+                    className="block text-xs font-semibold text-slate-700 mb-1.5 ml-1"
                   >
                     Username or Email Address
                   </label>
@@ -120,12 +128,12 @@ export default function Login() {
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Enter your username or email"
                     required
-                    className="w-full px-3 py-2 text-sm rounded-md border border-slate-300 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                    className="w-full px-4 py-2.5 sm:py-3 text-sm rounded-2xl border border-slate-200 bg-slate-50/70 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all duration-200"
                   />
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1.5 ml-1">
                     <label
                       htmlFor="password"
                       className="block text-xs font-semibold text-slate-700"
@@ -138,7 +146,7 @@ export default function Login() {
                         e.preventDefault();
                         alert('Password reset link sent to your registered email address.');
                       }}
-                      className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+                      className="text-xs text-purple-600 hover:text-purple-700 font-medium transition-colors duration-200 hover:underline"
                     >
                       Forgot password?
                     </a>
@@ -151,27 +159,27 @@ export default function Login() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
                       required
-                      className="w-full px-3 py-2 text-sm rounded-md border border-slate-300 bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
+                      className="w-full px-4 py-2.5 sm:py-3 pr-14 text-sm rounded-2xl border border-slate-200 bg-slate-50/70 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 transition-all duration-200"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-medium cursor-pointer"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-purple-600 text-xs font-semibold px-1.5 py-0.5 rounded-lg cursor-pointer transition-colors duration-200"
                     >
                       {showPassword ? 'Hide' : 'Show'}
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center">
+                <div className="flex items-center py-0.5 ml-1">
                   <input
                     id="rememberMe"
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded border-slate-300 text-purple-600 accent-purple-600 cursor-pointer"
+                    className="w-4 h-4 rounded-md border-slate-300 text-purple-600 accent-purple-600 cursor-pointer transition-colors duration-150"
                   />
-                  <label htmlFor="rememberMe" className="ml-2 text-xs text-slate-600 cursor-pointer select-none">
+                  <label htmlFor="rememberMe" className="ml-2.5 text-xs text-slate-600 cursor-pointer select-none">
                     Remember me on this device
                   </label>
                 </div>
@@ -180,7 +188,7 @@ export default function Login() {
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={isSubmitting}
-                  className="w-full py-2.5 px-4 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
+                  className="w-full py-2.5 sm:py-3 px-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 transition-all duration-200 shadow-xs hover:shadow-md active:scale-[0.99]"
                 >
                   <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                     <path
@@ -203,27 +211,28 @@ export default function Login() {
                   <span>Continue with Google</span>
                 </button>
 
-                <div className="relative flex items-center justify-center my-1.5">
-                  <div className="border-t border-slate-200 w-full" />
-                  <span className="bg-white px-3 text-xs text-slate-400 font-medium lowercase">
+                <div className="flex items-center my-3 sm:my-3.5">
+                  <div className="flex-1 h-px bg-slate-200 rounded-full" />
+                  <span className="px-3.5 py-0.5 rounded-full bg-slate-100/80 text-[11px] uppercase tracking-wider text-slate-400 font-bold select-none mx-2">
                     or
                   </span>
+                  <div className="flex-1 h-px bg-slate-200 rounded-full" />
                 </div>
 
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-2.5 px-4 rounded-md text-white text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer disabled:opacity-60 bg-gradient-to-r from-[#00b4d8] via-[#6366f1] via-[#8b5cf6] to-[#ec4899] hover:opacity-95"
+                  className="w-full py-3 sm:py-3.5 px-4 rounded-2xl text-white text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer disabled:opacity-60 bg-gradient-to-r from-[#00b4d8] via-[#6366f1] via-[#8b5cf6] to-[#ec4899] hover:opacity-95 hover:shadow-lg hover:shadow-purple-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
                 >
                   {isSubmitting ? 'Signing in...' : 'Sign In'}
                 </button>
               </form>
 
-              <div className="mt-4 pt-2.5 border-t border-slate-100 text-center text-xs text-slate-500">
+              <div className="mt-5 pt-3.5 border-t border-slate-100 text-center text-xs sm:text-sm text-slate-500">
                 Don&apos;t have an account?{' '}
-                <a href="#signup" className="text-purple-600 hover:text-purple-700 font-semibold">
+                <Link to="/register" className="text-purple-600 hover:text-purple-700 font-semibold transition-colors duration-200 hover:underline">
                   Create account
-                </a>
+                </Link>
               </div>
             </div>
           </div>
