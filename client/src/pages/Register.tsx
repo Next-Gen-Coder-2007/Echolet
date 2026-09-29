@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import registerImg from '../assets/register.png';
+import authService from '../services/authService';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -17,7 +18,7 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !username.trim() || !email.trim() || !birthday || !gender || !password.trim()) {
       setSubmitMessage({ type: 'error', text: 'Please fill in all required fields.' });
@@ -37,16 +38,31 @@ export default function Register() {
     setIsSubmitting(true);
     setSubmitMessage(null);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const response = await authService.register({
+        fullName: fullName.trim(),
+        username: username.trim(),
+        email: email.trim(),
+        birthday,
+        gender,
+        password,
+      });
+
       setSubmitMessage({
         type: 'success',
-        text: `Account created successfully! Welcome to Echolet, @${username}!`,
+        text: response.message || `Account created successfully! Welcome to Echolet, @${username}!`,
       });
+
       setTimeout(() => {
-        navigate('/login');
+        navigate('/');
       }, 1200);
-    }, 600);
+    } catch (err: any) {
+      const errorMsg =
+        err.response?.data?.message || 'Registration failed. Please check your information.';
+      setSubmitMessage({ type: 'error', text: errorMsg });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleGoogleSignUp = () => {

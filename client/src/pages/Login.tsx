@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import authImg from '../assets/auth.png';
+import authService from '../services/authService';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
       setSubmitMessage({ type: 'error', text: 'Please enter your username and password.' });
@@ -22,16 +23,28 @@ export default function Login() {
     setIsSubmitting(true);
     setSubmitMessage(null);
 
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const response = await authService.login({
+        username: username.trim(),
+        password: password.trim(),
+        rememberMe,
+      });
+
       setSubmitMessage({
         type: 'success',
-        text: `Signed in successfully. Welcome back, ${username}!`,
+        text: response.message || `Signed in successfully. Welcome back, ${response.user?.fullName || username}!`,
       });
+
       setTimeout(() => {
         navigate('/');
       }, 900);
-    }, 500);
+    } catch (err: any) {
+      const errorMsg =
+        err.response?.data?.message || 'Login failed. Please check your username and password.';
+      setSubmitMessage({ type: 'error', text: errorMsg });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleGoogleSignIn = () => {
