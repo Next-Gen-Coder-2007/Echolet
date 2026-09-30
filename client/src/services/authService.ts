@@ -7,6 +7,11 @@ export interface User {
   email: string;
   birthday?: string;
   gender?: string;
+  bio?: string;
+  avatarUrl?: string;
+  bannerUrl?: string;
+  followersCount?: number;
+  followingCount?: number;
   createdAt: string;
   updatedAt: string;
 }

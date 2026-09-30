@@ -3,25 +3,28 @@ import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import authImg from '../assets/auth.png';
 import authService from '../services/authService';
+import { useMessage } from '../context/MessageContext';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning, showInfo } = useMessage();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setSubmitMessage({ type: 'error', text: 'Please enter your username and password.' });
+      showWarning('Please enter your username and password.', 'Missing Fields');
+      setErrorMessage('Please enter your username and password.');
       return;
     }
 
     setIsSubmitting(true);
-    setSubmitMessage(null);
+    setErrorMessage(null);
 
     try {
       const response = await authService.login({
@@ -30,18 +33,17 @@ export default function Login() {
         rememberMe,
       });
 
-      setSubmitMessage({
-        type: 'success',
-        text: response.message || `Signed in successfully. Welcome back, ${response.user?.fullName || username}!`,
-      });
+      const welcomeText = response.message || `Signed in successfully. Welcome back, ${response.user?.fullName || username}!`;
+      showSuccess(welcomeText, 'Successfully Logged In', 5000);
 
       setTimeout(() => {
         navigate('/');
-      }, 900);
+      }, 700);
     } catch (err: any) {
       const errorMsg =
         err.response?.data?.message || 'Login failed. Please check your username and password.';
-      setSubmitMessage({ type: 'error', text: errorMsg });
+      showError(errorMsg, 'Login Failed', 5000);
+      setErrorMessage(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -51,10 +53,7 @@ export default function Login() {
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
-      setSubmitMessage({
-        type: 'success',
-        text: 'Google authentication connected successfully.',
-      });
+      showSuccess('Google authentication connected successfully.', 'Successfully Signed In', 5000);
     }, 400);
   };
 
@@ -111,18 +110,12 @@ export default function Login() {
                 </p>
               </div>
 
-              {submitMessage && (
-                <div
-                  className={`mb-4 p-3 rounded-2xl text-xs flex items-center gap-2.5 transition-all duration-300 ${
-                    submitMessage.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      : 'bg-rose-50 text-rose-800 border border-rose-200'
-                  }`}
-                >
+              {errorMessage && (
+                <div className="mb-4 p-3 rounded-2xl text-xs flex items-center gap-2.5 transition-all duration-300 bg-rose-50 text-rose-800 border border-rose-200">
                   <span className="w-4 h-4 rounded-full bg-white flex items-center justify-center font-bold text-[10px] shadow-xs shrink-0">
-                    {submitMessage.type === 'success' ? '✓' : '!'}
+                    !
                   </span>
-                  <span>{submitMessage.text}</span>
+                  <span>{errorMessage}</span>
                 </div>
               )}
 
@@ -157,7 +150,7 @@ export default function Login() {
                       href="#forgot"
                       onClick={(e) => {
                         e.preventDefault();
-                        alert('Password reset link sent to your registered email address.');
+                        showInfo('Password reset instructions have been sent to your registered email address.', 'Reset Link Sent', 5000);
                       }}
                       className="text-xs text-purple-600 hover:text-purple-700 font-medium transition-colors duration-200 hover:underline"
                     >

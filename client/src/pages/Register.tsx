@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import registerImg from '../assets/register.png';
 import authService from '../services/authService';
+import { useMessage } from '../context/MessageContext';
 
 export default function Register() {
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning } = useMessage();
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -16,27 +18,30 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !username.trim() || !email.trim() || !birthday || !gender || !password.trim()) {
-      setSubmitMessage({ type: 'error', text: 'Please fill in all required fields.' });
+      showWarning('Please fill in all required fields.', 'Incomplete Form', 5000);
+      setErrorMessage('Please fill in all required fields.');
       return;
     }
 
     if (password !== confirmPassword) {
-      setSubmitMessage({ type: 'error', text: 'Passwords do not match.' });
+      showError('Passwords do not match. Please verify your password.', 'Password Mismatch', 5000);
+      setErrorMessage('Passwords do not match.');
       return;
     }
 
     if (!agreeTerms) {
-      setSubmitMessage({ type: 'error', text: 'Please accept the Terms & Conditions.' });
+      showWarning('Please accept the Terms & Conditions.', 'Terms Required', 5000);
+      setErrorMessage('Please accept the Terms & Conditions.');
       return;
     }
 
     setIsSubmitting(true);
-    setSubmitMessage(null);
+    setErrorMessage(null);
 
     try {
       const response = await authService.register({
@@ -48,18 +53,17 @@ export default function Register() {
         password,
       });
 
-      setSubmitMessage({
-        type: 'success',
-        text: response.message || `Account created successfully! Welcome to Echolet, @${username}!`,
-      });
+      const successText = response.message || `Account created successfully! Welcome to Echolet, @${username}!`;
+      showSuccess(successText, 'Successfully Registered', 5000);
 
       setTimeout(() => {
         navigate('/');
-      }, 1200);
+      }, 900);
     } catch (err: any) {
       const errorMsg =
         err.response?.data?.message || 'Registration failed. Please check your information.';
-      setSubmitMessage({ type: 'error', text: errorMsg });
+      showError(errorMsg, 'Registration Failed', 5000);
+      setErrorMessage(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -69,10 +73,7 @@ export default function Register() {
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
-      setSubmitMessage({
-        type: 'success',
-        text: 'Google account linked successfully.',
-      });
+      showSuccess('Google account linked successfully.', 'Registration Complete', 5000);
     }, 400);
   };
 
@@ -98,18 +99,12 @@ export default function Register() {
                 </p>
               </div>
 
-              {submitMessage && (
-                <div
-                  className={`mb-3.5 p-3 rounded-2xl text-xs flex items-center gap-2.5 transition-all duration-300 ${
-                    submitMessage.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      : 'bg-rose-50 text-rose-800 border border-rose-200'
-                  }`}
-                >
+              {errorMessage && (
+                <div className="mb-3.5 p-3 rounded-2xl text-xs flex items-center gap-2.5 transition-all duration-300 bg-rose-50 text-rose-800 border border-rose-200">
                   <span className="w-4 h-4 rounded-full bg-white flex items-center justify-center font-bold text-[10px] shadow-xs shrink-0">
-                    {submitMessage.type === 'success' ? '✓' : '!'}
+                    !
                   </span>
-                  <span>{submitMessage.text}</span>
+                  <span>{errorMessage}</span>
                 </div>
               )}
 

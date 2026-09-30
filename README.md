@@ -24,7 +24,7 @@
 |---|---|---|
 | 1 | **Authentication** | Register, Login, Logout, JWT auth, HTTP-only cookies, Google OAuth, Forgot/reset password, Email verification, Account deletion, Account settings |
 | 2 | **User Profiles** | Username, display name, profile picture, cover image, bio, followers/following, posts, reels, tagged posts, liked posts, saved posts, follow/unfollow, block/unblock, mute/unmute |
-| 3 | **Home Feed** | Following feed, For You feed, text/image/video/GIF posts, polls, reposts, hashtags, mentions, likes, comments, shares, bookmarks |
+| 3 | **Home Feed** | Following feed, For You feed, text/image/video/GIF posts, polls, reposts, hashtags, mentions, likes, comments, shares, bookmarks |    
 | 4 | **Posts** | *Types:* text, image, multi-image, video, GIF, poll, link · *Actions:* like, comment, repost, share, bookmark, edit, delete, pin, report |
 | 5 | **Comments** | Comments, nested replies, like/edit/delete comments, user mentions, comment notifications |
 | 6 | **Stories** | Image/video/text stories, music, GIFs, stickers, polls, questions, story views, reactions, replies, 24-hour expiration |

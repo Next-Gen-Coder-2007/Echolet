@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo';
 import authService, { type User } from '../services/authService';
+import { useMessage } from '../context/MessageContext';
 
 export default function Home() {
   const navigate = useNavigate();
+  const { showSuccess, showError } = useMessage();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -35,8 +37,10 @@ export default function Home() {
     setIsLoggingOut(true);
     try {
       await authService.logout();
+      showSuccess('You have been securely signed out. See you again soon!', 'Successfully Logged Out', 5000);
     } catch (err) {
       console.error('Logout error:', err);
+      showError('Could not complete server logout, clearing local session.', 'Notice', 5000);
     } finally {
       navigate('/login', { replace: true });
     }
@@ -83,7 +87,6 @@ export default function Home() {
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>Signed in as <strong className="text-slate-800">@{user.username}</strong></span>
           </div>
-
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
