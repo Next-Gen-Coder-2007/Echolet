@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   HiOutlineHome,
   HiOutlineMagnifyingGlass,
@@ -26,19 +26,41 @@ interface SidebarProps {
 }
 
 export default function Sidebar({
-  activeTab = 'home',
+  activeTab,
   onTabChange,
   avatarUrl,
   userInitials = 'U',
   onLogout,
 }: SidebarProps) {
-  const [currentTab, setCurrentTab] = useState<SidebarTab>(activeTab);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const selectedTab = onTabChange ? activeTab : currentTab;
+  const getTabFromPath = (path: string): SidebarTab => {
+    if (path.startsWith('/search')) return 'search';
+    if (path.startsWith('/messages')) return 'messages';
+    if (path.startsWith('/notifications')) return 'notifications';
+    if (path.startsWith('/favorites')) return 'heart';
+    if (path.startsWith('/saved')) return 'saved';
+    return 'home';
+  };
+
+  const selectedTab = activeTab || getTabFromPath(location.pathname);
 
   const handleSelect = (tab: SidebarTab) => {
-    setCurrentTab(tab);
     onTabChange?.(tab);
+
+    const pathMap: Record<SidebarTab, string> = {
+      home: '/',
+      search: '/search',
+      messages: '/messages',
+      notifications: '/notifications',
+      heart: '/favorites',
+      saved: '/saved',
+    };
+
+    if (location.pathname !== pathMap[tab]) {
+      navigate(pathMap[tab]);
+    }
   };
 
   const navItems = [
@@ -115,9 +137,11 @@ export default function Sidebar({
       </div>
 
       <div className="flex flex-col items-center gap-4 w-full">
-        <div
+        <button
+          type="button"
+          onClick={() => navigate('/profile')}
           title="Account"
-          className="w-11 h-11 sm:w-12 sm:h-12 rounded-full p-[2px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105"
+          className="w-11 h-11 sm:w-12 sm:h-12 rounded-full p-[2px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
         >
           <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
             {avatarUrl ? (
@@ -128,7 +152,7 @@ export default function Sidebar({
               </span>
             )}
           </div>
-        </div>
+        </button>
 
         <button
           onClick={onLogout}
