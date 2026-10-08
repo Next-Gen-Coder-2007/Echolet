@@ -51,7 +51,7 @@ export default function AppLayout() {
         onLogout={handleLogout}
       />
 
-      <main className="flex-1 ml-24 sm:ml-28 p-6 sm:p-10 min-h-screen">
+      <main className="flex-1 ml-24 sm:ml-28 px-6 sm:px-10 py-3 sm:py-4 min-h-screen flex flex-col justify-center">
         <Outlet context={{ user }} />
       </main>
     </div>
