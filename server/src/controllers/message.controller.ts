@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database';
 import { Message } from '../entities/Message';
 import { User } from '../entities/User';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
+import { emitNewMessage } from '../socket';
 
 export const getConversations = async (
   req: AuthenticatedRequest,
@@ -199,6 +200,8 @@ export const sendMessage = async (
     });
 
     const savedMessage = await messageRepository.save(message);
+
+    emitNewMessage(savedMessage);
 
     res.status(201).json({
       status: 'success',

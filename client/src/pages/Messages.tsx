@@ -4,6 +4,7 @@ import { HiOutlinePaperAirplane, HiOutlineMagnifyingGlass, HiOutlineArrowLeft } 
 import messageService, { type MessageItem, type ConversationItem } from '../services/messageService';
 import userService, { type UserProfileResponse } from '../services/userService';
 import type { User } from '../services/authService';
+import getSocket, { joinUserRoom } from '../services/socket';
 
 export default function Messages() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -19,6 +20,12 @@ export default function Messages() {
   const [search, setSearch] = useState('');
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      joinUserRoom(currentUser.id);
+    }
+  }, [currentUser?.id]);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -54,12 +61,30 @@ export default function Messages() {
   useEffect(() => {
     if (!activeUser) return;
     fetchMessages(activeUser.id);
-    const timer = setInterval(() => {
-      fetchMessages(activeUser.id);
+  }, [activeUser, fetchMessages]);
+
+  useEffect(() => {
+    const socket = getSocket();
+
+    const handleNewMessage = (msg: MessageItem) => {
+      if (
+        activeUser &&
+        (msg.senderId === activeUser.id || msg.receiverId === activeUser.id)
+      ) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      }
       fetchConversations();
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [activeUser, fetchMessages, fetchConversations]);
+    };
+
+    socket.on('new_message', handleNewMessage);
+
+    return () => {
+      socket.off('new_message', handleNewMessage);
+    };
+  }, [activeUser, fetchConversations]);
 
   useEffect(() => {
     if (messages.length > 0) {

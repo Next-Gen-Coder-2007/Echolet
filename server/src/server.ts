@@ -3,7 +3,9 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import http from 'http';
 import { connectDatabase } from './config/database';
+import { initSocket } from './socket';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import messageRoutes from './routes/message.routes';
@@ -44,10 +46,13 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 
+const httpServer = http.createServer(app);
+initSocket(httpServer, clientOrigin);
+
 const startServer = async () => {
   try {
     await connectDatabase();
-    app.listen(port, () => {
+    httpServer.listen(port, () => {
       console.log(`Server listening on port ${port}`);
     });
   } catch (error) {
