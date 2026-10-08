@@ -8,7 +8,7 @@ export interface MessageOptions {
   title?: string;
   message: string;
   type?: MessageType;
-  duration?: number; // duration in ms, default 5000 (5s)
+  duration?: number;
 }
 
 export interface MessageContextType {
@@ -28,7 +28,6 @@ export const MessageProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const closeMessage = useCallback((id?: string) => {
     if (!id) {
-      // Dismiss the latest if no id provided
       setToasts((prev) => prev.slice(0, -1));
       return;
     }
@@ -56,7 +55,6 @@ export const MessageProvider: React.FC<{ children: React.ReactNode }> = ({ child
             };
 
       setToasts((prev) => {
-        // Keep at most 5 simultaneous toasts to prevent screen crowding
         const updated = [...prev, newToast];
         return updated.slice(-5);
       });
@@ -106,7 +104,6 @@ export const MessageProvider: React.FC<{ children: React.ReactNode }> = ({ child
     >
       {children}
 
-      {/* Right Side Popup Notification Container (Non-blocking, top-right) */}
       <div
         className="fixed top-5 right-5 z-50 flex flex-col items-end gap-3 pointer-events-none"
         aria-live="polite"

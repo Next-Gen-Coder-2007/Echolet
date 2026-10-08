@@ -19,8 +19,8 @@ const sendTokenCookie = (
   const secret = getJwtSecret();
   const expiresIn = rememberMe ? '30d' : '1d';
   const cookieMaxAge = rememberMe
-    ? 30 * 24 * 60 * 60 * 1000 // 30 days
-    : 24 * 60 * 60 * 1000;      // 1 day
+    ? 30 * 24 * 60 * 60 * 1000
+    : 24 * 60 * 60 * 1000;
 
   const signOptions: SignOptions = {
     expiresIn: expiresIn as SignOptions['expiresIn'],

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { HiOutlinePaperAirplane, HiOutlineMagnifyingGlass, HiOutlineArrowLeft } from 'react-icons/hi2';
 import messageService, { type MessageItem, type ConversationItem } from '../services/messageService';
 import userService, { type UserProfileResponse } from '../services/userService';
@@ -7,12 +7,14 @@ import type { User } from '../services/authService';
 import getSocket, { joinUserRoom } from '../services/socket';
 
 export default function Messages() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { username: paramUsername } = useParams<{ username?: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const outletContext = useOutletContext<{ user?: User | null }>();
   const currentUser = outletContext?.user;
+
   const targetUserParam =
-    searchParams.get('user') || searchParams.get('username') || searchParams.get('userId');
+    paramUsername || searchParams.get('user') || searchParams.get('username') || searchParams.get('userId');
 
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [activeUser, setActiveUser] = useState<UserProfileResponse | null>(null);
@@ -50,19 +52,29 @@ export default function Messages() {
   }, [fetchConversations]);
 
   useEffect(() => {
-    if (!targetUserParam) return;
+    if (!targetUserParam) {
+      setActiveUser(null);
+      setMessages([]);
+      return;
+    }
+
     const clean = targetUserParam.toLowerCase();
     const existing = conversations.find(
       (c) =>
         c.user.username.toLowerCase() === clean ||
         c.user.id.toLowerCase() === clean
     );
+
     if (existing) {
       setActiveUser(existing.user);
     } else {
       userService
         .getUserByUsername(targetUserParam)
-        .then((u) => u && setActiveUser(u))
+        .then((u) => {
+          if (u) {
+            setActiveUser(u);
+          }
+        })
         .catch(() => {});
     }
   }, [targetUserParam, conversations]);
@@ -103,7 +115,7 @@ export default function Messages() {
 
   const selectUser = (u: UserProfileResponse) => {
     setActiveUser(u);
-    setSearchParams({ user: u.username });
+    navigate(`/messages/${u.username}`);
   };
 
   const onSend = async (e: React.FormEvent) => {
@@ -141,7 +153,10 @@ export default function Messages() {
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
               <div className="flex items-center gap-3.5 min-w-0">
                 <button
-                  onClick={() => setActiveUser(null)}
+                  onClick={() => {
+                    setActiveUser(null);
+                    navigate('/messages');
+                  }}
                   className="md:hidden p-1.5 text-slate-500 hover:text-slate-900 cursor-pointer shrink-0"
                 >
                   <HiOutlineArrowLeft className="w-5 h-5" />
@@ -170,13 +185,16 @@ export default function Messages() {
               </button>
             </div>
 
-            <div className="flex-1 min-h-0 flex flex-col bg-slate-50/20">
+            <div
+              data-lenis-prevent
+              className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-2 bg-slate-50/20 overscroll-contain"
+            >
               {messages.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 text-sm p-6">
+                <div className="h-full min-h-[160px] flex flex-col items-center justify-center text-center text-slate-400 text-sm p-6">
                   <span>Send a message to start the conversation</span>
                 </div>
               ) : (
-                <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-3">
+                <>
                   {messages.map((m) => {
                     const isMe = m.senderId === currentUser?.id;
                     return (
@@ -185,25 +203,29 @@ export default function Messages() {
                         className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                       >
                         <div
-                          className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm sm:text-base leading-relaxed ${
+                          className={`max-w-[80%] sm:max-w-[70%] px-3.5 py-2 rounded-2xl text-sm sm:text-base leading-relaxed flex flex-wrap items-end justify-between gap-x-3 gap-y-1 shadow-2xs ${
                             isMe
                               ? 'bg-slate-900 text-white rounded-br-xs'
-                              : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs shadow-2xs'
+                              : 'bg-white text-slate-900 rounded-bl-xs border border-slate-200/90'
                           }`}
                         >
-                          <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                          <span className="whitespace-pre-wrap break-words">{m.content}</span>
+                          <span
+                            className={`text-[10px] ml-auto shrink-0 select-none pb-0.5 leading-none ${
+                              isMe ? 'text-slate-400' : 'text-slate-400'
+                            }`}
+                          >
+                            {new Date(m.createdAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
                         </div>
-                        <span className="text-xs text-slate-400 mt-1 px-1">
-                          {new Date(m.createdAt).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
                       </div>
                     );
                   })}
                   <div ref={endRef} />
-                </div>
+                </>
               )}
             </div>
 
@@ -264,7 +286,10 @@ export default function Messages() {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100">
+        <div
+          data-lenis-prevent
+          className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 overscroll-contain"
+        >
           {filtered.length === 0 ? (
             <div className="p-8 text-center text-sm text-slate-400">
               No users found. Start a new chat from Search.
@@ -288,9 +313,6 @@ export default function Messages() {
                       <span className="text-sm sm:text-base font-bold text-slate-900 truncate">
                         {c.user.fullName}
                       </span>
-                      {c.unreadCount > 0 && (
-                        <span className="w-2.5 h-2.5 rounded-full bg-purple-600 shrink-0" />
-                      )}
                     </div>
                     <p className="text-xs sm:text-sm text-slate-500 truncate mt-0.5">
                       {c.lastMessage?.content || `@${c.user.username}`}

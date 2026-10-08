@@ -189,7 +189,7 @@ export default function UserProfile() {
             ) : (
               <div className="flex items-center gap-2.5">
                 <button
-                  onClick={() => navigate(`/messages?user=${profileUser.username}`)}
+                  onClick={() => navigate(`/messages/${profileUser.username}`)}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200/90 bg-white hover:bg-purple-50/50 hover:border-purple-300 hover:text-purple-600 text-slate-700 shadow-xs cursor-pointer transition-all"
                 >
                   <HiOutlineChatBubbleOvalLeftEllipsis className="w-4 h-4 stroke-[2] text-purple-600" />

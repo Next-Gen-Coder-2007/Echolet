@@ -180,7 +180,7 @@ export default function Search() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate(`/messages?user=${user.username}`);
+                              navigate(`/messages/${user.username}`);
                             }}
                             className="p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold border border-slate-200 bg-white hover:bg-purple-50 hover:border-purple-200 hover:text-purple-600 text-slate-700 shadow-xs cursor-pointer transition-all flex items-center gap-1.5"
                             title="Message"

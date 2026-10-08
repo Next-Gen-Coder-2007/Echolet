@@ -7,7 +7,7 @@ export interface ToastItemData {
   title?: string;
   message: string;
   type?: ToastType;
-  duration?: number; // duration in ms, default 5000
+  duration?: number;
 }
 
 interface ToastPopupProps {
@@ -41,7 +41,6 @@ export const ToastPopup: React.FC<ToastPopupProps> = ({ toast, onDismiss }) => {
     };
   }, [duration]);
 
-  // Clean, minimal light icons
   const renderIcon = (toastType: ToastType) => {
     switch (toastType) {
       case 'success':

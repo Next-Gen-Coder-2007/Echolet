@@ -24,6 +24,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/search" element={<Search />} />
             <Route path="/messages" element={<Messages />} />
+            <Route path="/messages/:username" element={<Messages />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/saved" element={<Saved />} />
