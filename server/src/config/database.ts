@@ -5,12 +5,20 @@ import path from 'path';
 import { User } from '../entities/User';
 import { Follow } from '../entities/Follow';
 import { Message } from '../entities/Message';
+import { Post } from '../entities/Post';
+import { PostLike } from '../entities/PostLike';
+import { PostBookmark } from '../entities/PostBookmark';
+import { Comment } from '../entities/Comment';
+import { PollVote } from '../entities/PollVote';
+import { CommentLike } from '../entities/CommentLike';
 
 dotenv.config();
 
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const isPostgres =
   databaseUrl?.startsWith('postgres://') || databaseUrl?.startsWith('postgresql://');
+
+const entitiesList = [User, Follow, Message, Post, PostLike, PostBookmark, Comment, CommentLike, PollVote];
 
 export const AppDataSource = isPostgres
   ? new DataSource({
@@ -21,14 +29,14 @@ export const AppDataSource = isPostgres
       },
       synchronize: true,
       logging: false,
-      entities: [User, Follow, Message],
+      entities: entitiesList,
     })
   : new DataSource({
       type: 'better-sqlite3',
       database: path.join(__dirname, '../../echolet.sqlite'),
       synchronize: true,
       logging: false,
-      entities: [User, Follow, Message],
+      entities: entitiesList,
     });
 
 export const connectDatabase = async (): Promise<DataSource> => {

@@ -28,6 +28,12 @@ export class User {
   @Column({ type: 'varchar', length: 30 })
   gender: string;
 
+  @Column({ type: 'text', nullable: true })
+  bio?: string;
+
+  @Column({ type: 'text', nullable: true })
+  avatarUrl?: string;
+
   @Column({ type: 'varchar', select: false })
   password: string;
 
