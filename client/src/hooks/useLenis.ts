@@ -16,6 +16,12 @@ export function useLenis(options?: UseLenisOptions) {
       duration: options?.duration ?? 1.2,
       easing: options?.easing ?? ((t) => Math.min(1, 1.001 - Math.pow(2, -10 * t))),
       smoothWheel: options?.smoothWheel ?? true,
+      prevent: (node: HTMLElement) => {
+        return Boolean(
+          node.hasAttribute?.('data-lenis-prevent') ||
+          node.closest?.('[data-lenis-prevent]')
+        );
+      },
     });
 
     lenisRef.current = lenis;

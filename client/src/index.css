@@ -2,13 +2,13 @@
 
 @layer base {
   * {
-    font-family: 'Cosmic Sans', 'Comic Sans MS', 'Comic Neue', 'Comic Sans', cursive, sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 
   body {
-    font-family: 'Cosmic Sans', 'Comic Sans MS', 'Comic Neue', 'Comic Sans', cursive, sans-serif;
-    color: #1e293b;
-    background-color: #ffffff;
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #0f172a;
+    background-color: #f8fafc;
     -webkit-font-smoothing: antialiased;
   }
 }
@@ -19,12 +19,12 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #8b5cf6 transparent;
+  scrollbar-color: #cbd5e1 transparent;
 }
 
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -32,25 +32,31 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #00b4d8 0%, #6366f1 35%, #8b5cf6 70%, #ec4899 100%);
+  background: #cbd5e1;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: background-color 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #0096c7 0%, #4f46e5 35%, #7c3aed 70%, #db2777 100%);
+  background: #94a3b8;
 }
 
 ::-webkit-scrollbar-thumb:horizontal {
-  background: linear-gradient(90deg, #00b4d8 0%, #6366f1 35%, #8b5cf6 70%, #ec4899 100%);
+  background: #cbd5e1;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:horizontal:hover {
-  background: linear-gradient(90deg, #0096c7 0%, #4f46e5 35%, #7c3aed 70%, #db2777 100%);
+  background: #94a3b8;
 }
 
 ::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+::selection {
+  background-color: #0f172a;
+  color: #ffffff;
 }
 
 @keyframes toastSlideInRight {
