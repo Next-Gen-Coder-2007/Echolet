@@ -68,6 +68,7 @@ export default function AppLayout() {
       <Sidebar
         avatarUrl={user.avatarUrl}
         userInitials={userInitials}
+        username={user.username}
         onLogout={handleLogout}
       />
 

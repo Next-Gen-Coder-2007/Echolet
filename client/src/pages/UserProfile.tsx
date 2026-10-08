@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import {
   HiOutlineArrowLeft,
   HiOutlineCalendar,
@@ -7,10 +7,13 @@ import {
   HiOutlineChatBubbleOvalLeftEllipsis,
 } from 'react-icons/hi2';
 import userService, { type UserProfileResponse } from '../services/userService';
+import type { User } from '../services/authService';
 
 export default function UserProfile() {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
+  const outletContext = useOutletContext<{ user?: User | null }>();
+  const currentUser = outletContext?.user;
 
   const [profileUser, setProfileUser] = useState<UserProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,9 @@ export default function UserProfile() {
       .getUserByUsername(username)
       .then((data) => {
         if (isMounted) {
+          if (data.username && username.toLowerCase() !== data.username.toLowerCase()) {
+            navigate(`/profile/${data.username}`, { replace: true });
+          }
           setProfileUser(data);
           setIsFollowing(Boolean(data.isFollowing));
           setFollowersCount(data.followersCount || 0);
@@ -54,7 +60,7 @@ export default function UserProfile() {
     return () => {
       isMounted = false;
     };
-  }, [username]);
+  }, [username, navigate]);
 
   const handleToggleFollow = async () => {
     if (!profileUser || isFollowSubmitting) return;
@@ -173,27 +179,36 @@ export default function UserProfile() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
-              <button
-                onClick={() => navigate(`/messages?userId=${profileUser.id}`)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200/90 bg-white hover:bg-purple-50/50 hover:border-purple-300 hover:text-purple-600 text-slate-700 shadow-xs cursor-pointer transition-all"
-              >
-                <HiOutlineChatBubbleOvalLeftEllipsis className="w-4 h-4 stroke-[2] text-purple-600" />
-                <span>Message</span>
-              </button>
+            {currentUser?.id === profileUser.id ||
+            currentUser?.username?.toLowerCase() === profileUser.username?.toLowerCase() ? (
+              <div className="flex items-center gap-2.5">
+                <span className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600">
+                  Your Account
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => navigate(`/messages?user=${profileUser.username}`)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200/90 bg-white hover:bg-purple-50/50 hover:border-purple-300 hover:text-purple-600 text-slate-700 shadow-xs cursor-pointer transition-all"
+                >
+                  <HiOutlineChatBubbleOvalLeftEllipsis className="w-4 h-4 stroke-[2] text-purple-600" />
+                  <span>Message</span>
+                </button>
 
-              <button
-                onClick={handleToggleFollow}
-                disabled={isFollowSubmitting}
-                className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50 ${
-                  isFollowing
-                    ? 'bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600'
-                    : 'bg-gradient-to-r from-[#00b4d8] to-[#ff0080] text-white hover:opacity-95'
-                }`}
-              >
-                {isFollowing ? 'Following' : 'Follow'}
-              </button>
-            </div>
+                <button
+                  onClick={handleToggleFollow}
+                  disabled={isFollowSubmitting}
+                  className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50 ${
+                    isFollowing
+                      ? 'bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600'
+                      : 'bg-gradient-to-r from-[#00b4d8] to-[#ff0080] text-white hover:opacity-95'
+                  }`}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="mb-4">

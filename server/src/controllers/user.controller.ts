@@ -75,7 +75,7 @@ export const getUserByUsername = async (req: AuthenticatedRequest, res: Response
     const userRepository = AppDataSource.getRepository(User);
     const followRepository = AppDataSource.getRepository(Follow);
 
-    const user = await userRepository.findOne({
+    let user = await userRepository.findOne({
       where: { username },
       select: {
         id: true,
@@ -87,6 +87,21 @@ export const getUserByUsername = async (req: AuthenticatedRequest, res: Response
         createdAt: true,
       },
     });
+
+    if (!user) {
+      user = await userRepository.findOne({
+        where: { id: rawUsername },
+        select: {
+          id: true,
+          fullName: true,
+          username: true,
+          email: true,
+          birthday: true,
+          gender: true,
+          createdAt: true,
+        },
+      });
+    }
 
     if (!user) {
       res.status(404).json({

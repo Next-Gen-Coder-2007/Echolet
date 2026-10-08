@@ -22,6 +22,7 @@ interface SidebarProps {
   onTabChange?: (tab: SidebarTab) => void;
   avatarUrl?: string;
   userInitials?: string;
+  username?: string;
   onLogout?: () => void;
 }
 
@@ -30,6 +31,7 @@ export default function Sidebar({
   onTabChange,
   avatarUrl,
   userInitials = 'U',
+  username,
   onLogout,
 }: SidebarProps) {
   const navigate = useNavigate();
@@ -139,7 +141,7 @@ export default function Sidebar({
       <div className="flex flex-col items-center gap-4 w-full">
         <button
           type="button"
-          onClick={() => navigate('/profile')}
+          onClick={() => navigate(username ? `/profile/${username}` : '/profile')}
           title="Account"
           className="w-11 h-11 sm:w-12 sm:h-12 rounded-full p-[2px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95"
         >

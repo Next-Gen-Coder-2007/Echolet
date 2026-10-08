@@ -11,7 +11,8 @@ export default function Messages() {
   const navigate = useNavigate();
   const outletContext = useOutletContext<{ user?: User | null }>();
   const currentUser = outletContext?.user;
-  const urlUserId = searchParams.get('userId');
+  const targetUserParam =
+    searchParams.get('user') || searchParams.get('username') || searchParams.get('userId');
 
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [activeUser, setActiveUser] = useState<UserProfileResponse | null>(null);
@@ -49,14 +50,22 @@ export default function Messages() {
   }, [fetchConversations]);
 
   useEffect(() => {
-    if (!urlUserId) return;
-    const existing = conversations.find((c) => c.user.id === urlUserId);
+    if (!targetUserParam) return;
+    const clean = targetUserParam.toLowerCase();
+    const existing = conversations.find(
+      (c) =>
+        c.user.username.toLowerCase() === clean ||
+        c.user.id.toLowerCase() === clean
+    );
     if (existing) {
       setActiveUser(existing.user);
     } else {
-      userService.getUserById(urlUserId).then((u) => u && setActiveUser(u)).catch(() => {});
+      userService
+        .getUserByUsername(targetUserParam)
+        .then((u) => u && setActiveUser(u))
+        .catch(() => {});
     }
-  }, [urlUserId, conversations]);
+  }, [targetUserParam, conversations]);
 
   useEffect(() => {
     if (!activeUser) return;
@@ -94,7 +103,7 @@ export default function Messages() {
 
   const selectUser = (u: UserProfileResponse) => {
     setActiveUser(u);
-    setSearchParams({ userId: u.id });
+    setSearchParams({ user: u.username });
   };
 
   const onSend = async (e: React.FormEvent) => {
