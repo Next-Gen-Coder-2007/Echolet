@@ -18,30 +18,25 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !username.trim() || !email.trim() || !birthday || !gender || !password.trim()) {
       showWarning('Please fill in all required fields.', 'Incomplete Form', 5000);
-      setErrorMessage('Please fill in all required fields.');
       return;
     }
 
     if (password !== confirmPassword) {
       showError('Passwords do not match. Please verify your password.', 'Password Mismatch', 5000);
-      setErrorMessage('Passwords do not match.');
       return;
     }
 
     if (!agreeTerms) {
       showWarning('Please accept the Terms & Conditions.', 'Terms Required', 5000);
-      setErrorMessage('Please accept the Terms & Conditions.');
       return;
     }
 
     setIsSubmitting(true);
-    setErrorMessage(null);
 
     try {
       const response = await authService.register({
@@ -63,7 +58,6 @@ export default function Register() {
       const errorMsg =
         err.response?.data?.message || 'Registration failed. Please check your information.';
       showError(errorMsg, 'Registration Failed', 5000);
-      setErrorMessage(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -98,15 +92,6 @@ export default function Register() {
                   Join Echolet and start connecting today
                 </p>
               </div>
-
-              {errorMessage && (
-                <div className="mb-3.5 p-3 rounded-2xl text-xs flex items-center gap-2.5 transition-all duration-300 bg-rose-50 text-rose-800 border border-rose-200">
-                  <span className="w-4 h-4 rounded-full bg-white flex items-center justify-center font-bold text-[10px] shadow-xs shrink-0">
-                    !
-                  </span>
-                  <span>{errorMessage}</span>
-                </div>
-              )}
 
               <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">

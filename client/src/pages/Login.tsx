@@ -13,18 +13,15 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
       showWarning('Please enter your username and password.', 'Missing Fields');
-      setErrorMessage('Please enter your username and password.');
       return;
     }
 
     setIsSubmitting(true);
-    setErrorMessage(null);
 
     try {
       const response = await authService.login({
@@ -43,7 +40,6 @@ export default function Login() {
       const errorMsg =
         err.response?.data?.message || 'Login failed. Please check your username and password.';
       showError(errorMsg, 'Login Failed', 5000);
-      setErrorMessage(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -110,14 +106,6 @@ export default function Login() {
                 </p>
               </div>
 
-              {errorMessage && (
-                <div className="mb-4 p-3 rounded-2xl text-xs flex items-center gap-2.5 transition-all duration-300 bg-rose-50 text-rose-800 border border-rose-200">
-                  <span className="w-4 h-4 rounded-full bg-white flex items-center justify-center font-bold text-[10px] shadow-xs shrink-0">
-                    !
-                  </span>
-                  <span>{errorMessage}</span>
-                </div>
-              )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>

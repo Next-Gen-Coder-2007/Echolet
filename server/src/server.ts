@@ -5,6 +5,8 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { connectDatabase } from './config/database';
 import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
+import messageRoutes from './routes/message.routes';
 
 dotenv.config();
 
@@ -39,6 +41,8 @@ app.get('/api', (_req: Request, res: Response) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/messages', messageRoutes);
 
 const startServer = async () => {
   try {

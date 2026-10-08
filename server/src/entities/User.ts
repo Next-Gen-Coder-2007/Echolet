@@ -31,10 +31,10 @@ export class User {
   @Column({ type: 'varchar', select: false })
   password: string;
 
-  @CreateDateColumn({ type: 'timestamp with time zone' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamp with time zone' })
+  @UpdateDateColumn()
   updatedAt: Date;
 
   @BeforeInsert()

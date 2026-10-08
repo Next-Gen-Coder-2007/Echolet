@@ -56,9 +56,9 @@ export const MessageProvider: React.FC<{ children: React.ReactNode }> = ({ child
             };
 
       setToasts((prev) => {
-        // Keep at most 3 simultaneous toasts to prevent screen crowding
+        // Keep at most 5 simultaneous toasts to prevent screen crowding
         const updated = [...prev, newToast];
-        return updated.slice(-3);
+        return updated.slice(-5);
       });
     },
     []

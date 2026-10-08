@@ -9,6 +9,7 @@ import Notifications from './pages/Notifications';
 import Favorites from './pages/Favorites';
 import Saved from './pages/Saved';
 import Profile from './pages/Profile';
+import UserProfile from './pages/UserProfile';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/saved" element={<Saved />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/:username" element={<UserProfile />} />
           </Route>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
