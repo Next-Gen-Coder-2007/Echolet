@@ -62,7 +62,9 @@ export default function Messages() {
   }, [activeUser, fetchMessages, fetchConversations]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) {
+      endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const selectUser = (u: UserProfileResponse) => {
@@ -94,79 +96,81 @@ export default function Messages() {
   );
 
   return (
-    <div className="w-full max-w-6xl mx-auto h-[640px] max-h-[94vh] flex gap-5 select-none">
+    <div className="w-full h-[calc(100vh-3rem)] max-h-[640px] min-h-[460px] flex gap-4 select-none">
       <div
-        className={`flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-full ${
+        className={`flex-1 min-w-0 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-full ${
           !activeUser ? 'hidden md:flex' : 'flex'
         }`}
       >
         {activeUser ? (
           <>
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-              <div className="flex items-center gap-3.5">
+              <div className="flex items-center gap-3.5 min-w-0">
                 <button
                   onClick={() => setActiveUser(null)}
-                  className="md:hidden p-1.5 text-slate-500 hover:text-slate-900 cursor-pointer"
+                  className="md:hidden p-1.5 text-slate-500 hover:text-slate-900 cursor-pointer shrink-0"
                 >
                   <HiOutlineArrowLeft className="w-5 h-5" />
                 </button>
                 <div
                   onClick={() => navigate(`/profile/${activeUser.username}`)}
-                  className="flex items-center gap-3 cursor-pointer"
+                  className="flex items-center gap-3 cursor-pointer min-w-0"
                 >
                   <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0">
                     {activeUser.fullName?.[0] || 'U'}
                   </div>
-                  <div>
-                    <h2 className="text-base font-bold text-slate-900 leading-tight">
+                  <div className="min-w-0">
+                    <h2 className="text-base font-bold text-slate-900 leading-tight truncate">
                       {activeUser.fullName}
                     </h2>
-                    <p className="text-xs text-slate-400">@{activeUser.username}</p>
+                    <p className="text-xs text-slate-400 truncate">@{activeUser.username}</p>
                   </div>
                 </div>
               </div>
 
               <button
                 onClick={() => navigate(`/profile/${activeUser.username}`)}
-                className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition-colors"
+                className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition-colors shrink-0"
               >
                 Profile
               </button>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-3 bg-slate-50/20">
+            <div className="flex-1 min-h-0 flex flex-col bg-slate-50/20">
               {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 text-sm">
+                <div className="flex-1 flex flex-col items-center justify-center text-center text-slate-400 text-sm p-6">
                   <span>Send a message to start the conversation</span>
                 </div>
               ) : (
-                messages.map((m) => {
-                  const isMe = m.senderId === currentUser?.id;
-                  return (
-                    <div
-                      key={m.id}
-                      className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                    >
+                <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6 space-y-3">
+                  {messages.map((m) => {
+                    const isMe = m.senderId === currentUser?.id;
+                    return (
                       <div
-                        className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm sm:text-base leading-relaxed ${
-                          isMe
-                            ? 'bg-slate-900 text-white rounded-br-xs'
-                            : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs shadow-2xs'
-                        }`}
+                        key={m.id}
+                        className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                       >
-                        <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                        <div
+                          className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm sm:text-base leading-relaxed ${
+                            isMe
+                              ? 'bg-slate-900 text-white rounded-br-xs'
+                              : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs shadow-2xs'
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                        </div>
+                        <span className="text-xs text-slate-400 mt-1 px-1">
+                          {new Date(m.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
                       </div>
-                      <span className="text-xs text-slate-400 mt-1 px-1">
-                        {new Date(m.createdAt).toLocaleTimeString([], {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                  <div ref={endRef} />
+                </div>
               )}
-              <div ref={endRef} />
             </div>
 
             <form onSubmit={onSend} className="p-4 border-t border-slate-100 bg-white shrink-0">
