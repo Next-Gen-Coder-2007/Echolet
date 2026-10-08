@@ -37,3 +37,24 @@ export const emitNewMessage = (message: Message) => {
   io.to(message.receiverId).emit('new_message', message);
   io.to(message.senderId).emit('new_message', message);
 };
+
+export const emitNewPost = (post: any) => {
+  if (!io) return;
+  io.emit('new_post', post);
+};
+
+export const emitPostDeleted = (postId: string) => {
+  if (!io) return;
+  io.emit('post_deleted', { postId });
+};
+
+export const emitPostLiked = (data: { postId: string; userId: string; likesCount: number; isLiked: boolean }) => {
+  if (!io) return;
+  io.emit('post_liked', data);
+};
+
+export const emitNewComment = (comment: any) => {
+  if (!io) return;
+  io.emit('new_comment', comment);
+};
+

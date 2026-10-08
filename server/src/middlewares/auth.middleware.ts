@@ -70,3 +70,35 @@ export const authMiddleware = async (
     });
   }
 };
+
+export const optionalAuthMiddleware = async (
+  req: AuthenticatedRequest,
+  _res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const token = req.cookies?.echolet_token;
+    if (!token) {
+      req.user = undefined;
+      return next();
+    }
+
+    const secret = process.env.JWT_SECRET || 'fallback_echolet_secret_key';
+    const decoded = jwt.verify(token, secret) as JwtPayload;
+
+    if (decoded?.userId) {
+      const userRepository = AppDataSource.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: decoded.userId },
+      });
+      if (user) {
+        req.user = user;
+      }
+    }
+    next();
+  } catch {
+    req.user = undefined;
+    next();
+  }
+};
+

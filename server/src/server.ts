@@ -9,6 +9,7 @@ import { initSocket } from './socket';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import messageRoutes from './routes/message.routes';
+import postRoutes from './routes/post.routes';
 
 dotenv.config();
 
@@ -30,8 +31,8 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(cookieParser());
 
 app.get('/api', (_req: Request, res: Response) => {
@@ -45,6 +46,7 @@ app.get('/api', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/posts', postRoutes);
 
 const httpServer = http.createServer(app);
 initSocket(httpServer, clientOrigin);
