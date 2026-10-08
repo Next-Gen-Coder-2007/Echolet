@@ -10,7 +10,7 @@ export default function Profile() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-16 flex flex-col items-center justify-center">
+    <div className="w-full flex-1 py-16 flex flex-col items-center justify-center">
       <div className="w-8 h-8 border-3 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-3" />
       <p className="text-xs font-semibold text-slate-400">Loading profile...</p>
     </div>

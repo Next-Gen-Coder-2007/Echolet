@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { HiOutlinePaperAirplane, HiOutlineMagnifyingGlass, HiOutlineArrowLeft } from 'react-icons/hi2';
+import {
+  HiOutlinePaperAirplane,
+  HiOutlineMagnifyingGlass,
+  HiOutlineArrowLeft,
+  HiOutlineChatBubbleLeftRight,
+} from 'react-icons/hi2';
 import messageService, { type MessageItem, type ConversationItem } from '../services/messageService';
 import userService, { type UserProfileResponse } from '../services/userService';
 import type { User } from '../services/authService';
@@ -141,8 +146,110 @@ export default function Messages() {
       c.user.username?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const renderMessageContent = (content: string, isMe: boolean) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = content.split(urlRegex);
+    return parts.map((part, index) => {
+      if (/^https?:\/\//i.test(part)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`underline break-all ${
+              isMe ? 'text-sky-300 hover:text-sky-200' : 'text-sky-600 hover:text-sky-700'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   return (
-    <div className="w-full h-[calc(100vh-3rem)] max-h-[640px] min-h-[460px] flex gap-4 select-none">
+    <div className="w-full h-[calc(100vh-2.5rem)] sm:h-[calc(100vh-3.5rem)] min-h-[580px] flex gap-4 select-none">
+      {/* Left Pane: Conversations List */}
+      <div
+        className={`w-full md:w-80 lg:w-96 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden shrink-0 h-full ${
+          activeUser ? 'hidden md:flex' : 'flex'
+        }`}
+      >
+        <div className="p-4 sm:p-5 border-b border-slate-100 shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Messages</h1>
+            <button
+              onClick={() => navigate('/search')}
+              className="text-xs sm:text-sm font-semibold text-purple-600 hover:text-purple-700 cursor-pointer"
+            >
+              + Search
+            </button>
+          </div>
+
+          <div className="relative flex items-center">
+            <HiOutlineMagnifyingGlass className="absolute left-3 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter conversations..."
+              className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 transition-all"
+            />
+          </div>
+        </div>
+
+        <div
+          data-lenis-prevent
+          onWheel={(e) => e.stopPropagation()}
+          className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 overscroll-contain"
+        >
+          {filtered.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-400">
+              No conversations found. Start a new chat from Search.
+            </div>
+          ) : (
+            filtered.map((c) => {
+              const isSelected = activeUser?.id === c.user.id;
+              return (
+                <button
+                  key={c.user.id}
+                  onClick={() => selectUser(c.user)}
+                  className={`w-full p-3.5 text-left flex items-center gap-3 transition-colors cursor-pointer ${
+                    isSelected ? 'bg-slate-100' : 'hover:bg-slate-50/70'
+                  }`}
+                >
+                  {c.user.avatarUrl ? (
+                    <img
+                      src={c.user.avatarUrl}
+                      alt={c.user.fullName}
+                      className="w-10 h-10 rounded-full object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0">
+                      {c.user.fullName?.[0] || 'U'}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm sm:text-base font-bold text-slate-900 truncate">
+                        {c.user.fullName}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-500 truncate mt-0.5">
+                      {c.lastMessage?.content || `@${c.user.username}`}
+                    </p>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Right Pane: Active Chat / Empty State */}
       <div
         className={`flex-1 min-w-0 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-full ${
           !activeUser ? 'hidden md:flex' : 'flex'
@@ -165,9 +272,17 @@ export default function Messages() {
                   onClick={() => navigate(`/profile/${activeUser.username}`)}
                   className="flex items-center gap-3 cursor-pointer min-w-0"
                 >
-                  <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0">
-                    {activeUser.fullName?.[0] || 'U'}
-                  </div>
+                  {activeUser.avatarUrl ? (
+                    <img
+                      src={activeUser.avatarUrl}
+                      alt={activeUser.fullName}
+                      className="w-10 h-10 rounded-full object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0">
+                      {activeUser.fullName?.[0] || 'U'}
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <h2 className="text-base font-bold text-slate-900 leading-tight truncate">
                       {activeUser.fullName}
@@ -187,6 +302,7 @@ export default function Messages() {
 
             <div
               data-lenis-prevent
+              onWheel={(e) => e.stopPropagation()}
               className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-2 bg-slate-50/20 overscroll-contain"
             >
               {messages.length === 0 ? (
@@ -209,7 +325,7 @@ export default function Messages() {
                               : 'bg-white text-slate-900 rounded-bl-xs border border-slate-200/90'
                           }`}
                         >
-                          <span className="whitespace-pre-wrap break-words">{m.content}</span>
+                          <span className="whitespace-pre-wrap break-words">{renderMessageContent(m.content, isMe)}</span>
                           <span
                             className={`text-[10px] ml-auto shrink-0 select-none pb-0.5 leading-none ${
                               isMe ? 'text-slate-400' : 'text-slate-400'
@@ -250,79 +366,22 @@ export default function Messages() {
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400">
-            <h2 className="text-lg sm:text-xl font-bold text-slate-800 mb-1.5">Messages</h2>
-            <p className="text-sm sm:text-base text-slate-500 max-w-sm">
-              Select a conversation from the users list on the right
+            <div className="w-16 h-16 rounded-3xl bg-slate-100 text-slate-700 flex items-center justify-center mb-4 shadow-2xs">
+              <HiOutlineChatBubbleLeftRight className="w-8 h-8 stroke-[1.8]" />
+            </div>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-1.5">Your Messages</h2>
+            <p className="text-sm text-slate-500 max-w-sm mb-6">
+              Select a conversation from the left to start chatting, or find someone new to message.
             </p>
-          </div>
-        )}
-      </div>
-
-      <div
-        className={`w-full md:w-80 lg:w-88 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden shrink-0 h-full ${
-          activeUser ? 'hidden md:flex' : 'flex'
-        }`}
-      >
-        <div className="p-4 sm:p-5 border-b border-slate-100 shrink-0">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Messages</h1>
             <button
+              type="button"
               onClick={() => navigate('/search')}
-              className="text-xs sm:text-sm font-semibold text-purple-600 hover:text-purple-700 cursor-pointer"
+              className="px-5 py-2.5 rounded-2xl bg-slate-900 text-white font-semibold text-sm hover:bg-slate-800 transition-colors shadow-2xs cursor-pointer"
             >
-              + Search
+              Find People
             </button>
           </div>
-
-          <div className="relative flex items-center">
-            <HiOutlineMagnifyingGlass className="absolute left-3 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter users..."
-              className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 transition-all"
-            />
-          </div>
-        </div>
-
-        <div
-          data-lenis-prevent
-          className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 overscroll-contain"
-        >
-          {filtered.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-400">
-              No users found. Start a new chat from Search.
-            </div>
-          ) : (
-            filtered.map((c) => {
-              const isSelected = activeUser?.id === c.user.id;
-              return (
-                <button
-                  key={c.user.id}
-                  onClick={() => selectUser(c.user)}
-                  className={`w-full p-3.5 text-left flex items-center gap-3 transition-colors cursor-pointer ${
-                    isSelected ? 'bg-slate-100' : 'hover:bg-slate-50/70'
-                  }`}
-                >
-                  <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0">
-                    {c.user.fullName?.[0] || 'U'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm sm:text-base font-bold text-slate-900 truncate">
-                        {c.user.fullName}
-                      </span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-slate-500 truncate mt-0.5">
-                      {c.lastMessage?.content || `@${c.user.username}`}
-                    </p>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

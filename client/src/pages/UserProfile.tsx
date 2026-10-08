@@ -7,6 +7,8 @@ import {
   HiOutlineChatBubbleOvalLeftEllipsis,
 } from 'react-icons/hi2';
 import userService, { type UserProfileResponse } from '../services/userService';
+import postService, { type Post } from '../services/postService';
+import PostCard from '../components/PostCard';
 import type { User } from '../services/authService';
 
 export default function UserProfile() {
@@ -23,6 +25,9 @@ export default function UserProfile() {
   const [followingCount, setFollowingCount] = useState(0);
   const [isFollowSubmitting, setIsFollowSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<'echoes' | 'media' | 'likes'>('echoes');
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [echoesCount, setEchoesCount] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,6 +67,40 @@ export default function UserProfile() {
     };
   }, [username, navigate]);
 
+  useEffect(() => {
+    if (!profileUser?.username) return;
+
+    let isMounted = true;
+    setPostsLoading(true);
+
+    postService
+      .getUserPosts(profileUser.username, activeTab)
+      .then((data) => {
+        if (isMounted) {
+          setPosts(data);
+          if (activeTab === 'echoes') {
+            setEchoesCount(data.length);
+          }
+          setPostsLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPosts([]);
+          setPostsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [profileUser?.username, activeTab]);
+
+  const handlePostDeleted = (postId: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    setEchoesCount((prev) => Math.max(0, prev - 1));
+  };
+
   const handleToggleFollow = async () => {
     if (!profileUser || isFollowSubmitting) return;
 
@@ -88,7 +127,7 @@ export default function UserProfile() {
 
   if (loading) {
     return (
-      <div className="w-full max-w-4xl mx-auto py-16 flex flex-col items-center justify-center">
+      <div className="w-full flex-1 py-16 flex flex-col items-center justify-center">
         <div className="w-8 h-8 border-3 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-3" />
         <p className="text-xs font-semibold text-slate-400">Loading profile...</p>
       </div>
@@ -97,7 +136,7 @@ export default function UserProfile() {
 
   if (error || !profileUser) {
     return (
-      <div className="w-full max-w-4xl mx-auto py-12">
+      <div className="w-full flex-1 py-12">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl mb-6 cursor-pointer"
@@ -139,7 +178,7 @@ export default function UserProfile() {
     : 'Recently';
 
   return (
-    <div className="w-full max-w-4xl mx-auto py-4">
+    <div className="w-full flex-1">
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => navigate(-1)}
@@ -190,19 +229,19 @@ export default function UserProfile() {
               <div className="flex items-center gap-2.5">
                 <button
                   onClick={() => navigate(`/messages/${profileUser.username}`)}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-200/90 bg-white hover:bg-purple-50/50 hover:border-purple-300 hover:text-purple-600 text-slate-700 shadow-xs cursor-pointer transition-all"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs cursor-pointer transition-all"
                 >
-                  <HiOutlineChatBubbleOvalLeftEllipsis className="w-4 h-4 stroke-[2] text-purple-600" />
+                  <HiOutlineChatBubbleOvalLeftEllipsis className="w-4 h-4 text-slate-700" />
                   <span>Message</span>
                 </button>
 
                 <button
                   onClick={handleToggleFollow}
                   disabled={isFollowSubmitting}
-                  className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50 ${
+                  className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-50 ${
                     isFollowing
                       ? 'bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600'
-                      : 'bg-gradient-to-r from-[#00b4d8] to-[#ff0080] text-white hover:opacity-95'
+                      : 'bg-slate-900 text-white hover:bg-slate-800'
                   }`}
                 >
                   {isFollowing ? 'Following' : 'Follow'}
@@ -246,34 +285,84 @@ export default function UserProfile() {
               <span className="text-slate-400">Following</span>
             </div>
             <div>
-              <span className="font-bold text-slate-900 mr-1.5">0</span>
+              <span className="font-bold text-slate-900 mr-1.5">{echoesCount}</span>
               <span className="text-slate-400">Echoes</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-2">
-        <div className="flex border-b border-slate-100">
-          {(['echoes', 'media', 'likes'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-3 text-xs font-bold capitalize transition-colors cursor-pointer border-b-2 ${
-                activeTab === tab
-                  ? 'border-purple-600 text-purple-600'
-                  : 'border-transparent text-slate-400 hover:text-slate-700'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Main Column */}
+        <div className="lg:col-span-8">
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-2 mb-6">
+            <div className="flex border-b border-slate-100">
+              {(['echoes', 'media', 'likes'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`flex-1 py-3 text-xs sm:text-sm font-bold capitalize transition-colors cursor-pointer border-b-2 ${
+                    activeTab === tab
+                      ? 'border-slate-900 text-slate-900'
+                      : 'border-transparent text-slate-400 hover:text-slate-700'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-3 sm:p-4">
+              {postsLoading ? (
+                <div className="p-10 text-center">
+                  <div className="w-6 h-6 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-2" />
+                  <p className="text-xs text-slate-400">Loading {activeTab}...</p>
+                </div>
+              ) : posts.length === 0 ? (
+                <div className="p-10 text-center">
+                  <p className="text-xs text-slate-400">
+                    No {activeTab} shared by @{profileUser.username} yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4 pt-2">
+                  {posts.map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      currentUser={currentUser}
+                      onPostDeleted={handlePostDeleted}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="p-8 text-center">
-          <p className="text-xs text-slate-400">
-            No {activeTab} shared by @{profileUser.username} yet.
-          </p>
+        {/* Right Info Sidebar */}
+        <div className="hidden lg:block lg:col-span-4 sticky top-4 self-start space-y-5">
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-5">
+            <h3 className="text-sm font-bold text-slate-900 mb-3">About @{profileUser.username}</h3>
+            <div className="space-y-3 text-xs text-slate-600">
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-400">Total Echoes</span>
+                <span className="font-bold text-slate-900">{echoesCount}</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-400">Followers</span>
+                <span className="font-bold text-slate-900">{followersCount}</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-400">Following</span>
+                <span className="font-bold text-slate-900">{followingCount}</span>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-slate-400">Member Since</span>
+                <span className="font-semibold text-slate-800">{joinedDate}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
