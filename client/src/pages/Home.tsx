@@ -9,6 +9,7 @@ import {
 import CreatePostCard from '../components/CreatePostCard';
 import PostCard from '../components/PostCard';
 import WhoToFollow from '../components/WhoToFollow';
+import Stories from '../components/Stories';
 import { useMessage } from '../context/MessageContext';
 import postService, { type Post } from '../services/postService';
 import type { User } from '../services/authService';
@@ -54,12 +55,10 @@ export default function Home() {
     fetchFeed(feedType);
   }, [feedType, fetchFeed]);
 
-  // Real-time socket updates
   useEffect(() => {
     const socket = getSocket();
 
     const handleNewPost = (newPost: Post) => {
-      // If created by current user, it was already handled by onPostCreated
       if (newPost.userId === currentUser?.id) return;
 
       setPosts((prev) => {
@@ -92,10 +91,8 @@ export default function Home() {
   return (
     <div className="w-full flex-1 relative select-none">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Main Feed Column */}
         <div className="lg:col-span-8">
-          {/* Sticky Feed Header */}
-          <div className="sticky top-4 z-30 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-5 flex items-center justify-between transition-all">
+          <div className="sticky top-6 z-30 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-5 flex items-center justify-between transition-all">
             <div className="bg-slate-100/90 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/60">
               <button
                 type="button"
@@ -137,14 +134,12 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Create Post Card */}
           <CreatePostCard
             currentUser={currentUser}
             onPostCreated={handlePostCreated}
             showToast={showToast}
           />
 
-          {/* Feed List */}
           {loading ? (
             <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 shadow-sm">
               <div className="w-7 h-7 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin mx-auto mb-3" />
@@ -195,8 +190,9 @@ export default function Home() {
           )}
         </div>
 
-        <div className="hidden lg:block lg:col-span-4 sticky top-4 self-start">
+        <div className="hidden lg:block lg:col-span-4 sticky top-6 self-start space-y-5">
           <WhoToFollow currentUser={currentUser} showToast={showToast} />
+          <Stories currentUser={currentUser} showToast={showToast} />
         </div>
       </div>
     </div>

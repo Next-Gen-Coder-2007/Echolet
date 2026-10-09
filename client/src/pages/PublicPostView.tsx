@@ -6,13 +6,14 @@ import {
   HiOutlineBookmark,
   HiOutlineShare,
   HiOutlineLink,
-  HiXMark,
   HiOutlineArrowTopRightOnSquare,
+  HiOutlineArrowsPointingOut,
   HiOutlineArrowLeft,
   HiChevronDown,
   HiChevronUp,
 } from 'react-icons/hi2';
 import postService, { type Post, type PostComment } from '../services/postService';
+import MediaViewerModal from '../components/MediaViewerModal';
 
 /**
  * Recursive read-only comment component for public post view
@@ -147,7 +148,7 @@ export default function PublicPostView() {
   const [comments, setComments] = useState<PostComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [activeLightboxImg, setActiveLightboxImg] = useState<string | null>(null);
+  const [activeMediaIndex, setActiveMediaIndex] = useState<number | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
@@ -258,27 +259,13 @@ export default function PublicPostView() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col selection:bg-slate-900 selection:text-white">
-      {/* Lightbox Modal */}
-      {activeLightboxImg && (
-        <div
-          onClick={() => setActiveLightboxImg(null)}
-          className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out animate-in fade-in"
-        >
-          <button
-            type="button"
-            onClick={() => setActiveLightboxImg(null)}
-            className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-2.5 rounded-full transition-colors cursor-pointer"
-          >
-            <HiXMark className="w-6 h-6 stroke-[2.5]" />
-          </button>
-          <img
-            src={activeLightboxImg}
-            alt="Full size view"
-            className="max-h-[90vh] max-w-[90vw] object-contain rounded-2xl shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+      <MediaViewerModal
+        isOpen={activeMediaIndex !== null}
+        onClose={() => setActiveMediaIndex(null)}
+        images={mediaList}
+        initialIndex={activeMediaIndex ?? 0}
+        authorName={post?.user?.fullName}
+      />
 
       {/* Standalone Public Header (Not using AppLayout) */}
       <header className="w-full bg-white border-b border-slate-200/90 sticky top-0 z-40 backdrop-blur-md shadow-2xs">
@@ -394,73 +381,117 @@ export default function PublicPostView() {
                 </div>
               )}
 
-              {/* Multi-Image Gallery */}
               {mediaList.length > 0 && (
                 <div className="mb-4">
                   {mediaList.length === 1 && (
                     <div
-                      onClick={() => setActiveLightboxImg(mediaList[0])}
-                      className="rounded-2xl overflow-hidden border border-slate-200/80 bg-slate-100/60 flex items-center justify-center cursor-pointer group shadow-2xs"
+                      onClick={() => setActiveMediaIndex(0)}
+                      className="relative rounded-2xl overflow-hidden border border-slate-200/90 bg-slate-900/5 cursor-pointer group shadow-2xs hover:shadow-md transition-all duration-300 max-h-[520px] flex items-center justify-center"
                     >
                       <img
                         src={mediaList[0]}
                         alt="Echo media"
-                        className="w-full h-auto max-h-[500px] object-cover sm:object-contain rounded-2xl transition-transform duration-300 group-hover:scale-[1.01]"
+                        className="w-full h-auto max-h-[520px] object-cover sm:object-contain rounded-2xl transition-transform duration-500 group-hover:scale-[1.015]"
                       />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-300 pointer-events-none" />
+                      <div className="absolute top-3 right-3 bg-black/60 hover:bg-black/80 text-white p-2 rounded-xl backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-200 shadow-md transform translate-y-1 group-hover:translate-y-0">
+                        <HiOutlineArrowsPointingOut className="w-4 h-4" />
+                      </div>
                     </div>
                   )}
 
                   {mediaList.length === 2 && (
-                    <div className="grid grid-cols-2 gap-2 rounded-2xl overflow-hidden border border-slate-200/80 bg-slate-100/40 p-1 shadow-2xs">
+                    <div className="grid grid-cols-2 gap-2 rounded-2xl overflow-hidden border border-slate-200/90 bg-slate-100/50 p-1.5 shadow-2xs">
                       {mediaList.map((url, i) => (
                         <div
                           key={i}
-                          onClick={() => setActiveLightboxImg(url)}
-                          className="aspect-4/3 rounded-xl overflow-hidden cursor-pointer group bg-slate-200"
+                          onClick={() => setActiveMediaIndex(i)}
+                          className="relative aspect-4/3 rounded-xl overflow-hidden cursor-pointer group bg-slate-200"
                         >
                           <img
                             src={url}
                             alt={`Echo attachment ${i + 1}`}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-200 pointer-events-none" />
+                          <div className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-lg backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-sm">
+                            <HiOutlineArrowsPointingOut className="w-3.5 h-3.5" />
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
 
                   {mediaList.length === 3 && (
-                    <div className="grid grid-cols-3 gap-2 rounded-2xl overflow-hidden border border-slate-200/80 bg-slate-100/40 p-1 shadow-2xs">
-                      {mediaList.map((url, i) => (
-                        <div
-                          key={i}
-                          onClick={() => setActiveLightboxImg(url)}
-                          className="aspect-square rounded-xl overflow-hidden cursor-pointer group bg-slate-200"
-                        >
-                          <img
-                            src={url}
-                            alt={`Echo attachment ${i + 1}`}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
+                    <div className="grid grid-cols-2 gap-2 rounded-2xl overflow-hidden border border-slate-200/90 bg-slate-100/50 p-1.5 shadow-2xs aspect-[16/10] sm:aspect-[16/9]">
+                      <div
+                        onClick={() => setActiveMediaIndex(0)}
+                        className="relative h-full rounded-xl overflow-hidden cursor-pointer group bg-slate-200"
+                      >
+                        <img
+                          src={mediaList[0]}
+                          alt="Echo attachment 1"
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-200 pointer-events-none" />
+                        <div className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-lg backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-sm">
+                          <HiOutlineArrowsPointingOut className="w-3.5 h-3.5" />
                         </div>
-                      ))}
+                      </div>
+
+                      <div className="grid grid-rows-2 gap-2 h-full">
+                        {mediaList.slice(1, 3).map((url, i) => (
+                          <div
+                            key={i + 1}
+                            onClick={() => setActiveMediaIndex(i + 1)}
+                            className="relative h-full rounded-xl overflow-hidden cursor-pointer group bg-slate-200"
+                          >
+                            <img
+                              src={url}
+                              alt={`Echo attachment ${i + 2}`}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-200 pointer-events-none" />
+                            <div className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-lg backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-sm">
+                              <HiOutlineArrowsPointingOut className="w-3.5 h-3.5" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
                   {mediaList.length >= 4 && (
-                    <div className="grid grid-cols-2 gap-2 rounded-2xl overflow-hidden border border-slate-200/80 bg-slate-100/40 p-1 shadow-2xs">
-                      {mediaList.slice(0, 4).map((url, i) => (
-                        <div
-                          key={i}
-                          onClick={() => setActiveLightboxImg(url)}
-                          className="aspect-4/3 rounded-xl overflow-hidden cursor-pointer group bg-slate-200"
-                        >
-                          <img
-                            src={url}
-                            alt={`Echo attachment ${i + 1}`}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        </div>
-                      ))}
+                    <div className="grid grid-cols-2 gap-2 rounded-2xl overflow-hidden border border-slate-200/90 bg-slate-100/50 p-1.5 shadow-2xs">
+                      {mediaList.slice(0, 4).map((url, i) => {
+                        const isFourthAndMore = i === 3 && mediaList.length > 4;
+                        return (
+                          <div
+                            key={i}
+                            onClick={() => setActiveMediaIndex(i)}
+                            className="relative aspect-4/3 rounded-xl overflow-hidden cursor-pointer group bg-slate-200"
+                          >
+                            <img
+                              src={url}
+                              alt={`Echo attachment ${i + 1}`}
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            />
+                            {isFourthAndMore ? (
+                              <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-xs flex flex-col items-center justify-center text-white font-bold group-hover:bg-slate-950/65 transition-colors">
+                                <span className="text-xl sm:text-2xl font-black">+{mediaList.length - 3}</span>
+                                <span className="text-[11px] font-medium text-slate-300">more photos</span>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-200 pointer-events-none" />
+                                <div className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-lg backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-sm">
+                                  <HiOutlineArrowsPointingOut className="w-3.5 h-3.5" />
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

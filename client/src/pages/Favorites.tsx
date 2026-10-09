@@ -54,8 +54,7 @@ export default function Favorites() {
 
   return (
     <div className="w-full flex-1 select-none">
-      {/* Header Container */}
-      <div className="sticky top-4 z-30 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-5 flex items-center justify-between gap-3 transition-all">
+      <div className="sticky top-6 z-30 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-5 flex items-center justify-between gap-3 transition-all">
             <div className="flex items-center gap-3 min-w-0">
               <Link
                 to="/"
@@ -90,7 +89,6 @@ export default function Favorites() {
             </div>
           </div>
 
-          {/* Content */}
           {loading ? (
             <div className="py-20 text-center bg-white rounded-3xl border border-slate-200 shadow-sm">
               <div className="w-7 h-7 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin mx-auto mb-3" />
