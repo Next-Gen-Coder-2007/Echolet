@@ -22,11 +22,11 @@ export class User {
   @Column({ type: 'varchar', length: 255, unique: true })
   email: string;
 
-  @Column({ type: 'varchar', length: 30 })
-  birthday: string;
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  birthday?: string;
 
-  @Column({ type: 'varchar', length: 30 })
-  gender: string;
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  gender?: string;
 
   @Column({ type: 'text', nullable: true })
   bio?: string;
@@ -34,8 +34,14 @@ export class User {
   @Column({ type: 'text', nullable: true })
   avatarUrl?: string;
 
-  @Column({ type: 'varchar', select: false })
-  password: string;
+  @Column({ type: 'text', nullable: true })
+  bannerUrl?: string;
+
+  @Column({ type: 'varchar', select: false, nullable: true })
+  password?: string;
+
+  @Column({ type: 'varchar', length: 120, nullable: true, select: false })
+  googleId?: string;
 
   @CreateDateColumn()
   createdAt: Date;

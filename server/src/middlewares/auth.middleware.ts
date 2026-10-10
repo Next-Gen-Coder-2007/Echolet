@@ -19,12 +19,16 @@ export const authMiddleware = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const token = req.cookies?.echolet_token;
+    const token =
+      req.cookies?.echolet_token ||
+      (req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.substring(7).trim()
+        : req.headers.authorization);
 
     if (!token) {
       res.status(401).json({
         status: 'error',
-        message: 'Authentication required. No session cookie provided.',
+        message: 'Authentication required. No session credentials provided.',
       });
       return;
     }
@@ -77,7 +81,11 @@ export const optionalAuthMiddleware = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const token = req.cookies?.echolet_token;
+    const token =
+      req.cookies?.echolet_token ||
+      (req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.substring(7).trim()
+        : req.headers.authorization);
     if (!token) {
       req.user = undefined;
       return next();

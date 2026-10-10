@@ -16,15 +16,25 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
-}
+// Trust proxy headers from cloud platforms (Render, Railway, Vercel, Nginx, AWS, Cloudflare)
+app.set('trust proxy', 1);
 
-const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const rawClientOrigins = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = rawClientOrigins
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
 
 app.use(
   cors({
-    origin: clientOrigin,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, server-to-server, curl) or registered origins
+      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -49,7 +59,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/posts', postRoutes);
 
 const httpServer = http.createServer(app);
-initSocket(httpServer, clientOrigin);
+initSocket(httpServer, allowedOrigins);
 
 const startServer = async () => {
   try {

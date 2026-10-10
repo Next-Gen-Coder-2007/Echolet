@@ -4,7 +4,7 @@ import { Message } from './entities/Message';
 
 let io: SocketIOServer | null = null;
 
-export const initSocket = (server: HttpServer, clientOrigin: string): SocketIOServer => {
+export const initSocket = (server: HttpServer, clientOrigin: string | string[]): SocketIOServer => {
   io = new SocketIOServer(server, {
     cors: {
       origin: clientOrigin,
