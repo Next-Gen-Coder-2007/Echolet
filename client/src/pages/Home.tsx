@@ -32,6 +32,14 @@ export default function Home() {
     [showMessage]
   );
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('auth') === 'google_success' || params.get('auth') === 'success') {
+      showToast('Signed in with Google successfully! Welcome to Echolet.', 'success');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [showToast]);
+
   const fetchFeed = useCallback(
     async (type: 'for-you' | 'following', isRefresh = false) => {
       if (isRefresh) setRefreshing(true);

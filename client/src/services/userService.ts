@@ -44,6 +44,19 @@ export const userService = {
     const response = await api.delete<FollowResponse>(`/users/${encodeURIComponent(userId)}/follow`);
     return response.data;
   },
+
+  async updateProfile(data: {
+    fullName?: string;
+    bio?: string;
+    avatarUrl?: string;
+    bannerUrl?: string;
+  }): Promise<{ status: string; message: string; user: UserProfileResponse }> {
+    const response = await api.put<{ status: string; message: string; user: UserProfileResponse }>(
+      '/users/profile',
+      data
+    );
+    return response.data;
+  },
 };
 
 export default userService;

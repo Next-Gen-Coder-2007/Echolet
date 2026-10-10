@@ -55,6 +55,10 @@ export const MessageProvider: React.FC<{ children: React.ReactNode }> = ({ child
             };
 
       setToasts((prev) => {
+        const isDuplicate = prev.some(
+          (t) => t.message === newToast.message && t.type === newToast.type
+        );
+        if (isDuplicate) return prev;
         const updated = [...prev, newToast];
         return updated.slice(-5);
       });
