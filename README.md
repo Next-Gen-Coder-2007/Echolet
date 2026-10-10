@@ -40,3 +40,28 @@
 | 16 | **Polls** | Can be created in posts, stories, and group chats |
 | 17 | **Fun Features** | **Surprise Me** — randomly discover a post, user, reel, or topic for a natural rabbit-hole browsing experience |
 | 18 | **AI Features** | **Recommendations** (activity → interests → ranking → personalized feed) · **Moderation** (spam, toxic-content, NSFW, suspicious-account detection) · **Meme Generator** (upload → AI captions → select → post) · **Search** (semantic queries, e.g. "show me funny programming memes") |
+
+## Implementation Status
+
+> **Overall Progress: ~42% (Core MVP Active)**
+
+| Sl No | Feature | Status | What's Implemented | What's Pending |
+|:---:|---|:---:|---|---|
+| 1 | **Authentication** | 🟡 ~65% | Register, Login, Logout, JWT auth, HTTP-only cookies | Google OAuth, forgot/reset password, email verification, account deletion/settings |
+| 2 | **User Profiles** | 🟡 ~60% | Profile views, follow/unfollow toggle, followers/following counts & lists | Edit Profile modal (avatar/bio/cover), cover photo, block/unblock, mute |
+| 3 | **Home Feed** | 🟡 ~60% | Post stream with real-time WebSocket updates, multi-image, video, polls, interactions | "Following" vs "For You" toggle tabs, reposts, clickable hashtag/mention parsing |
+| 4 | **Posts** | 🟡 ~65% | Text, multi-image, video, poll creation, like, comment, bookmark, delete, share link | Edit post, pin post, report post, GIF picker, quote posts / reposts |
+| 5 | **Comments** | 🟡 ~60% | Add comment, delete comment, like comment, live comment counts | Nested/threaded replies (`parentId`), edit comments, user mentions |
+| 6 | **Stories** | 🔴 ~10% | Frontend UI component shell (`Stories.tsx`) | Backend entity & routes, file upload, full story viewer modal, 24-hour expiration |
+| 7 | **Reels / Short Videos** | ⚪ 0% | — | Vertical reel feed, video player, reels tab/page, backend model |
+| 8 | **Explore** | ⚪ 0% | — | Visual grid, trending content discovery page |
+| 9 | **Trending** | ⚪ 0% | — | Trending ranking engine (engagement + velocity + recency) |
+| 10 | **Hashtags** | 🔴 ~10% | Hashtags can be typed into posts | Hashtag parsing/indexing, hashtag pages, follow hashtags, search hashtags |
+| 11 | **Search** | 🟡 ~35% | Real-time user search by username/display name | Search posts, reels, hashtags, and media |
+| 12 | **Messaging** | 🟡 ~45% | Real-time 1-to-1 direct messaging via WebSockets | Media sharing, typing indicator, online status, group chats, global chatroom |
+| 13 | **Notifications** | 🔴 ~15% | Frontend UI layout (`Notifications.tsx`) with mock data | Backend entity, DB persistence, real-time socket triggers on interactions |
+| 14 | **Bookmarks** | 🟡 ~55% | Save/unsave posts, saved posts feed | Custom collections/folders (Memes, Movies, Programming, etc.) |
+| 15 | **Reactions** | 🔴 ~20% | Binary like/heart on posts & comments | Rich emoji reactions (Love, Funny, Fire, Wow, Sad, Dead, Applause) |
+| 16 | **Polls** | 🟡 ~60% | Poll posts with voting, percentages, single-vote prevention | Polls inside stories and group chats |
+| 17 | **Fun Features** | ⚪ 0% | — | "Surprise Me" random discovery button & route |
+| 18 | **AI Features** | ⚪ 0% | — | Smart recommendation engine, moderation, AI meme generator |

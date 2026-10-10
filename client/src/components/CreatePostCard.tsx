@@ -25,13 +25,9 @@ interface SelectedImage {
   sizeText: string;
 }
 
-const MAX_IMAGE_BYTES = 1 * 1024 * 1024; // 1 MB limit per image
-const MAX_IMAGES_COUNT = 4; // Maximum 4 images per post
+const MAX_IMAGE_BYTES = 1 * 1024 * 1024;
+const MAX_IMAGES_COUNT = 4;
 
-/**
- * Optimize an image file client-side using HTML5 Canvas to keep base64 payload compact & fast.
- * GIFs preserve animation frames.
- */
 const optimizeImageFile = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (file.type === 'image/gif') {
