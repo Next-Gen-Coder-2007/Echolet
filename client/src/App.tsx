@@ -11,17 +11,19 @@ import Favorites from './pages/Favorites';
 import Saved from './pages/Saved';
 import Profile from './pages/Profile';
 import UserProfile from './pages/UserProfile';
+import {
+  Settings,
+  EditProfile,
+  AccountSettings,
+  NotificationSettings,
+  PrivacySettings,
+} from './pages/settings';
 import PostDetail from './pages/PostDetail';
 import PublicPostView from './pages/PublicPostView';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import authService, { type User } from './services/authService';
 
-/**
- * Smart router for /post/:id
- * While not logged in, guests can ONLY see this specific post via PublicPostView (NOT applying AppLayout).
- * While logged in, members view the post with full layout and engagement capabilities.
- */
 function PostRouteHandler() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
 
@@ -49,12 +51,10 @@ function PostRouteHandler() {
     );
   }
 
-  // Guest -> Standalone PublicPostView without AppLayout
   if (!user) {
     return <PublicPostView />;
   }
 
-  // Authenticated User -> PostDetail wrapped in AppLayout
   return (
     <AppLayout initialUser={user}>
       <PostDetail user={user} />
@@ -69,11 +69,9 @@ export default function App() {
     <MessageProvider>
       <BrowserRouter>
         <Routes>
-          {/* Post Route: Guests get PublicPostView (no AppLayout); Members get PostDetail in AppLayout */}
           <Route path="/post/:id" element={<PostRouteHandler />} />
           <Route path="/public/post/:id" element={<PublicPostView />} />
 
-          {/* Main App Routes (Strictly requires login, wraps in AppLayout) */}
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/search" element={<Search />} />
@@ -84,6 +82,14 @@ export default function App() {
             <Route path="/saved" element={<Saved />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/profile/:username" element={<UserProfile />} />
+            <Route path="/settings" element={<Settings />}>
+              <Route index element={<Navigate to="/settings/profile" replace />} />
+              <Route path="profile" element={<EditProfile />} />
+              <Route path="account" element={<AccountSettings />} />
+              <Route path="notifications" element={<NotificationSettings />} />
+              <Route path="privacy" element={<PrivacySettings />} />
+            </Route>
+            <Route path="/profile/edit" element={<Navigate to="/settings/profile" replace />} />
           </Route>
 
           <Route path="/login" element={<Login />} />

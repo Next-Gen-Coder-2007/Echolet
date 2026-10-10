@@ -83,10 +83,18 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
 
         <main className="flex-1 ml-20 sm:ml-24 md:ml-28 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-h-screen flex flex-col">
           <div className="w-full flex-1 flex flex-col">
-            {children || <Outlet context={{ user }} />}
+            {children || (
+              <Outlet
+                context={{
+                  user,
+                  onUserUpdated: (updatedUser: User) => setUser(updatedUser),
+                }}
+              />
+            )}
           </div>
         </main>
       </div>
     </div>
   );
 }
+
