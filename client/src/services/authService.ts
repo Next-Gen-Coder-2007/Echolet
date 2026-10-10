@@ -56,6 +56,11 @@ export const authService = {
     const response = await api.get<{ status: string; user: User }>('/auth/me');
     return response.data.user;
   },
+
+  async googleAuth(data: { credential?: string; accessToken?: string }): Promise<AuthResponse> {
+    const response = await api.post<AuthResponse>('/auth/google', data);
+    return response.data;
+  },
 };
 
 export default authService;
