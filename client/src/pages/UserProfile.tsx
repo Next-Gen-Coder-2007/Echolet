@@ -5,6 +5,7 @@ import {
   HiOutlineCalendar,
   HiOutlineEnvelope,
   HiOutlineChatBubbleOvalLeftEllipsis,
+  HiOutlinePencilSquare,
 } from 'react-icons/hi2';
 import userService, { type UserProfileResponse } from '../services/userService';
 import postService, { type Post } from '../services/postService';
@@ -196,7 +197,17 @@ export default function UserProfile() {
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden mb-6">
-        <div className="h-36 sm:h-44 w-full bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] relative" />
+        <div className="h-36 sm:h-52 w-full bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] relative overflow-hidden">
+          {profileUser.bannerUrl ? (
+            <img
+              src={profileUser.bannerUrl}
+              alt={`${profileUser.fullName}'s banner`}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080]" />
+          )}
+        </div>
 
         <div className="px-6 pb-6 pt-0 relative">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-16 sm:-mt-20 mb-5">
@@ -221,9 +232,14 @@ export default function UserProfile() {
             {currentUser?.id === profileUser.id ||
             currentUser?.username?.toLowerCase() === profileUser.username?.toLowerCase() ? (
               <div className="flex items-center gap-2.5">
-                <span className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600">
-                  Your Account
-                </span>
+                <button
+                  type="button"
+                  onClick={() => navigate('/settings/profile')}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 shadow-2xs cursor-pointer transition-all active:scale-95"
+                >
+                  <HiOutlinePencilSquare className="w-4 h-4 text-purple-600" />
+                  <span>Edit Profile</span>
+                </button>
               </div>
             ) : (
               <div className="flex items-center gap-2.5">
@@ -257,6 +273,11 @@ export default function UserProfile() {
             <p className="text-sm font-semibold text-purple-600">
               @{profileUser.username}
             </p>
+            {profileUser.bio && (
+              <p className="text-xs sm:text-sm text-slate-700 font-normal mt-2.5 leading-relaxed whitespace-pre-line max-w-2xl">
+                {profileUser.bio}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 mb-6">
