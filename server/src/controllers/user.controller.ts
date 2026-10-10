@@ -29,7 +29,8 @@ export const searchUsers = async (req: AuthenticatedRequest, res: Response): Pro
         'user.id',
         'user.fullName',
         'user.username',
-        'user.email',
+        'user.avatarUrl',
+        'user.bio',
         'user.createdAt',
       ]);
 
@@ -84,6 +85,9 @@ export const getUserByUsername = async (req: AuthenticatedRequest, res: Response
         email: true,
         birthday: true,
         gender: true,
+        bio: true,
+        avatarUrl: true,
+        bannerUrl: true,
         createdAt: true,
       },
     });
@@ -98,6 +102,9 @@ export const getUserByUsername = async (req: AuthenticatedRequest, res: Response
           email: true,
           birthday: true,
           gender: true,
+          bio: true,
+          avatarUrl: true,
+          bannerUrl: true,
           createdAt: true,
         },
       });
@@ -126,14 +133,30 @@ export const getUserByUsername = async (req: AuthenticatedRequest, res: Response
         )
       : false;
 
+    const isSelf = currentUserId === user.id;
+    const safeUserProfile = {
+      id: user.id,
+      fullName: user.fullName,
+      username: user.username,
+      avatarUrl: user.avatarUrl,
+      bannerUrl: user.bannerUrl,
+      bio: user.bio,
+      createdAt: user.createdAt,
+      followersCount,
+      followingCount,
+      isFollowing,
+      ...(isSelf
+        ? {
+            email: user.email,
+            birthday: user.birthday,
+            gender: user.gender,
+          }
+        : {}),
+    };
+
     res.json({
       status: 'success',
-      user: {
-        ...user,
-        followersCount,
-        followingCount,
-        isFollowing,
-      },
+      user: safeUserProfile,
     });
   } catch (error) {
     console.error('Get user by username error:', error);
@@ -162,6 +185,9 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
         email: true,
         birthday: true,
         gender: true,
+        bio: true,
+        avatarUrl: true,
+        bannerUrl: true,
         createdAt: true,
       },
     });
@@ -189,14 +215,30 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
         )
       : false;
 
+    const isSelf = currentUserId === user.id;
+    const safeUserProfile = {
+      id: user.id,
+      fullName: user.fullName,
+      username: user.username,
+      avatarUrl: user.avatarUrl,
+      bannerUrl: user.bannerUrl,
+      bio: user.bio,
+      createdAt: user.createdAt,
+      followersCount,
+      followingCount,
+      isFollowing,
+      ...(isSelf
+        ? {
+            email: user.email,
+            birthday: user.birthday,
+            gender: user.gender,
+          }
+        : {}),
+    };
+
     res.json({
       status: 'success',
-      user: {
-        ...user,
-        followersCount,
-        followingCount,
-        isFollowing,
-      },
+      user: safeUserProfile,
     });
   } catch (error) {
     console.error('Get user by id error:', error);
@@ -311,3 +353,61 @@ export const unfollowUser = async (req: AuthenticatedRequest, res: Response): Pr
     });
   }
 };
+
+export const updateProfile = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const { fullName, bio, avatarUrl, bannerUrl } = req.body;
+    const userRepository = AppDataSource.getRepository(User);
+
+    const user = await userRepository.findOne({
+      where: { id: currentUserId },
+    });
+
+    if (!user) {
+      res.status(404).json({ status: 'error', message: 'User not found' });
+      return;
+    }
+
+    if (fullName !== undefined) {
+      const trimmedName = String(fullName).trim();
+      if (trimmedName.length > 0) {
+        user.fullName = trimmedName;
+      }
+    }
+
+    if (bio !== undefined) {
+      user.bio = String(bio).trim();
+    }
+
+    if (avatarUrl !== undefined) {
+      user.avatarUrl = avatarUrl;
+    }
+
+    if (bannerUrl !== undefined) {
+      user.bannerUrl = bannerUrl;
+    }
+
+    await userRepository.save(user);
+
+    const { password: _, googleId: __, ...safeUser } = user as any;
+
+    res.json({
+      status: 'success',
+      message: 'Profile updated successfully',
+      user: safeUser,
+    });
+  } catch (error: any) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to update profile',
+    });
+  }
+};
+
