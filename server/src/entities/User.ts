@@ -43,6 +43,9 @@ export class User {
   @Column({ type: 'varchar', length: 120, nullable: true, select: false })
   googleId?: string;
 
+  @Column({ nullable: true })
+  lastSeen?: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

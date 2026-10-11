@@ -12,6 +12,8 @@ export interface User {
   bannerUrl?: string;
   followersCount?: number;
   followingCount?: number;
+  lastSeen?: string;
+  isOnline?: boolean;
   createdAt: string;
   updatedAt: string;
 }

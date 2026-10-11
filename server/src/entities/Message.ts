@@ -25,6 +25,27 @@ export class Message {
   @Column({ type: 'boolean', default: false })
   isRead: boolean;
 
+  @Column({ type: 'varchar', length: 20, default: 'sent' })
+  status: 'sent' | 'delivered' | 'read';
+
+  @Column({ type: 'boolean', default: false })
+  isEdited: boolean;
+
+  @Column({ nullable: true })
+  editedAt?: Date;
+
+  @Column({ type: 'simple-json', nullable: true })
+  replyTo?: { id: string; senderId: string; senderName: string; content: string };
+
+  @Column({ type: 'boolean', default: false })
+  isForwarded: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  isDeletedForEveryone: boolean;
+
+  @Column({ type: 'simple-json', nullable: true })
+  deletedFor?: string[];
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'senderId' })
   sender: User;

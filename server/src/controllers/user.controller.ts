@@ -88,6 +88,7 @@ export const getUserByUsername = async (req: AuthenticatedRequest, res: Response
         bio: true,
         avatarUrl: true,
         bannerUrl: true,
+        lastSeen: true,
         createdAt: true,
       },
     });
@@ -105,6 +106,7 @@ export const getUserByUsername = async (req: AuthenticatedRequest, res: Response
           bio: true,
           avatarUrl: true,
           bannerUrl: true,
+          lastSeen: true,
           createdAt: true,
         },
       });
@@ -141,6 +143,7 @@ export const getUserByUsername = async (req: AuthenticatedRequest, res: Response
       avatarUrl: user.avatarUrl,
       bannerUrl: user.bannerUrl,
       bio: user.bio,
+      lastSeen: user.lastSeen,
       createdAt: user.createdAt,
       followersCount,
       followingCount,
@@ -188,6 +191,7 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
         bio: true,
         avatarUrl: true,
         bannerUrl: true,
+        lastSeen: true,
         createdAt: true,
       },
     });
@@ -223,6 +227,7 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
       avatarUrl: user.avatarUrl,
       bannerUrl: user.bannerUrl,
       bio: user.bio,
+      lastSeen: user.lastSeen,
       createdAt: user.createdAt,
       followersCount,
       followingCount,
