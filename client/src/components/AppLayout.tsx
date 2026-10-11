@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import authService, { type User } from '../services/authService';
+import messageService from '../services/messageService';
+import getSocket, { joinUserRoom } from '../services/socket';
 
 interface AppLayoutProps {
   children?: React.ReactNode;
@@ -13,6 +15,16 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
   const location = useLocation();
   const [user, setUser] = useState<User | null>(initialUser ?? null);
   const [loading, setLoading] = useState(initialUser === undefined);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const count = await messageService.getUnreadCount();
+      setUnreadMessagesCount(count);
+    } catch {
+      // silently fail if network or unauthorized
+    }
+  }, []);
 
   useEffect(() => {
     if (initialUser !== undefined) return;
@@ -37,6 +49,49 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
       isMounted = false;
     };
   }, [initialUser]);
+
+  // Load unread count and listen for socket message events
+  useEffect(() => {
+    if (!user?.id) return;
+
+    joinUserRoom(user.id);
+    fetchUnreadCount();
+
+    const socket = getSocket();
+
+    const handleUnreadCount = ({ count }: { count: number }) => {
+      setUnreadMessagesCount(count);
+    };
+
+    const handleNewMessage = (msg: { receiverId: string }) => {
+      if (msg.receiverId === user.id) {
+        fetchUnreadCount();
+      }
+    };
+
+    const handleMessagesRead = ({ readerId }: { readerId?: string } = {}) => {
+      if (!readerId || readerId === user.id) {
+        fetchUnreadCount();
+      }
+    };
+
+    socket.on('unread_count', handleUnreadCount);
+    socket.on('new_message', handleNewMessage);
+    socket.on('messages_read', handleMessagesRead);
+
+    return () => {
+      socket.off('unread_count', handleUnreadCount);
+      socket.off('new_message', handleNewMessage);
+      socket.off('messages_read', handleMessagesRead);
+    };
+  }, [user?.id, fetchUnreadCount]);
+
+  // Whenever the user navigates, refresh unread count
+  useEffect(() => {
+    if (user?.id) {
+      fetchUnreadCount();
+    }
+  }, [location.pathname, user?.id, fetchUnreadCount]);
 
   const handleLogout = async () => {
     try {
@@ -78,6 +133,7 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
           avatarUrl={user?.avatarUrl}
           userInitials={userInitials}
           username={user?.username}
+          unreadMessagesCount={unreadMessagesCount}
           onLogout={handleLogout}
         />
 
@@ -88,6 +144,7 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
                 context={{
                   user,
                   onUserUpdated: (updatedUser: User) => setUser(updatedUser),
+                  refreshUnreadCount: fetchUnreadCount,
                 }}
               />
             )}
@@ -97,4 +154,3 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
     </div>
   );
 }
-

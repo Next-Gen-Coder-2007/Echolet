@@ -31,6 +31,7 @@ interface SidebarProps {
   onLogout?: () => void;
   onCreateClick?: () => void;
   onSettingsClick?: () => void;
+  unreadMessagesCount?: number;
 }
 
 export default function Sidebar({
@@ -42,6 +43,7 @@ export default function Sidebar({
   onLogout,
   onCreateClick,
   onSettingsClick,
+  unreadMessagesCount = 0,
 }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -210,6 +212,11 @@ export default function Sidebar({
                   isActive ? 'stroke-[2.2]' : 'stroke-[1.6]'
                 }`}
               />
+              {item.id === 'messages' && unreadMessagesCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white shadow-xs pointer-events-none select-none z-20">
+                  {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
+                </span>
+              )}
             </button>
           );
         })}
