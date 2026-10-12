@@ -13,6 +13,9 @@ import {
   emitGroupUpdated,
   emitGroupCreated,
   emitGroupMemberUpdate,
+  emitGroupMessageStarred,
+  emitGroupMessagePinned,
+  emitGroupChatCleared,
   addUsersToGroupSocketRoom,
   removeUsersFromGroupSocketRoom,
 } from '../socket';
@@ -451,6 +454,12 @@ export const getGroupMessages = async (
       senderId: msg.senderId,
       content: msg.content,
       messageType: msg.messageType,
+      audioUrl: msg.audioUrl,
+      audioDuration: msg.audioDuration,
+      isPinned: msg.isPinned,
+      pinnedAt: msg.pinnedAt,
+      pinnedBy: msg.pinnedBy,
+      starredBy: msg.starredBy,
       replyTo: msg.replyTo,
       isEdited: msg.isEdited,
       editedAt: msg.editedAt,
@@ -489,9 +498,13 @@ export const sendGroupMessage = async (
     }
 
     const groupId = getParam(req.params.groupId);
-    const { content, messageType = 'text', replyTo } = req.body;
+    const messageType = req.body.messageType || 'text';
+    let content = (typeof req.body.content === 'string' ? req.body.content : '').trim();
+    if (!content && (messageType === 'voice' || messageType === 'audio')) {
+      content = 'Voice message';
+    }
 
-    if (!content || typeof content !== 'string' || !content.trim()) {
+    if (!content) {
       res.status(400).json({ status: 'error', message: 'Message content is required' });
       return;
     }
@@ -513,9 +526,11 @@ export const sendGroupMessage = async (
     const newMsg = messageRepository.create({
       groupId,
       senderId: currentUserId,
-      content: content.trim(),
+      content,
       messageType,
-      replyTo: replyTo || undefined,
+      audioUrl: req.body.audioUrl || null,
+      audioDuration: req.body.audioDuration ? Number(req.body.audioDuration) : undefined,
+      replyTo: req.body.replyTo || undefined,
     });
     const savedMsg = await messageRepository.save(newMsg);
 
@@ -678,6 +693,171 @@ export const deleteGroupMessage = async (
   } catch (error) {
     console.error('Delete group message error:', error);
     res.status(500).json({ status: 'error', message: 'Failed to delete message' });
+  }
+};
+
+export const toggleStarGroupMessage = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const groupId = getParam(req.params.groupId);
+    const messageId = getParam(req.params.messageId);
+
+    const messageRepository = AppDataSource.getRepository(GroupMessage);
+    const memberRepository = AppDataSource.getRepository(GroupMember);
+
+    const membership = await memberRepository.findOne({
+      where: { groupId, userId: currentUserId },
+    });
+
+    if (!membership) {
+      res.status(403).json({ status: 'error', message: 'You are not a member of this group' });
+      return;
+    }
+
+    const message = await messageRepository.findOne({
+      where: { id: messageId, groupId },
+      relations: { sender: true },
+    });
+
+    if (!message) {
+      res.status(404).json({ status: 'error', message: 'Message not found' });
+      return;
+    }
+
+    let starredBy = Array.isArray(message.starredBy) ? [...message.starredBy] : [];
+    if (starredBy.includes(currentUserId)) {
+      starredBy = starredBy.filter((id) => id !== currentUserId);
+    } else {
+      starredBy.push(currentUserId);
+    }
+    message.starredBy = starredBy;
+
+    const saved = await messageRepository.save(message);
+    emitGroupMessageStarred(saved);
+
+    res.json({
+      status: 'success',
+      message: saved,
+      isStarred: starredBy.includes(currentUserId),
+    });
+  } catch (error) {
+    console.error('Toggle star group message error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to toggle star' });
+  }
+};
+
+export const togglePinGroupMessage = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const groupId = getParam(req.params.groupId);
+    const messageId = getParam(req.params.messageId);
+
+    const messageRepository = AppDataSource.getRepository(GroupMessage);
+    const memberRepository = AppDataSource.getRepository(GroupMember);
+
+    const membership = await memberRepository.findOne({
+      where: { groupId, userId: currentUserId },
+    });
+
+    if (!membership) {
+      res.status(403).json({ status: 'error', message: 'You are not a member of this group' });
+      return;
+    }
+
+    const message = await messageRepository.findOne({
+      where: { id: messageId, groupId },
+      relations: { sender: true },
+    });
+
+    if (!message) {
+      res.status(404).json({ status: 'error', message: 'Message not found' });
+      return;
+    }
+
+    const isNowPinned = !message.isPinned;
+    message.isPinned = isNowPinned;
+    message.pinnedAt = isNowPinned ? new Date() : undefined;
+    message.pinnedBy = isNowPinned ? currentUserId : undefined;
+
+    const saved = await messageRepository.save(message);
+    emitGroupMessagePinned(saved);
+
+    res.json({
+      status: 'success',
+      message: saved,
+      isPinned: isNowPinned,
+    });
+  } catch (error) {
+    console.error('Toggle pin group message error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to toggle pin' });
+  }
+};
+
+export const clearGroupChat = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const groupId = getParam(req.params.groupId);
+    const messageRepository = AppDataSource.getRepository(GroupMessage);
+    const memberRepository = AppDataSource.getRepository(GroupMember);
+
+    const membership = await memberRepository.findOne({
+      where: { groupId, userId: currentUserId },
+    });
+
+    if (!membership) {
+      res.status(403).json({ status: 'error', message: 'You are not a member of this group' });
+      return;
+    }
+
+    const messages = await messageRepository.find({
+      where: { groupId },
+    });
+
+    for (const msg of messages) {
+      const deletedFor = Array.isArray(msg.deletedFor) ? [...msg.deletedFor] : [];
+      if (!deletedFor.includes(currentUserId)) {
+        deletedFor.push(currentUserId);
+        msg.deletedFor = deletedFor;
+      }
+    }
+
+    if (messages.length > 0) {
+      await messageRepository.save(messages);
+    }
+
+    emitGroupChatCleared(groupId, currentUserId);
+
+    res.json({
+      status: 'success',
+      message: 'Group chat cleared successfully',
+    });
+  } catch (error) {
+    console.error('Clear group chat error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to clear group chat' });
   }
 };
 

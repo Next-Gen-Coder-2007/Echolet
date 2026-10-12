@@ -8,6 +8,10 @@ import {
   emitMessagesRead,
   emitMessageEdited,
   emitMessageDeletedForEveryone,
+  emitMessageStarred,
+  emitMessagePinned,
+  emitChatCleared,
+  emitChatSettingsUpdated,
   isUserOnline,
 } from '../socket';
 
@@ -266,17 +270,40 @@ export const sendMessage = async (
       return;
     }
 
-    const content = (req.body.content || '').trim();
+    const messageType = req.body.messageType || 'text';
+    let content = (req.body.content || '').trim();
+    if (!content && (messageType === 'voice' || messageType === 'audio')) {
+      content = 'Voice message';
+    }
+
     if (!content) {
       res.status(400).json({ status: 'error', message: 'Message content cannot be empty' });
       return;
     }
 
     const userRepository = AppDataSource.getRepository(User);
+    const currentUser = await userRepository.findOne({ where: { id: currentUserId } });
     const targetUser = await userRepository.findOne({ where: { id: targetUserId } });
 
     if (!targetUser) {
       res.status(404).json({ status: 'error', message: 'Recipient not found' });
+      return;
+    }
+
+    // Check if either user has blocked the other
+    if (currentUser?.blockedUsers && currentUser.blockedUsers.includes(targetUserId)) {
+      res.status(403).json({
+        status: 'error',
+        message: 'You have blocked this contact. Unblock to send messages.',
+      });
+      return;
+    }
+
+    if (targetUser.blockedUsers && targetUser.blockedUsers.includes(currentUserId)) {
+      res.status(403).json({
+        status: 'error',
+        message: 'You cannot send messages to this contact.',
+      });
       return;
     }
 
@@ -289,6 +316,9 @@ export const sendMessage = async (
       senderId: currentUserId,
       receiverId: targetUserId,
       content,
+      messageType,
+      audioUrl: req.body.audioUrl || null,
+      audioDuration: req.body.audioDuration ? Number(req.body.audioDuration) : undefined,
       isRead: false,
       status: initialStatus,
       replyTo: req.body.replyTo || null,
@@ -489,3 +519,256 @@ export const deleteMessage = async (
     res.status(500).json({ status: 'error', message: 'Failed to delete message' });
   }
 };
+
+export const toggleStarMessage = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const rawMessageId = Array.isArray(req.params.messageId)
+      ? req.params.messageId[0]
+      : req.params.messageId;
+    const messageId = (rawMessageId || '').trim();
+
+    const messageRepository = AppDataSource.getRepository(Message);
+    const message = await messageRepository.findOne({ where: { id: messageId } });
+
+    if (!message) {
+      res.status(404).json({ status: 'error', message: 'Message not found' });
+      return;
+    }
+
+    let starredBy = Array.isArray(message.starredBy) ? [...message.starredBy] : [];
+    if (starredBy.includes(currentUserId)) {
+      starredBy = starredBy.filter((id) => id !== currentUserId);
+    } else {
+      starredBy.push(currentUserId);
+    }
+    message.starredBy = starredBy;
+
+    const saved = await messageRepository.save(message);
+    emitMessageStarred(saved);
+
+    res.json({
+      status: 'success',
+      message: saved,
+      isStarred: starredBy.includes(currentUserId),
+    });
+  } catch (error) {
+    console.error('Toggle star message error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to toggle star' });
+  }
+};
+
+export const togglePinMessage = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const rawMessageId = Array.isArray(req.params.messageId)
+      ? req.params.messageId[0]
+      : req.params.messageId;
+    const messageId = (rawMessageId || '').trim();
+
+    const messageRepository = AppDataSource.getRepository(Message);
+    const message = await messageRepository.findOne({ where: { id: messageId } });
+
+    if (!message) {
+      res.status(404).json({ status: 'error', message: 'Message not found' });
+      return;
+    }
+
+    const isNowPinned = !message.isPinned;
+    message.isPinned = isNowPinned;
+    message.pinnedAt = isNowPinned ? new Date() : undefined;
+    message.pinnedBy = isNowPinned ? currentUserId : undefined;
+
+    const saved = await messageRepository.save(message);
+    emitMessagePinned(saved);
+
+    res.json({
+      status: 'success',
+      message: saved,
+      isPinned: isNowPinned,
+    });
+  } catch (error) {
+    console.error('Toggle pin message error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to toggle pin' });
+  }
+};
+
+export const clearConversation = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const rawTargetId = Array.isArray(req.params.userId)
+      ? req.params.userId[0]
+      : req.params.userId;
+    const targetUserId = (rawTargetId || '').trim();
+
+    if (!targetUserId) {
+      res.status(400).json({ status: 'error', message: 'Target user ID is required' });
+      return;
+    }
+
+    const messageRepository = AppDataSource.getRepository(Message);
+    const messages = await messageRepository
+      .createQueryBuilder('m')
+      .where(
+        '(m.senderId = :currentUserId AND m.receiverId = :targetUserId) OR (m.senderId = :targetUserId AND m.receiverId = :currentUserId)',
+        { currentUserId, targetUserId }
+      )
+      .getMany();
+
+    for (const msg of messages) {
+      const deletedFor = Array.isArray(msg.deletedFor) ? [...msg.deletedFor] : [];
+      if (!deletedFor.includes(currentUserId)) {
+        deletedFor.push(currentUserId);
+        msg.deletedFor = deletedFor;
+      }
+    }
+
+    if (messages.length > 0) {
+      await messageRepository.save(messages);
+    }
+
+    emitChatCleared(currentUserId, targetUserId);
+
+    res.json({
+      status: 'success',
+      message: 'Chat cleared successfully',
+    });
+  } catch (error) {
+    console.error('Clear conversation error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to clear conversation' });
+  }
+};
+
+export const getChatSettings = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({ where: { id: currentUserId } });
+
+    if (!user) {
+      res.status(404).json({ status: 'error', message: 'User not found' });
+      return;
+    }
+
+    res.json({
+      status: 'success',
+      settings: {
+        archivedChats: user.archivedChats || [],
+        mutedChats: user.mutedChats || [],
+        pinnedChats: user.pinnedChats || [],
+        unreadChats: user.unreadChats || [],
+        favouriteChats: user.favouriteChats || [],
+        blockedUsers: user.blockedUsers || [],
+      },
+    });
+  } catch (error) {
+    console.error('Get chat settings error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to retrieve chat settings' });
+  }
+};
+
+export const updateChatSettings = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const { action, chatId, targetUserId } = req.body;
+    const targetId = (chatId || targetUserId || '').trim();
+
+    if (!targetId) {
+      res.status(400).json({ status: 'error', message: 'chatId or targetUserId is required' });
+      return;
+    }
+
+    const userRepository = AppDataSource.getRepository(User);
+    const user = await userRepository.findOne({ where: { id: currentUserId } });
+
+    if (!user) {
+      res.status(404).json({ status: 'error', message: 'User not found' });
+      return;
+    }
+
+    const toggle = (list?: string[], item?: string) => {
+      if (!item) return list || [];
+      const arr = Array.isArray(list) ? [...list] : [];
+      return arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item];
+    };
+
+    if (action === 'toggle_archive') {
+      user.archivedChats = toggle(user.archivedChats, targetId);
+    } else if (action === 'toggle_mute') {
+      user.mutedChats = toggle(user.mutedChats, targetId);
+    } else if (action === 'toggle_pin') {
+      user.pinnedChats = toggle(user.pinnedChats, targetId);
+    } else if (action === 'toggle_unread') {
+      user.unreadChats = toggle(user.unreadChats, targetId);
+    } else if (action === 'toggle_favourite') {
+      user.favouriteChats = toggle(user.favouriteChats, targetId);
+    } else if (action === 'toggle_block') {
+      user.blockedUsers = toggle(user.blockedUsers, targetId);
+    } else {
+      res.status(400).json({ status: 'error', message: 'Invalid action' });
+      return;
+    }
+
+    await userRepository.save(user);
+
+    const updatedSettings = {
+      archivedChats: user.archivedChats || [],
+      mutedChats: user.mutedChats || [],
+      pinnedChats: user.pinnedChats || [],
+      unreadChats: user.unreadChats || [],
+      favouriteChats: user.favouriteChats || [],
+      blockedUsers: user.blockedUsers || [],
+    };
+
+    emitChatSettingsUpdated(currentUserId, updatedSettings);
+
+    res.json({
+      status: 'success',
+      settings: updatedSettings,
+    });
+  } catch (error) {
+    console.error('Update chat settings error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to update chat settings' });
+  }
+};
+
