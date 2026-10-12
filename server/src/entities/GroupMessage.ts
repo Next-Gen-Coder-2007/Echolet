@@ -24,7 +24,13 @@ export class GroupMessage {
   content: string;
 
   @Column({ type: 'varchar', length: 20, default: 'text' })
-  messageType: 'text' | 'image' | 'system';
+  messageType: 'text' | 'image' | 'voice' | 'audio' | 'system';
+
+  @Column({ type: 'text', nullable: true })
+  audioUrl?: string;
+
+  @Column({ type: 'float', nullable: true })
+  audioDuration?: number;
 
   @Column({ type: 'simple-json', nullable: true })
   replyTo?: { id: string; senderId: string; senderName: string; content: string };
@@ -34,6 +40,18 @@ export class GroupMessage {
 
   @Column({ nullable: true })
   editedAt?: Date;
+
+  @Column({ type: 'boolean', default: false })
+  isPinned: boolean;
+
+  @Column({ nullable: true })
+  pinnedAt?: Date;
+
+  @Column({ type: 'uuid', nullable: true })
+  pinnedBy?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  starredBy?: string[];
 
   @Column({ type: 'boolean', default: false })
   isDeletedForEveryone: boolean;

@@ -46,6 +46,24 @@ export class User {
   @Column({ nullable: true })
   lastSeen?: Date;
 
+  @Column({ type: 'simple-json', nullable: true })
+  archivedChats?: string[];
+
+  @Column({ type: 'simple-json', nullable: true })
+  mutedChats?: string[];
+
+  @Column({ type: 'simple-json', nullable: true })
+  pinnedChats?: string[];
+
+  @Column({ type: 'simple-json', nullable: true })
+  unreadChats?: string[];
+
+  @Column({ type: 'simple-json', nullable: true })
+  favouriteChats?: string[];
+
+  @Column({ type: 'simple-json', nullable: true })
+  blockedUsers?: string[];
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -297,6 +297,47 @@ export const emitMessageDeletedForEveryone = (message: Message) => {
   }
 };
 
+export const emitMessageStarred = (message: Message) => {
+  if (!io) return;
+  io.to(message.receiverId).emit('message_starred', message);
+  if (message.receiverId !== message.senderId) {
+    io.to(message.senderId).emit('message_starred', message);
+  }
+};
+
+export const emitMessagePinned = (message: Message) => {
+  if (!io) return;
+  io.to(message.receiverId).emit('message_pinned', message);
+  if (message.receiverId !== message.senderId) {
+    io.to(message.senderId).emit('message_pinned', message);
+  }
+};
+
+export const emitChatCleared = (userId: string, partnerId: string) => {
+  if (!io) return;
+  io.to(userId).emit('chat_cleared', { userId, partnerId });
+};
+
+export const emitGroupMessageStarred = (message: any) => {
+  if (!io) return;
+  io.to(`group:${message.groupId}`).emit('group_message_starred', message);
+};
+
+export const emitGroupMessagePinned = (message: any) => {
+  if (!io) return;
+  io.to(`group:${message.groupId}`).emit('group_message_pinned', message);
+};
+
+export const emitGroupChatCleared = (groupId: string, userId: string) => {
+  if (!io) return;
+  io.to(userId).emit('group_chat_cleared', { groupId, userId });
+};
+
+export const emitChatSettingsUpdated = (userId: string, settings: any) => {
+  if (!io) return;
+  io.to(userId).emit('chat_settings_updated', settings);
+};
+
 export const emitNewPost = (post: any) => {
   if (!io) return;
   io.emit('new_post', post);
