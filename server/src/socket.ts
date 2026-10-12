@@ -3,6 +3,9 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { AppDataSource } from './config/database';
 import { Message } from './entities/Message';
 import { User } from './entities/User';
+import { GroupMember } from './entities/GroupMember';
+import { GroupMessage } from './entities/GroupMessage';
+import { Group } from './entities/Group';
 
 let io: SocketIOServer | null = null;
 
@@ -40,6 +43,22 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
         onlineUsers.set(userId, new Set());
       }
       onlineUsers.get(userId)!.add(socket.id);
+
+      // Join all group rooms the user belongs to
+      try {
+        if (AppDataSource.isInitialized) {
+          const memberRepository = AppDataSource.getRepository(GroupMember);
+          const userGroups = await memberRepository.find({
+            where: { userId },
+            select: { groupId: true },
+          });
+          userGroups.forEach((g) => {
+            socket.join(`group:${g.groupId}`);
+          });
+        }
+      } catch (err) {
+        console.error('Error joining group rooms on connect:', err);
+      }
 
       // Send the currently online users list to this client
       socket.emit('online_users', Array.from(onlineUsers.keys()));
@@ -90,6 +109,19 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
       handleUserDisconnect(socket.id, userId);
     });
 
+    // Group room subscriptions
+    socket.on('join_group', (groupId: string) => {
+      if (groupId) {
+        socket.join(`group:${groupId}`);
+      }
+    });
+
+    socket.on('leave_group', (groupId: string) => {
+      if (groupId) {
+        socket.leave(`group:${groupId}`);
+      }
+    });
+
     // Real-time mark-as-read via WebSocket
     socket.on('mark_as_read', async ({ readerId, partnerId }: { readerId: string; partnerId: string }) => {
       if (!readerId || !partnerId) return;
@@ -130,6 +162,40 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
         io?.to(receiverId).emit('stop_typing', { senderId, receiverId });
       }
     });
+
+    // Group Typing indicators
+    socket.on(
+      'group_typing',
+      ({
+        groupId,
+        userId,
+        userName,
+      }: {
+        groupId: string;
+        userId: string;
+        userName: string;
+      }) => {
+        if (groupId) {
+          socket.to(`group:${groupId}`).emit('group_typing', {
+            groupId,
+            userId,
+            userName,
+          });
+        }
+      }
+    );
+
+    socket.on(
+      'group_stop_typing',
+      ({ groupId, userId }: { groupId: string; userId: string }) => {
+        if (groupId) {
+          socket.to(`group:${groupId}`).emit('group_stop_typing', {
+            groupId,
+            userId,
+          });
+        }
+      }
+    );
 
     socket.on('disconnect', () => {
       const userId = socketToUser.get(socket.id);
@@ -188,7 +254,9 @@ export const emitUnreadCount = async (userId: string) => {
 export const emitNewMessage = async (message: Message) => {
   if (!io) return;
   io.to(message.receiverId).emit('new_message', message);
-  io.to(message.senderId).emit('new_message', message);
+  if (message.receiverId !== message.senderId) {
+    io.to(message.senderId).emit('new_message', message);
+  }
   // Send updated unread count to receiver in real time
   await emitUnreadCount(message.receiverId);
 };
@@ -197,8 +265,10 @@ export const emitMessagesRead = (readerId: string, partnerId: string, messageIds
   if (!io) return;
   // Notify sender (partnerId) so their message ticks turn double blue in real-time
   io.to(partnerId).emit('messages_read', { readerId, partnerId, messageIds });
-  // Notify reader (readerId) so their own tabs/badges update in real-time
-  io.to(readerId).emit('messages_read', { readerId, partnerId, messageIds });
+  if (readerId !== partnerId) {
+    // Notify reader (readerId) so their own tabs/badges update in real-time
+    io.to(readerId).emit('messages_read', { readerId, partnerId, messageIds });
+  }
   // Emit updated unread count to reader in real time
   emitUnreadCount(readerId).catch(console.error);
 };
@@ -206,7 +276,9 @@ export const emitMessagesRead = (readerId: string, partnerId: string, messageIds
 export const emitMessageEdited = (message: Message) => {
   if (!io) return;
   io.to(message.receiverId).emit('message_edited', message);
-  io.to(message.senderId).emit('message_edited', message);
+  if (message.receiverId !== message.senderId) {
+    io.to(message.senderId).emit('message_edited', message);
+  }
 };
 
 export const emitMessageDeletedForEveryone = (message: Message) => {
@@ -216,11 +288,13 @@ export const emitMessageDeletedForEveryone = (message: Message) => {
     content: message.content,
     isDeletedForEveryone: true,
   });
-  io.to(message.senderId).emit('message_deleted_for_everyone', {
-    messageId: message.id,
-    content: message.content,
-    isDeletedForEveryone: true,
-  });
+  if (message.receiverId !== message.senderId) {
+    io.to(message.senderId).emit('message_deleted_for_everyone', {
+      messageId: message.id,
+      content: message.content,
+      isDeletedForEveryone: true,
+    });
+  }
 };
 
 export const emitNewPost = (post: any) => {
@@ -242,3 +316,82 @@ export const emitNewComment = (comment: any) => {
   if (!io) return;
   io.emit('new_comment', comment);
 };
+
+export const emitNewGroupMessage = (message: any) => {
+  if (!io) return;
+  io.to(`group:${message.groupId}`).emit('new_group_message', message);
+};
+
+export const emitGroupMessageEdited = (message: any) => {
+  if (!io) return;
+  io.to(`group:${message.groupId}`).emit('group_message_edited', message);
+};
+
+export const emitGroupMessageDeleted = (
+  groupId: string,
+  messageId: string,
+  isDeletedForEveryone: boolean
+) => {
+  if (!io) return;
+  io.to(`group:${groupId}`).emit('group_message_deleted', {
+    groupId,
+    messageId,
+    isDeletedForEveryone,
+  });
+};
+
+export const emitGroupUpdated = (group: any) => {
+  if (!io) return;
+  io.to(`group:${group.id}`).emit('group_updated', group);
+};
+
+export const emitGroupCreated = (group: any, memberUserIds: string[]) => {
+  if (!io) return;
+  memberUserIds.forEach((userId) => {
+    io?.to(userId).emit('group_created', group);
+    const userSockets = onlineUsers.get(userId);
+    if (userSockets) {
+      userSockets.forEach((sId) => {
+        io?.sockets.sockets.get(sId)?.join(`group:${group.id}`);
+      });
+    }
+  });
+};
+
+export const emitGroupMemberUpdate = (
+  groupId: string,
+  event: 'joined' | 'left' | 'removed' | 'role_changed',
+  memberData: any
+) => {
+  if (!io) return;
+  io.to(`group:${groupId}`).emit('group_member_update', {
+    groupId,
+    event,
+    ...memberData,
+  });
+};
+
+export const addUsersToGroupSocketRoom = (groupId: string, userIds: string[]) => {
+  if (!io) return;
+  userIds.forEach((userId) => {
+    const userSockets = onlineUsers.get(userId);
+    if (userSockets) {
+      userSockets.forEach((sId) => {
+        io?.sockets.sockets.get(sId)?.join(`group:${groupId}`);
+      });
+    }
+  });
+};
+
+export const removeUsersFromGroupSocketRoom = (groupId: string, userIds: string[]) => {
+  if (!io) return;
+  userIds.forEach((userId) => {
+    const userSockets = onlineUsers.get(userId);
+    if (userSockets) {
+      userSockets.forEach((sId) => {
+        io?.sockets.sockets.get(sId)?.leave(`group:${groupId}`);
+      });
+    }
+  });
+};
+

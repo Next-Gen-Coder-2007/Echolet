@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import messageRoutes from './routes/message.routes';
 import postRoutes from './routes/post.routes';
+import groupRoutes from './routes/group.routes';
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ app.get('/api', (_req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/groups', groupRoutes);
 app.use('/api/posts', postRoutes);
 
 const httpServer = http.createServer(app);
