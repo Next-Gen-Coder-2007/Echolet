@@ -59,7 +59,7 @@
 | 10 | **Trending** | ⚪ 0% | — | Trending ranking engine (engagement + velocity + recency) |
 | 11 | **Hashtags** | 🔴 ~10% | Hashtags can be typed into posts | Hashtag parsing/indexing, hashtag pages, follow hashtags, search hashtags |
 | 12 | **Search** | 🟡 ~35% | Real-time user search by username/display name | Search posts, reels, hashtags, and media |
-| 13 | **Messaging** | 🟡 ~45% | Real-time 1-to-1 direct messaging via WebSockets | Media sharing, typing indicator, online status, group chats, global chatroom |
+| 13 | **Messaging** | 🟢 ~75% | Real-time 1-to-1 direct messaging, group chat creation & management (add/remove members, roles, admin moderation, system alerts, real-time typing, unread badges) via WebSockets | Media sharing, global chatroom |
 | 14 | **Notifications** | 🔴 ~15% | Frontend UI layout (`Notifications.tsx`) with mock data | Backend entity, DB persistence, real-time socket triggers on interactions |
 | 15 | **Bookmarks** | 🟡 ~55% | Save/unsave posts, saved posts feed | Custom collections/folders (Memes, Movies, Programming, etc.) |
 | 16 | **Reactions** | 🔴 ~20% | Binary like/heart on posts & comments | Rich emoji reactions (Love, Funny, Fire, Wow, Sad, Dead, Applause) |
