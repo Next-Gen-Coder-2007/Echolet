@@ -11,6 +11,9 @@ import { PostBookmark } from '../entities/PostBookmark';
 import { Comment } from '../entities/Comment';
 import { PollVote } from '../entities/PollVote';
 import { CommentLike } from '../entities/CommentLike';
+import { Group } from '../entities/Group';
+import { GroupMember } from '../entities/GroupMember';
+import { GroupMessage } from '../entities/GroupMessage';
 
 dotenv.config();
 
@@ -18,7 +21,20 @@ const databaseUrl = process.env.DATABASE_URL?.trim();
 const isPostgres =
   databaseUrl?.startsWith('postgres://') || databaseUrl?.startsWith('postgresql://');
 
-const entitiesList = [User, Follow, Message, Post, PostLike, PostBookmark, Comment, CommentLike, PollVote];
+const entitiesList = [
+  User,
+  Follow,
+  Message,
+  Post,
+  PostLike,
+  PostBookmark,
+  Comment,
+  CommentLike,
+  PollVote,
+  Group,
+  GroupMember,
+  GroupMessage,
+];
 
 export const AppDataSource = isPostgres
   ? new DataSource({
