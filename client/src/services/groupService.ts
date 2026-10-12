@@ -22,7 +22,13 @@ export interface GroupMessageItem {
   groupId: string;
   senderId?: string;
   content: string;
-  messageType: 'text' | 'image' | 'system';
+  messageType: 'text' | 'image' | 'voice' | 'audio' | 'system';
+  audioUrl?: string;
+  audioDuration?: number;
+  isPinned?: boolean;
+  pinnedAt?: string;
+  pinnedBy?: string;
+  starredBy?: string[];
   replyTo?: { id: string; senderId: string; senderName: string; content: string } | null;
   isEdited?: boolean;
   editedAt?: string;
@@ -112,7 +118,9 @@ export const groupService = {
     content: string,
     options?: {
       replyTo?: { id: string; senderId: string; senderName: string; content: string } | null;
-      messageType?: 'text' | 'image';
+      messageType?: 'text' | 'image' | 'voice' | 'audio' | 'system';
+      audioUrl?: string;
+      audioDuration?: number;
     }
   ): Promise<GroupMessageItem> {
     const response = await api.post<{ status: string; message: GroupMessageItem }>(
@@ -121,9 +129,35 @@ export const groupService = {
         content,
         replyTo: options?.replyTo,
         messageType: options?.messageType || 'text',
+        audioUrl: options?.audioUrl,
+        audioDuration: options?.audioDuration,
       }
     );
     return response.data.message;
+  },
+
+  async toggleStarGroupMessage(
+    groupId: string,
+    messageId: string
+  ): Promise<{ message: GroupMessageItem; isStarred: boolean }> {
+    const response = await api.post<{ status: string; message: GroupMessageItem; isStarred: boolean }>(
+      `/groups/${encodeURIComponent(groupId)}/messages/${encodeURIComponent(messageId)}/star`
+    );
+    return response.data;
+  },
+
+  async togglePinGroupMessage(
+    groupId: string,
+    messageId: string
+  ): Promise<{ message: GroupMessageItem; isPinned: boolean }> {
+    const response = await api.post<{ status: string; message: GroupMessageItem; isPinned: boolean }>(
+      `/groups/${encodeURIComponent(groupId)}/messages/${encodeURIComponent(messageId)}/pin`
+    );
+    return response.data;
+  },
+
+  async clearGroupChat(groupId: string): Promise<void> {
+    await api.post(`/groups/${encodeURIComponent(groupId)}/clear`);
   },
 
   async editGroupMessage(

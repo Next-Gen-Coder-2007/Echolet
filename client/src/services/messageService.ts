@@ -13,15 +13,31 @@ export interface MessageItem {
   senderId: string;
   receiverId: string;
   content: string;
+  messageType?: 'text' | 'image' | 'voice' | 'audio' | 'system';
+  audioUrl?: string;
+  audioDuration?: number;
   isRead: boolean;
   status?: 'sent' | 'delivered' | 'read';
   isEdited?: boolean;
   editedAt?: string;
+  isPinned?: boolean;
+  pinnedAt?: string;
+  pinnedBy?: string;
+  starredBy?: string[];
   replyTo?: MessageReplyInfo | null;
   isForwarded?: boolean;
   isDeletedForEveryone?: boolean;
   deletedFor?: string[];
   createdAt: string;
+}
+
+export interface ChatSettings {
+  archivedChats: string[];
+  mutedChats: string[];
+  pinnedChats: string[];
+  unreadChats: string[];
+  favouriteChats: string[];
+  blockedUsers: string[];
 }
 
 export interface ConversationItem {
@@ -62,6 +78,9 @@ export const messageService = {
     options?: {
       replyTo?: MessageReplyInfo | null;
       isForwarded?: boolean;
+      messageType?: 'text' | 'image' | 'voice' | 'audio' | 'system';
+      audioUrl?: string;
+      audioDuration?: number;
     }
   ): Promise<MessageItem> {
     const response = await api.post<{ status: string; message: MessageItem }>(
@@ -70,6 +89,9 @@ export const messageService = {
         content,
         replyTo: options?.replyTo,
         isForwarded: options?.isForwarded,
+        messageType: options?.messageType || 'text',
+        audioUrl: options?.audioUrl,
+        audioDuration: options?.audioDuration,
       }
     );
     return response.data.message;
@@ -81,6 +103,57 @@ export const messageService = {
       { content }
     );
     return response.data.message;
+  },
+
+  async toggleStarMessage(messageId: string): Promise<{ message: MessageItem; isStarred: boolean }> {
+    const response = await api.post<{ status: string; message: MessageItem; isStarred: boolean }>(
+      `/messages/item/${encodeURIComponent(messageId)}/star`
+    );
+    return response.data;
+  },
+
+  async togglePinMessage(messageId: string): Promise<{ message: MessageItem; isPinned: boolean }> {
+    const response = await api.post<{ status: string; message: MessageItem; isPinned: boolean }>(
+      `/messages/item/${encodeURIComponent(messageId)}/pin`
+    );
+    return response.data;
+  },
+
+  async clearConversation(userId: string): Promise<void> {
+    await api.post(`/messages/${encodeURIComponent(userId)}/clear`);
+  },
+
+  async getChatSettings(): Promise<ChatSettings> {
+    const response = await api.get<{ status: string; settings: ChatSettings }>(
+      '/messages/chat-settings'
+    );
+    return (
+      response.data.settings || {
+        archivedChats: [],
+        mutedChats: [],
+        pinnedChats: [],
+        unreadChats: [],
+        favouriteChats: [],
+        blockedUsers: [],
+      }
+    );
+  },
+
+  async updateChatSettings(
+    action:
+      | 'toggle_archive'
+      | 'toggle_mute'
+      | 'toggle_pin'
+      | 'toggle_unread'
+      | 'toggle_favourite'
+      | 'toggle_block',
+    chatId: string
+  ): Promise<ChatSettings> {
+    const response = await api.post<{ status: string; settings: ChatSettings }>(
+      '/messages/chat-settings',
+      { action, chatId }
+    );
+    return response.data.settings;
   },
 
   async deleteMessage(
