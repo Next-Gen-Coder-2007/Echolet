@@ -8,14 +8,14 @@ import {
   HiOutlineHeart,
   HiOutlineBookmark,
   HiOutlineArrowRightOnRectangle,
-  HiOutlinePlus,
   HiOutlineCog6Tooth,
+  HiOutlineFilm,
 } from 'react-icons/hi2';
 
 export type SidebarTab =
   | 'home'
   | 'search'
-  | 'create'
+  | 'reels'
   | 'messages'
   | 'notifications'
   | 'heart'
@@ -29,7 +29,6 @@ interface SidebarProps {
   userInitials?: string;
   username?: string;
   onLogout?: () => void;
-  onCreateClick?: () => void;
   onSettingsClick?: () => void;
   unreadMessagesCount?: number;
 }
@@ -41,7 +40,6 @@ export default function Sidebar({
   userInitials = 'U',
   username,
   onLogout,
-  onCreateClick,
   onSettingsClick,
   unreadMessagesCount = 0,
 }: SidebarProps) {
@@ -59,6 +57,7 @@ export default function Sidebar({
 
   const getTabFromPath = (path: string): SidebarTab => {
     if (path.startsWith('/search')) return 'search';
+    if (path.startsWith('/reels')) return 'reels';
     if (path.startsWith('/messages')) return 'messages';
     if (path.startsWith('/notifications')) return 'notifications';
     if (path.startsWith('/favorites')) return 'heart';
@@ -93,11 +92,6 @@ export default function Sidebar({
   }, [selectedTab]);
 
   const handleSelect = (tab: SidebarTab) => {
-    if (tab === 'create') {
-      onCreateClick?.();
-      return;
-    }
-
     if (tab === 'settings') {
       if (onSettingsClick) {
         onSettingsClick();
@@ -112,6 +106,7 @@ export default function Sidebar({
     const pathMap: Record<string, string> = {
       home: '/',
       search: '/search',
+      reels: '/reels',
       messages: '/messages',
       notifications: '/notifications',
       heart: '/favorites',
@@ -124,7 +119,7 @@ export default function Sidebar({
     }
   };
 
-  const navItems: { id: SidebarTab; label: string; icon: any; isAction?: boolean }[] = [
+  const navItems: { id: SidebarTab; label: string; icon: any }[] = [
     {
       id: 'home',
       label: 'Home',
@@ -136,10 +131,9 @@ export default function Sidebar({
       icon: HiOutlineMagnifyingGlass,
     },
     {
-      id: 'create',
-      label: 'Create',
-      icon: HiOutlinePlus,
-      isAction: true,
+      id: 'reels',
+      label: 'Reels',
+      icon: HiOutlineFilm,
     },
     {
       id: 'messages',
@@ -185,10 +179,8 @@ export default function Sidebar({
         />
 
         {navItems.map((item) => {
-          const isActive = selectedTab === item.id && !item.isAction;
+          const isActive = selectedTab === item.id;
           const Icon = item.icon;
-          const isCreate = item.id === 'create';
-
           return (
             <button
               key={item.id}
@@ -202,8 +194,6 @@ export default function Sidebar({
               className={`relative z-10 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center cursor-pointer transition-all duration-200 active:scale-95 ${
                 isActive
                   ? 'text-white scale-105'
-                  : isCreate
-                  ? 'text-slate-500 hover:text-purple-600 hover:bg-purple-50/80 hover:scale-105'
                   : 'text-slate-500 hover:text-[#7928ca] hover:bg-purple-50/80 hover:scale-110'
               }`}
             >

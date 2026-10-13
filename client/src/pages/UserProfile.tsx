@@ -6,9 +6,12 @@ import {
   HiOutlineEnvelope,
   HiOutlineChatBubbleOvalLeftEllipsis,
   HiOutlinePencilSquare,
+  HiOutlinePlay,
+  HiOutlineHeart,
 } from 'react-icons/hi2';
 import userService, { type UserProfileResponse } from '../services/userService';
 import postService, { type Post } from '../services/postService';
+import reelService, { type Reel } from '../services/reelService';
 import PostCard from '../components/PostCard';
 import type { User } from '../services/authService';
 
@@ -25,8 +28,9 @@ export default function UserProfile() {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [isFollowSubmitting, setIsFollowSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'echoes' | 'media' | 'likes'>('echoes');
+  const [activeTab, setActiveTab] = useState<'echoes' | 'media' | 'reels' | 'likes'>('echoes');
   const [posts, setPosts] = useState<Post[]>([]);
+  const [userReels, setUserReels] = useState<Reel[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const [echoesCount, setEchoesCount] = useState(0);
 
@@ -74,23 +78,40 @@ export default function UserProfile() {
     let isMounted = true;
     setPostsLoading(true);
 
-    postService
-      .getUserPosts(profileUser.username, activeTab)
-      .then((data) => {
-        if (isMounted) {
-          setPosts(data);
-          if (activeTab === 'echoes') {
-            setEchoesCount(data.length);
+    if (activeTab === 'reels') {
+      reelService
+        .getUserReels(profileUser.username)
+        .then((data) => {
+          if (isMounted) {
+            setUserReels(data || []);
+            setPostsLoading(false);
           }
-          setPostsLoading(false);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setPosts([]);
-          setPostsLoading(false);
-        }
-      });
+        })
+        .catch(() => {
+          if (isMounted) {
+            setUserReels([]);
+            setPostsLoading(false);
+          }
+        });
+    } else {
+      postService
+        .getUserPosts(profileUser.username, activeTab)
+        .then((data) => {
+          if (isMounted) {
+            setPosts(data);
+            if (activeTab === 'echoes') {
+              setEchoesCount(data.length);
+            }
+            setPostsLoading(false);
+          }
+        })
+        .catch(() => {
+          if (isMounted) {
+            setPosts([]);
+            setPostsLoading(false);
+          }
+        });
+    }
 
     return () => {
       isMounted = false;
@@ -318,7 +339,7 @@ export default function UserProfile() {
         <div className="lg:col-span-8">
           <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-2 mb-6">
             <div className="flex border-b border-slate-100">
-              {(['echoes', 'media', 'likes'] as const).map((tab) => (
+              {(['echoes', 'media', 'reels', 'likes'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -339,6 +360,50 @@ export default function UserProfile() {
                   <div className="w-6 h-6 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-2" />
                   <p className="text-xs text-slate-400">Loading {activeTab}...</p>
                 </div>
+              ) : activeTab === 'reels' ? (
+                userReels.length === 0 ? (
+                  <div className="p-10 text-center">
+                    <p className="text-xs text-slate-400">
+                      No reels shared by @{profileUser.username} yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 pt-2">
+                    {userReels.map((reel) => (
+                      <div
+                        key={reel.id}
+                        onClick={() => navigate(`/reels/${reel.id}`)}
+                        className="group relative aspect-[9/16] bg-slate-950 rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-purple-400 transition-all cursor-pointer"
+                      >
+                        {reel.thumbnailUrl ? (
+                          <img
+                            src={reel.thumbnailUrl}
+                            alt={reel.caption || 'Reel'}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <video
+                            src={reel.videoUrl}
+                            className="w-full h-full object-cover"
+                            muted
+                            preload="metadata"
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                        <div className="absolute bottom-2.5 left-2.5 right-2.5 text-white flex items-center justify-between text-xs font-bold">
+                          <span className="flex items-center gap-1 drop-shadow-sm">
+                            <HiOutlineHeart className="w-3.5 h-3.5 text-rose-400" />
+                            {reel.likesCount || 0}
+                          </span>
+                          <span className="flex items-center gap-1 text-[10px] bg-black/50 px-1.5 py-0.5 rounded-md">
+                            <HiOutlinePlay className="w-3 h-3 text-purple-400" />
+                            {reel.duration ? `${reel.duration}s` : 'Reel'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
               ) : posts.length === 0 ? (
                 <div className="p-10 text-center">
                   <p className="text-xs text-slate-400">
