@@ -14,6 +14,7 @@ import { CommentLike } from '../entities/CommentLike';
 import { Group } from '../entities/Group';
 import { GroupMember } from '../entities/GroupMember';
 import { GroupMessage } from '../entities/GroupMessage';
+import { GlobalMessage } from '../entities/GlobalMessage';
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ const entitiesList = [
   Group,
   GroupMember,
   GroupMessage,
+  GlobalMessage,
 ];
 
 export const AppDataSource = isPostgres

@@ -6,6 +6,7 @@ import { User } from './entities/User';
 import { GroupMember } from './entities/GroupMember';
 import { GroupMessage } from './entities/GroupMessage';
 import { Group } from './entities/Group';
+import { GlobalMessage } from './entities/GlobalMessage';
 
 let io: SocketIOServer | null = null;
 
@@ -13,6 +14,14 @@ let io: SocketIOServer | null = null;
 const onlineUsers = new Map<string, Set<string>>();
 // Track socketId -> userId
 const socketToUser = new Map<string, string>();
+
+// Global chat presence tracking
+const globalChatSockets = new Set<string>();
+const globalChatUserCounts = new Map<string, number>();
+
+export const getGlobalOnlineCount = (): number => {
+  return globalChatUserCounts.size > 0 ? globalChatUserCounts.size : globalChatSockets.size;
+};
 
 export const isUserOnline = (userId: string): boolean => {
   return (onlineUsers.get(userId)?.size ?? 0) > 0;
@@ -197,8 +206,70 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
       }
     );
 
+    // Global chat subscriptions & presence
+    socket.on('join_global_chat', (userId?: string) => {
+      socket.join('global_chat');
+      globalChatSockets.add(socket.id);
+      const uid = userId || socketToUser.get(socket.id);
+      if (uid) {
+        globalChatUserCounts.set(uid, (globalChatUserCounts.get(uid) || 0) + 1);
+      }
+      io?.to('global_chat').emit('global_online_count', { count: getGlobalOnlineCount() });
+    });
+
+    socket.on('leave_global_chat', (userId?: string) => {
+      socket.leave('global_chat');
+      globalChatSockets.delete(socket.id);
+      const uid = userId || socketToUser.get(socket.id);
+      if (uid && globalChatUserCounts.has(uid)) {
+        const count = globalChatUserCounts.get(uid)! - 1;
+        if (count <= 0) {
+          globalChatUserCounts.delete(uid);
+        } else {
+          globalChatUserCounts.set(uid, count);
+        }
+      }
+      io?.to('global_chat').emit('global_online_count', { count: getGlobalOnlineCount() });
+    });
+
+    // Global typing indicators
+    socket.on(
+      'global_typing',
+      ({
+        userId,
+        username,
+        fullName,
+      }: {
+        userId: string;
+        username: string;
+        fullName?: string;
+      }) => {
+        socket.to('global_chat').emit('global_typing', {
+          userId,
+          username,
+          fullName,
+        });
+      }
+    );
+
+    socket.on('global_stop_typing', ({ userId }: { userId: string }) => {
+      socket.to('global_chat').emit('global_stop_typing', { userId });
+    });
+
     socket.on('disconnect', () => {
       const userId = socketToUser.get(socket.id);
+      if (globalChatSockets.has(socket.id)) {
+        globalChatSockets.delete(socket.id);
+        if (userId && globalChatUserCounts.has(userId)) {
+          const count = globalChatUserCounts.get(userId)! - 1;
+          if (count <= 0) {
+            globalChatUserCounts.delete(userId);
+          } else {
+            globalChatUserCounts.set(userId, count);
+          }
+        }
+        io?.to('global_chat').emit('global_online_count', { count: getGlobalOnlineCount() });
+      }
       if (userId) {
         handleUserDisconnect(socket.id, userId);
       }
@@ -434,5 +505,38 @@ export const removeUsersFromGroupSocketRoom = (groupId: string, userIds: string[
       });
     }
   });
+};
+
+export const emitGlobalMessage = (message: GlobalMessage) => {
+  if (!io) return;
+  io.emit('global_new_message', message);
+};
+
+export const emitGlobalMessageEdited = (message: GlobalMessage) => {
+  if (!io) return;
+  io.emit('global_message_edited', message);
+};
+
+export const emitGlobalMessageDeleted = (messageId: string) => {
+  if (!io) return;
+  io.emit('global_message_deleted', { messageId });
+};
+
+export const emitGlobalReactionUpdated = (
+  messageId: string,
+  reactions: Record<string, string[]>
+) => {
+  if (!io) return;
+  io.emit('global_reaction_updated', { messageId, reactions });
+};
+
+export const emitGlobalMessagePinned = (message: GlobalMessage) => {
+  if (!io) return;
+  io.emit('global_message_pinned', message);
+};
+
+export const emitGlobalChatCleared = () => {
+  if (!io) return;
+  io.emit('global_chat_cleared', {});
 };
 

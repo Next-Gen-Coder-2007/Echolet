@@ -11,6 +11,7 @@ import userRoutes from './routes/user.routes';
 import messageRoutes from './routes/message.routes';
 import postRoutes from './routes/post.routes';
 import groupRoutes from './routes/group.routes';
+import globalChatRoutes from './routes/globalChat.routes';
 
 dotenv.config();
 
@@ -59,6 +60,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/global-chat', globalChatRoutes);
 
 const httpServer = http.createServer(app);
 initSocket(httpServer, allowedOrigins);
