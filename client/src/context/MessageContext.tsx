@@ -109,7 +109,8 @@ export const MessageProvider: React.FC<{ children: React.ReactNode }> = ({ child
       {children}
 
       <div
-        className="fixed top-5 right-5 z-50 flex flex-col items-end gap-3 pointer-events-none"
+        style={{ zIndex: 99999 }}
+        className="fixed top-5 right-5 z-[99999] flex flex-col items-end gap-3 pointer-events-none"
         aria-live="polite"
       >
         {toasts.map((toast) => (

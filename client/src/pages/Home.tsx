@@ -79,12 +79,20 @@ export default function Home() {
       setPosts((prev) => prev.filter((p) => p.id !== postId));
     };
 
+    const handlePostPollVoted = (data: { postId: string; pollOptions: any[] }) => {
+      setPosts((prev) =>
+        prev.map((p) => (p.id === data.postId ? { ...p, pollOptions: data.pollOptions } : p))
+      );
+    };
+
     socket.on('new_post', handleNewPost);
     socket.on('post_deleted', handlePostDeleted);
+    socket.on('post_poll_voted', handlePostPollVoted);
 
     return () => {
       socket.off('new_post', handleNewPost);
       socket.off('post_deleted', handlePostDeleted);
+      socket.off('post_poll_voted', handlePostPollVoted);
     };
   }, [currentUser?.id]);
 

@@ -11,6 +11,8 @@ import {
   HiOutlineArrowLeft,
   HiChevronDown,
   HiChevronUp,
+  HiOutlineChartBar,
+  HiOutlineClock,
 } from 'react-icons/hi2';
 import postService, { type Post, type PostComment } from '../services/postService';
 import MediaViewerModal from '../components/MediaViewerModal';
@@ -358,8 +360,8 @@ export default function PublicPostView() {
                     <div className="font-bold text-base text-slate-900 leading-tight">
                       {post.user?.fullName}
                     </div>
-                    <div className="text-xs text-slate-400 font-medium mt-0.5">
-                      @{post.user?.username} · {formatTime(post.createdAt)}
+                    <div className="text-xs text-slate-400 font-medium mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <span>@{post.user?.username} · {formatTime(post.createdAt)}</span>
                     </div>
                   </div>
                 </div>
@@ -494,6 +496,71 @@ export default function PublicPostView() {
                       })}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Poll Widget */}
+              {post.pollOptions && post.pollOptions.length >= 2 && (
+                <div className="mb-5 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-purple-50/60 via-slate-50 to-indigo-50/40 border border-purple-200/80 shadow-2xs">
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-purple-900">
+                      <div className="w-5 h-5 rounded-md bg-purple-600 text-white flex items-center justify-center text-[10px]">
+                        <HiOutlineChartBar className="w-3.5 h-3.5" />
+                      </div>
+                      <span>Poll</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {Boolean(post.isPollExpired || (post.pollExpiresAt && new Date(post.pollExpiresAt) <= new Date())) ? (
+                        <span className="text-[11px] font-bold text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          Poll Ended
+                        </span>
+                      ) : post.pollExpiresAt ? (
+                        <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <HiOutlineClock className="w-3 h-3 text-amber-600" />
+                          Timed Poll
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          No timer
+                        </span>
+                      )}
+                      <span className="text-[11px] font-bold text-purple-700 bg-purple-100/90 px-2 py-0.5 rounded-full">
+                        {post.pollOptions.reduce((s, o) => s + (o.votes || 0), 0)} votes
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {(() => {
+                      const totalVotes = post.pollOptions.reduce((sum, opt) => sum + (opt.votes || 0), 0);
+                      return post.pollOptions.map((opt, idx) => {
+                        const pct = totalVotes > 0 ? Math.round(((opt.votes || 0) / totalVotes) * 100) : 0;
+                        return (
+                          <div
+                            key={idx}
+                            onClick={handlePromptLogin}
+                            className="relative overflow-hidden p-3 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm cursor-pointer hover:border-purple-300 transition-all select-none"
+                          >
+                            <div
+                              style={{ width: `${pct}%` }}
+                              className="absolute top-0 bottom-0 left-0 bg-purple-100/70 transition-all duration-500 rounded-xl"
+                            />
+                            <div className="relative z-10 flex items-center justify-between gap-2">
+                              <span className="font-medium text-slate-800">{opt.text}</span>
+                              <span className="font-semibold text-slate-600 text-xs">{pct}% ({opt.votes || 0})</span>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 mt-2.5 text-right font-medium">
+                    Log in to vote and participate
+                  </p>
                 </div>
               )}
 

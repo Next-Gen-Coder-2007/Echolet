@@ -1519,19 +1519,19 @@ export default function Messages() {
     }
   };
 
-  const handleCreatePoll = async (question: string, options: string[]) => {
+  const handleCreatePoll = async (question: string, options: string[], timer?: string | null) => {
     try {
       if (activeGroup) {
         const sent = await groupService.sendGroupMessage(activeGroup.id, '', {
           messageType: 'poll',
-          poll: { question, options },
+          poll: { question, options, duration: timer || undefined },
         });
         setGroupMessages((prev) => [...prev, sent]);
         fetchGroups();
       } else if (activeUser) {
         const sent = await messageService.sendMessage(activeUser.id, '', {
           messageType: 'poll',
-          poll: { question, options },
+          poll: { question, options, duration: timer || undefined },
         });
         setMessages((prev) => [...prev, sent]);
         fetchConversations();
@@ -3879,6 +3879,7 @@ export default function Messages() {
                                   poll={m.poll}
                                   currentUserId={currentUser?.id}
                                   onVote={(optionId) => handleVotePoll(m.id, optionId)}
+                                  isMe={isMe}
                                 />
                               ) : m.messageType === 'voice' || m.audioUrl ? (
                                 <VoiceNotePlayer
@@ -4629,6 +4630,7 @@ export default function Messages() {
                                   poll={m.poll}
                                   currentUserId={currentUser?.id}
                                   onVote={(optionId) => handleVotePoll(m.id, optionId)}
+                                  isMe={isMe}
                                 />
                               ) : m.messageType === 'voice' || m.audioUrl ? (
                                 <VoiceNotePlayer
