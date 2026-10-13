@@ -15,6 +15,9 @@ import { Group } from '../entities/Group';
 import { GroupMember } from '../entities/GroupMember';
 import { GroupMessage } from '../entities/GroupMessage';
 import { GlobalMessage } from '../entities/GlobalMessage';
+import { Reel } from '../entities/Reel';
+import { ReelLike } from '../entities/ReelLike';
+import { ReelComment } from '../entities/ReelComment';
 
 dotenv.config();
 
@@ -36,6 +39,9 @@ const entitiesList = [
   GroupMember,
   GroupMessage,
   GlobalMessage,
+  Reel,
+  ReelLike,
+  ReelComment,
 ];
 
 export const AppDataSource = isPostgres
