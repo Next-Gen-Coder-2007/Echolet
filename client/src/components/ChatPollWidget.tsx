@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { HiOutlineCheckCircle } from 'react-icons/hi2';
+import React, { useState, useEffect } from 'react';
+import { HiOutlineCheckCircle, HiOutlineClock } from 'react-icons/hi2';
 
 export interface PollOption {
   id: string;
@@ -8,9 +8,10 @@ export interface PollOption {
 }
 
 interface ChatPollWidgetProps {
-  poll?: { question: string; options: PollOption[] };
+  poll?: { question: string; options: PollOption[]; expiresAt?: string | null };
   question?: string;
   options?: PollOption[];
+  expiresAt?: string | null;
   currentUserId?: string;
   onVote: (optionId: string) => void | Promise<void>;
   isMe?: boolean;
@@ -20,6 +21,7 @@ export const ChatPollWidget: React.FC<ChatPollWidgetProps> = ({
   poll,
   question: propQuestion,
   options: propOptions,
+  expiresAt: propExpiresAt,
   currentUserId,
   onVote,
   isMe = false,
@@ -27,15 +29,111 @@ export const ChatPollWidget: React.FC<ChatPollWidgetProps> = ({
   const [votingId, setVotingId] = useState<string | null>(null);
 
   const question = poll?.question || propQuestion || '';
-  const options = poll?.options || propOptions || [];
+  const pollExpiresAt = poll?.expiresAt || propExpiresAt;
 
-  const totalVotes = options.reduce((sum, opt) => sum + (opt.voterIds?.length || 0), 0);
+  // Normalize options to ensure every item has { id, text, voterIds }
+  const rawOptions = (poll?.options || propOptions || []) as any[];
+  const normalizedOptions: PollOption[] = rawOptions.map((opt, idx) => {
+    if (typeof opt === 'string') {
+      return { id: String(idx), text: opt, voterIds: [] };
+    }
+    return {
+      id: opt.id !== undefined ? String(opt.id) : String(idx),
+      text: opt.text || '',
+      voterIds: Array.isArray(opt.voterIds) ? opt.voterIds : [],
+    };
+  });
+
+  // Local optimistic options state for instant UI response when voting/switching
+  const [localOptions, setLocalOptions] = useState<PollOption[]>(normalizedOptions);
+
+  useEffect(() => {
+    setLocalOptions(normalizedOptions);
+  }, [JSON.stringify(normalizedOptions)]);
+
+  // Poll Expiration Live Countdown
+  const [isExpired, setIsExpired] = useState<boolean>(() => {
+    if (!pollExpiresAt) return false;
+    return new Date(pollExpiresAt).getTime() <= Date.now();
+  });
+  const [timeRemainingText, setTimeRemainingText] = useState<string>('');
+
+  useEffect(() => {
+    if (!pollExpiresAt) {
+      setIsExpired(false);
+      setTimeRemainingText('');
+      return;
+    }
+
+    const updateTimer = () => {
+      const expiresAtMs = new Date(pollExpiresAt).getTime();
+      const diff = expiresAtMs - Date.now();
+
+      if (diff <= 0) {
+        setIsExpired(true);
+        setTimeRemainingText('Ended');
+        return;
+      }
+
+      setIsExpired(false);
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+
+      if (days > 0) {
+        const remH = Math.floor((diff % 86400000) / 3600000);
+        setTimeRemainingText(`${days}d ${remH}h left`);
+      } else if (hours > 0) {
+        const remM = Math.floor((diff % 3600000) / 60000);
+        setTimeRemainingText(`${hours}h ${remM}m left`);
+      } else if (minutes > 0) {
+        const remS = Math.floor((diff % 60000) / 1000);
+        setTimeRemainingText(`${minutes}m ${remS}s left`);
+      } else {
+        const seconds = Math.max(0, Math.floor(diff / 1000));
+        setTimeRemainingText(`${seconds}s left`);
+      }
+    };
+
+    updateTimer();
+    const expiresDiff = new Date(pollExpiresAt).getTime() - Date.now();
+    const intervalTime = expiresDiff < 3600000 ? 1000 : 10000;
+    const interval = setInterval(updateTimer, intervalTime);
+    return () => clearInterval(interval);
+  }, [pollExpiresAt]);
+
+  const totalVotes = localOptions.reduce((sum, opt) => sum + (opt.voterIds?.length || 0), 0);
+  const userHasVoted = Boolean(
+    currentUserId && localOptions.some((opt) => opt.voterIds?.includes(currentUserId))
+  );
 
   const handleOptionClick = async (optionId: string) => {
-    if (votingId) return;
+    if (votingId || isExpired) return;
+
+    // Optimistically update local options immediately
+    if (currentUserId) {
+      setLocalOptions((prev) =>
+        prev.map((opt) => {
+          const voters = Array.isArray(opt.voterIds) ? [...opt.voterIds] : [];
+          if (opt.id === optionId) {
+            if (voters.includes(currentUserId)) {
+              return { ...opt, voterIds: voters.filter((id) => id !== currentUserId) };
+            } else {
+              return { ...opt, voterIds: [...voters, currentUserId] };
+            }
+          } else {
+            return { ...opt, voterIds: voters.filter((id) => id !== currentUserId) };
+          }
+        })
+      );
+    }
+
     try {
       setVotingId(optionId);
       await onVote(optionId);
+    } catch {
+      // Revert if error
+      setLocalOptions(normalizedOptions);
     } finally {
       setVotingId(null);
     }
@@ -43,19 +141,35 @@ export const ChatPollWidget: React.FC<ChatPollWidgetProps> = ({
 
   return (
     <div className="flex flex-col gap-2.5 w-full min-w-[220px] max-w-sm py-1 select-none">
-      {/* Question */}
-      <div className="flex items-start gap-2">
-        <span className="text-sm font-bold tracking-tight leading-snug">
+      {/* Question & Timer Badge */}
+      <div className="flex items-start justify-between gap-2">
+        <span className={`text-sm font-bold tracking-tight leading-snug ${isMe ? 'text-white' : 'text-slate-900'}`}>
           📊 {question}
         </span>
+        {isExpired ? (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
+            isMe ? 'bg-white/20 text-slate-200' : 'bg-slate-200 text-slate-600'
+          }`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+            Ended
+          </span>
+        ) : pollExpiresAt ? (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
+            isMe ? 'bg-amber-400/20 text-amber-200 border border-amber-300/30' : 'bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs'
+          }`}>
+            <HiOutlineClock className="w-3 h-3 text-amber-500 animate-pulse" />
+            {timeRemainingText || 'Active'}
+          </span>
+        ) : null}
       </div>
 
       {/* Options List */}
       <div className="flex flex-col gap-2">
-        {options.map((opt) => {
+        {localOptions.map((opt) => {
           const votesCount = opt.voterIds?.length || 0;
           const pct = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
           const hasVoted = Boolean(currentUserId && opt.voterIds?.includes(currentUserId));
+          const canClick = !isExpired && !votingId;
 
           return (
             <button
@@ -65,14 +179,20 @@ export const ChatPollWidget: React.FC<ChatPollWidgetProps> = ({
                 e.stopPropagation();
                 handleOptionClick(opt.id);
               }}
-              disabled={Boolean(votingId)}
-              className={`relative overflow-hidden text-left p-2.5 rounded-xl border transition-all cursor-pointer group active:scale-[0.99] ${
+              disabled={!canClick}
+              className={`relative overflow-hidden text-left p-2.5 rounded-xl border transition-all ${
+                canClick ? 'cursor-pointer active:scale-[0.99]' : 'cursor-default'
+              } group ${
                 hasVoted
                   ? isMe
                     ? 'border-indigo-400 bg-white/10 ring-1 ring-indigo-400/50'
                     : 'border-indigo-500 bg-indigo-50/60 ring-1 ring-indigo-500/30'
                   : isMe
-                  ? 'border-slate-700 hover:border-slate-600 bg-white/5 hover:bg-white/10'
+                  ? isExpired
+                    ? 'border-slate-800 bg-white/5 opacity-80'
+                    : 'border-slate-700 hover:border-slate-600 bg-white/5 hover:bg-white/10'
+                  : isExpired
+                  ? 'border-slate-200 bg-slate-50/60 opacity-85'
                   : 'border-slate-200 hover:border-slate-300 bg-slate-50/60 hover:bg-slate-100/80'
               }`}
             >
@@ -130,7 +250,13 @@ export const ChatPollWidget: React.FC<ChatPollWidgetProps> = ({
         isMe ? 'text-slate-300' : 'text-slate-400'
       }`}>
         <span>{totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}</span>
-        <span className="italic">Click to vote</span>
+        <span className="italic">
+          {isExpired
+            ? 'Poll ended · Final results'
+            : userHasVoted
+            ? '✓ Voted (click to change)'
+            : 'Click to vote'}
+        </span>
       </div>
     </div>
   );

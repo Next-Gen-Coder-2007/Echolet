@@ -4,13 +4,25 @@ import {
   HiOutlinePlus,
   HiOutlineTrash,
   HiOutlineExclamationCircle,
+  HiOutlineClock,
 } from 'react-icons/hi2';
 import Modal from './Modal';
+
+export const CHAT_POLL_TIMER_DURATIONS = [
+  { value: 'none', label: 'No timer (Never ends)' },
+  { value: '5m', label: '5 minutes' },
+  { value: '1h', label: '1 hour' },
+  { value: '6h', label: '6 hours' },
+  { value: '12h', label: '12 hours' },
+  { value: '24h', label: '24 hours' },
+  { value: '3d', label: '3 days' },
+  { value: '7d', label: '7 days' },
+];
 
 interface CreateChatPollModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (question: string, options: string[]) => void;
+  onSubmit: (question: string, options: string[], timer?: string | null) => void;
 }
 
 export const CreateChatPollModal: React.FC<CreateChatPollModalProps> = ({
@@ -20,6 +32,7 @@ export const CreateChatPollModal: React.FC<CreateChatPollModalProps> = ({
 }) => {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState<string[]>(['', '']);
+  const [pollTimer, setPollTimer] = useState<string>('none');
   const [error, setError] = useState<string | null>(null);
   const optionInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -27,6 +40,7 @@ export const CreateChatPollModal: React.FC<CreateChatPollModalProps> = ({
     if (isOpen) {
       setQuestion('');
       setOptions(['', '']);
+      setPollTimer('none');
       setError(null);
     }
   }, [isOpen]);
@@ -86,7 +100,7 @@ export const CreateChatPollModal: React.FC<CreateChatPollModalProps> = ({
     }
 
     setError(null);
-    onSubmit(trimmedQuestion, trimmedOptions);
+    onSubmit(trimmedQuestion, trimmedOptions, pollTimer !== 'none' ? pollTimer : null);
     onClose();
   };
 
@@ -210,6 +224,44 @@ export const CreateChatPollModal: React.FC<CreateChatPollModalProps> = ({
               <span>Add Option ({options.length}/6)</span>
             </button>
           )}
+        </div>
+
+        {/* Poll Duration / Timer Setting */}
+        <div className="pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <HiOutlineClock className="w-4 h-4 text-purple-600" />
+              Poll Timer
+            </span>
+            <span className="text-[11px] font-semibold text-purple-700 bg-purple-100/90 px-2 py-0.5 rounded-md">
+              {CHAT_POLL_TIMER_DURATIONS.find((d) => d.value === pollTimer)?.label || 'No timer'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            {CHAT_POLL_TIMER_DURATIONS.map((d) => {
+              const isSelected = pollTimer === d.value;
+              return (
+                <button
+                  key={d.value}
+                  type="button"
+                  onClick={() => setPollTimer(d.value)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold text-center transition-all cursor-pointer border ${
+                    isSelected
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-2xs font-bold'
+                      : 'bg-white hover:bg-purple-50/80 text-slate-700 border-slate-200 hover:border-purple-300'
+                  }`}
+                >
+                  {d.value === 'none' ? 'No timer' : d.label.split(' ')[0] + (d.label.split(' ')[1] ? ' ' + d.label.split(' ')[1] : '')}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
+            {pollTimer === 'none'
+              ? 'Voting remains open permanently until deleted.'
+              : `Voting automatically closes after ${CHAT_POLL_TIMER_DURATIONS.find((d) => d.value === pollTimer)?.label}. The message remains in the chat.`}
+          </p>
         </div>
 
         {/* Tip banner */}
