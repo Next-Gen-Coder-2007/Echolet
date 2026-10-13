@@ -15,7 +15,52 @@ import {
   emitPostDeleted,
   emitPostLiked,
   emitNewComment,
+  emitPostPollVoted,
 } from '../socket';
+
+/**
+ * Helper to calculate expiration date from expiresIn duration or explicit expiresAt date
+ */
+const calculateExpiresAt = (
+  expiresIn?: string | number | null,
+  expiresAt?: string | null
+): Date | null => {
+  if (expiresAt) {
+    const parsed = new Date(expiresAt);
+    if (!isNaN(parsed.getTime()) && parsed.getTime() > Date.now()) {
+      return parsed;
+    }
+  }
+
+  if (!expiresIn || expiresIn === 'none' || expiresIn === '0') {
+    return null;
+  }
+
+  const now = Date.now();
+  if (typeof expiresIn === 'number' && expiresIn > 0) {
+    return new Date(now + expiresIn * 60 * 1000);
+  }
+
+  if (typeof expiresIn === 'string') {
+    const trimmed = expiresIn.trim().toLowerCase();
+    if (trimmed === '5m') return new Date(now + 5 * 60 * 1000);
+    if (trimmed === '15m') return new Date(now + 15 * 60 * 1000);
+    if (trimmed === '30m') return new Date(now + 30 * 60 * 1000);
+    if (trimmed === '1h') return new Date(now + 60 * 60 * 1000);
+    if (trimmed === '6h') return new Date(now + 6 * 60 * 60 * 1000);
+    if (trimmed === '12h') return new Date(now + 12 * 60 * 60 * 1000);
+    if (trimmed === '24h' || trimmed === '1d') return new Date(now + 24 * 60 * 60 * 1000);
+    if (trimmed === '3d') return new Date(now + 3 * 24 * 60 * 60 * 1000);
+    if (trimmed === '7d' || trimmed === '1w') return new Date(now + 7 * 24 * 60 * 60 * 1000);
+
+    const numeric = parseInt(trimmed, 10);
+    if (!isNaN(numeric) && numeric > 0) {
+      return new Date(now + numeric * 60 * 1000);
+    }
+  }
+
+  return null;
+};
 
 /**
  * Safely parse Express 5 string parameter
@@ -32,9 +77,11 @@ const enrichPostsWithUserData = async (
   posts: Post[],
   currentUserId?: string
 ) => {
+  const now = new Date();
   if (!posts.length || !currentUserId) {
     return posts.map((post) => ({
       ...post,
+      isPollExpired: Boolean(post.pollExpiresAt && new Date(post.pollExpiresAt) <= now),
       isLiked: false,
       isBookmarked: false,
       userVotedOption: null,
@@ -77,6 +124,7 @@ const enrichPostsWithUserData = async (
 
   return posts.map((post) => ({
     ...post,
+    isPollExpired: Boolean(post.pollExpiresAt && new Date(post.pollExpiresAt) <= now),
     isLiked: likedSet.has(post.id),
     isBookmarked: bookmarkedSet.has(post.id),
     userVotedOption: voteMap.has(post.id) ? voteMap.get(post.id) : null,
@@ -97,11 +145,24 @@ export const createPost = async (
       return;
     }
 
-    const { content, mediaUrls, mediaType, pollOptions } = req.body;
+    const {
+      content,
+      mediaUrls,
+      mediaType,
+      pollOptions,
+      pollExpiresIn,
+      pollDuration,
+      pollExpiresAt,
+      expiresIn,
+      expiresAt,
+    } = req.body;
 
     const trimmedContent = (content || '').trim();
     const hasMedia = Array.isArray(mediaUrls) && mediaUrls.length > 0;
-    const hasPoll = Array.isArray(pollOptions) && pollOptions.length >= 2;
+    const rawPollOptions = Array.isArray(pollOptions)
+      ? pollOptions.filter((opt: any) => typeof opt === 'string' && opt.trim().length > 0)
+      : [];
+    const hasPoll = rawPollOptions.length >= 2;
 
     if (!trimmedContent && !hasMedia && !hasPoll) {
       res.status(400).json({
@@ -118,9 +179,8 @@ export const createPost = async (
 
     if (hasPoll) {
       computedMediaType = 'poll';
-      formattedPollOptions = pollOptions
-        .filter((opt: any) => typeof opt === 'string' && opt.trim().length > 0)
-        .slice(0, 4)
+      formattedPollOptions = rawPollOptions
+        .slice(0, 6)
         .map((text: string, idx: number) => ({
           id: idx,
           text: text.trim(),
@@ -149,12 +209,21 @@ export const createPost = async (
       }
     }
 
+    // Timer is specifically for the poll (or null for permanent / no timer)
+    const calculatedPollExpiresAt = hasPoll
+      ? calculateExpiresAt(
+          pollExpiresIn || pollDuration || expiresIn,
+          pollExpiresAt || expiresAt
+        )
+      : null;
+
     const newPost = new Post();
     newPost.userId = currentUserId;
     newPost.content = trimmedContent;
     newPost.mediaUrls = hasMedia ? mediaUrls : null;
     newPost.mediaType = computedMediaType;
     newPost.pollOptions = formattedPollOptions;
+    newPost.pollExpiresAt = calculatedPollExpiresAt;
     newPost.likesCount = 0;
     newPost.commentsCount = 0;
     newPost.repostsCount = 0;
@@ -171,6 +240,7 @@ export const createPost = async (
 
     const responsePost = {
       ...fullPost,
+      isPollExpired: Boolean(fullPost?.pollExpiresAt && new Date(fullPost.pollExpiresAt) <= new Date()),
       isLiked: false,
       isBookmarked: false,
       userVotedOption: null,
@@ -582,6 +652,14 @@ export const votePoll = async (
       return;
     }
 
+    if (post.pollExpiresAt && new Date(post.pollExpiresAt) <= new Date()) {
+      res.status(400).json({
+        status: 'error',
+        message: 'This poll has ended and voting is closed',
+      });
+      return;
+    }
+
     if (
       typeof optionIndex !== 'number' ||
       optionIndex < 0 ||
@@ -598,36 +676,65 @@ export const votePoll = async (
       where: { postId: id, userId: currentUserId },
     });
 
+    let nextUserVotedOption: number | null = optionIndex;
+    let updatedOptions = [...post.pollOptions];
+
     if (existingVote) {
-      res.status(400).json({
-        status: 'error',
-        message: 'You have already voted on this poll',
-        userVotedOption: existingVote.optionIndex,
-      });
-      return;
-    }
-
-    const vote = new PollVote();
-    vote.postId = id;
-    vote.userId = currentUserId;
-    vote.optionIndex = optionIndex;
-    await voteRepo.save(vote);
-
-    // Update poll options vote counts
-    const updatedOptions = post.pollOptions.map((opt, idx) => {
-      if (idx === optionIndex) {
-        return { ...opt, votes: (opt.votes || 0) + 1 };
+      if (existingVote.optionIndex === optionIndex) {
+        // Toggle off / remove vote
+        await voteRepo.remove(existingVote);
+        nextUserVotedOption = null;
+        updatedOptions = post.pollOptions.map((opt, idx) => {
+          if (idx === optionIndex) {
+            return { ...opt, votes: Math.max(0, (opt.votes || 0) - 1) };
+          }
+          return opt;
+        });
+      } else {
+        // Switch vote from previous option to new option
+        const prevIndex = existingVote.optionIndex;
+        existingVote.optionIndex = optionIndex;
+        await voteRepo.save(existingVote);
+        nextUserVotedOption = optionIndex;
+        updatedOptions = post.pollOptions.map((opt, idx) => {
+          if (idx === prevIndex) {
+            return { ...opt, votes: Math.max(0, (opt.votes || 0) - 1) };
+          }
+          if (idx === optionIndex) {
+            return { ...opt, votes: (opt.votes || 0) + 1 };
+          }
+          return opt;
+        });
       }
-      return opt;
-    });
+    } else {
+      const vote = new PollVote();
+      vote.postId = id;
+      vote.userId = currentUserId;
+      vote.optionIndex = optionIndex;
+      await voteRepo.save(vote);
+      nextUserVotedOption = optionIndex;
+      updatedOptions = post.pollOptions.map((opt, idx) => {
+        if (idx === optionIndex) {
+          return { ...opt, votes: (opt.votes || 0) + 1 };
+        }
+        return opt;
+      });
+    }
 
     post.pollOptions = updatedOptions;
     await postRepo.save(post);
 
+    emitPostPollVoted({
+      postId: post.id,
+      pollOptions: post.pollOptions,
+      userVotedOption: nextUserVotedOption,
+      userId: currentUserId,
+    });
+
     res.json({
       status: 'success',
       pollOptions: post.pollOptions,
-      userVotedOption: optionIndex,
+      userVotedOption: nextUserVotedOption,
     });
   } catch (error) {
     console.error('Vote poll error:', error);
