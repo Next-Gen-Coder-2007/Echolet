@@ -12,6 +12,8 @@ import messageRoutes from './routes/message.routes';
 import postRoutes from './routes/post.routes';
 import groupRoutes from './routes/group.routes';
 import globalChatRoutes from './routes/globalChat.routes';
+import reelRoutes from './routes/reel.routes';
+import searchRoutes from './routes/search.routes';
 
 dotenv.config();
 
@@ -43,8 +45,8 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use(cookieParser());
 
 app.get('/api', (_req: Request, res: Response) => {
@@ -61,6 +63,8 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/global-chat', globalChatRoutes);
+app.use('/api/reels', reelRoutes);
+app.use('/api/search', searchRoutes);
 
 const httpServer = http.createServer(app);
 initSocket(httpServer, allowedOrigins);
