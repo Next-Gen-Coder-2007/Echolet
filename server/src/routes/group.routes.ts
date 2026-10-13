@@ -15,6 +15,7 @@ import {
   markGroupAsRead,
   toggleStarGroupMessage,
   togglePinGroupMessage,
+  voteGroupMessagePoll,
   clearGroupChat,
 } from '../controllers/group.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
@@ -31,6 +32,7 @@ router.get('/:groupId/messages', getGroupMessages);
 router.post('/:groupId/messages', sendGroupMessage);
 router.post('/:groupId/messages/:messageId/star', toggleStarGroupMessage);
 router.post('/:groupId/messages/:messageId/pin', togglePinGroupMessage);
+router.post('/:groupId/messages/:messageId/vote', voteGroupMessagePoll);
 router.put('/:groupId/messages/:messageId', editGroupMessage);
 router.delete('/:groupId/messages/:messageId', deleteGroupMessage);
 router.post('/:groupId/clear', clearGroupChat);

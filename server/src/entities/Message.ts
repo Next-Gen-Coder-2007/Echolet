@@ -22,8 +22,31 @@ export class Message {
   @Column({ type: 'text' })
   content: string;
 
-  @Column({ type: 'varchar', length: 20, default: 'text' })
-  messageType: 'text' | 'image' | 'voice' | 'audio' | 'system';
+  @Column({ type: 'varchar', length: 30, default: 'text' })
+  messageType:
+    | 'text'
+    | 'image'
+    | 'video'
+    | 'document'
+    | 'poll'
+    | 'voice'
+    | 'audio'
+    | 'system';
+
+  @Column({ type: 'text', nullable: true })
+  mediaUrl?: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  fileName?: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  fileSize?: string;
+
+  @Column({ type: 'simple-json', nullable: true })
+  poll?: {
+    question: string;
+    options: { id: string; text: string; voterIds: string[] }[];
+  };
 
   @Column({ type: 'text', nullable: true })
   audioUrl?: string;

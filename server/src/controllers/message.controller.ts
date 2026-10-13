@@ -273,11 +273,17 @@ export const sendMessage = async (
     const messageType = req.body.messageType || 'text';
     let content = (req.body.content || '').trim();
     if (!content && (messageType === 'voice' || messageType === 'audio')) {
-      content = 'Voice message';
+      content = 'Voice note';
+    } else if (!content && (messageType === 'image' || messageType === 'video')) {
+      content = messageType === 'image' ? 'Photo' : 'Video';
+    } else if (!content && messageType === 'document') {
+      content = req.body.fileName || 'Document';
+    } else if (!content && messageType === 'poll') {
+      content = req.body.poll?.question || 'Poll';
     }
 
-    if (!content) {
-      res.status(400).json({ status: 'error', message: 'Message content cannot be empty' });
+    if (!content && !req.body.mediaUrl && !req.body.poll) {
+      res.status(400).json({ status: 'error', message: 'Message content or attachment is required' });
       return;
     }
 
@@ -317,6 +323,10 @@ export const sendMessage = async (
       receiverId: targetUserId,
       content,
       messageType,
+      mediaUrl: req.body.mediaUrl || null,
+      fileName: req.body.fileName || null,
+      fileSize: req.body.fileSize || null,
+      poll: req.body.poll || null,
       audioUrl: req.body.audioUrl || null,
       audioDuration: req.body.audioDuration ? Number(req.body.audioDuration) : undefined,
       isRead: false,
@@ -488,9 +498,18 @@ export const deleteMessage = async (
 
       message.isDeletedForEveryone = true;
       message.content = 'This message was deleted';
+      message.isPinned = false;
+      message.pinnedAt = undefined;
+      message.pinnedBy = undefined;
+      message.starredBy = [];
+      message.audioUrl = undefined;
+      message.mediaUrl = undefined;
+      message.poll = undefined;
       const saved = await messageRepository.save(message);
 
       emitMessageDeletedForEveryone(saved);
+      emitMessagePinned(saved);
+      emitMessageStarred(saved);
 
       res.json({
         status: 'success',
@@ -505,6 +524,12 @@ export const deleteMessage = async (
         deletedFor.push(currentUserId);
       }
       message.deletedFor = deletedFor;
+
+      // Remove from starredBy for me if I starred it
+      if (Array.isArray(message.starredBy) && message.starredBy.includes(currentUserId)) {
+        message.starredBy = message.starredBy.filter((id) => id !== currentUserId);
+      }
+
       const saved = await messageRepository.save(message);
 
       res.json({
@@ -591,6 +616,20 @@ export const togglePinMessage = async (
     }
 
     const isNowPinned = !message.isPinned;
+    if (isNowPinned) {
+      // Unpin any other message between these two conversation partners
+      const partnerId = message.senderId === currentUserId ? message.receiverId : message.senderId;
+      await messageRepository
+        .createQueryBuilder()
+        .update(Message)
+        .set({ isPinned: false, pinnedAt: undefined, pinnedBy: undefined })
+        .where(
+          '((senderId = :u1 AND receiverId = :u2) OR (senderId = :u2 AND receiverId = :u1)) AND id != :msgId',
+          { u1: currentUserId, u2: partnerId, msgId: message.id }
+        )
+        .execute();
+    }
+
     message.isPinned = isNowPinned;
     message.pinnedAt = isNowPinned ? new Date() : undefined;
     message.pinnedBy = isNowPinned ? currentUserId : undefined;
@@ -606,6 +645,64 @@ export const togglePinMessage = async (
   } catch (error) {
     console.error('Toggle pin message error:', error);
     res.status(500).json({ status: 'error', message: 'Failed to toggle pin' });
+  }
+};
+
+export const voteMessagePoll = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const rawMessageId = Array.isArray(req.params.messageId)
+      ? req.params.messageId[0]
+      : req.params.messageId;
+    const messageId = (rawMessageId || '').trim();
+    const { optionId } = req.body;
+
+    if (!optionId) {
+      res.status(400).json({ status: 'error', message: 'Option ID is required' });
+      return;
+    }
+
+    const messageRepository = AppDataSource.getRepository(Message);
+    const message = await messageRepository.findOne({ where: { id: messageId } });
+
+    if (!message || !message.poll || !Array.isArray(message.poll.options)) {
+      res.status(404).json({ status: 'error', message: 'Poll message not found' });
+      return;
+    }
+
+    const poll = { ...message.poll };
+    poll.options = poll.options.map((opt) => {
+      const voters = Array.isArray(opt.voterIds) ? [...opt.voterIds] : [];
+      if (opt.id === optionId) {
+        if (voters.includes(currentUserId)) {
+          return { ...opt, voterIds: voters.filter((id) => id !== currentUserId) };
+        } else {
+          return { ...opt, voterIds: [...voters, currentUserId] };
+        }
+      } else {
+        return { ...opt, voterIds: voters.filter((id) => id !== currentUserId) };
+      }
+    });
+
+    message.poll = poll;
+    const saved = await messageRepository.save(message);
+    emitMessageEdited(saved);
+
+    res.json({
+      status: 'success',
+      message: saved,
+    });
+  } catch (error) {
+    console.error('Vote message poll error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to vote on poll' });
   }
 };
 

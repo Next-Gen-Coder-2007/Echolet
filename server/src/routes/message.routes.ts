@@ -9,6 +9,7 @@ import {
   getUnreadCount,
   toggleStarMessage,
   togglePinMessage,
+  voteMessagePoll,
   clearConversation,
   getChatSettings,
   updateChatSettings,
@@ -25,6 +26,7 @@ router.get('/chat-settings', getChatSettings);
 router.post('/chat-settings', updateChatSettings);
 router.post('/item/:messageId/star', toggleStarMessage);
 router.post('/item/:messageId/pin', togglePinMessage);
+router.post('/item/:messageId/vote', voteMessagePoll);
 router.put('/item/:messageId', editMessage);
 router.delete('/item/:messageId', deleteMessage);
 router.post('/:userId/clear', clearConversation);
