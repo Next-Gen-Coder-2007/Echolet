@@ -44,7 +44,8 @@ export class GlobalMessage {
   poll?: {
     question: string;
     options: { id: string; text: string; voterIds: string[] }[];
-  };
+    expiresAt?: string | null;
+  } | null;
 
   @Column({ type: 'text', nullable: true })
   audioUrl?: string;
