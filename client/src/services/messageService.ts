@@ -8,12 +8,35 @@ export interface MessageReplyInfo {
   content: string;
 }
 
+export interface PollOptionItem {
+  id: string;
+  text: string;
+  voterIds: string[];
+}
+
+export interface MessagePoll {
+  question: string;
+  options: PollOptionItem[];
+}
+
 export interface MessageItem {
   id: string;
   senderId: string;
   receiverId: string;
   content: string;
-  messageType?: 'text' | 'image' | 'voice' | 'audio' | 'system';
+  messageType?:
+    | 'text'
+    | 'image'
+    | 'video'
+    | 'document'
+    | 'poll'
+    | 'voice'
+    | 'audio'
+    | 'system';
+  mediaUrl?: string;
+  fileName?: string;
+  fileSize?: string | number;
+  poll?: MessagePoll;
   audioUrl?: string;
   audioDuration?: number;
   isRead: boolean;
@@ -78,7 +101,19 @@ export const messageService = {
     options?: {
       replyTo?: MessageReplyInfo | null;
       isForwarded?: boolean;
-      messageType?: 'text' | 'image' | 'voice' | 'audio' | 'system';
+      messageType?:
+        | 'text'
+        | 'image'
+        | 'video'
+        | 'document'
+        | 'poll'
+        | 'voice'
+        | 'audio'
+        | 'system';
+      mediaUrl?: string;
+      fileName?: string;
+      fileSize?: string | number;
+      poll?: { question: string; options: string[] | PollOptionItem[] };
       audioUrl?: string;
       audioDuration?: number;
     }
@@ -90,6 +125,10 @@ export const messageService = {
         replyTo: options?.replyTo,
         isForwarded: options?.isForwarded,
         messageType: options?.messageType || 'text',
+        mediaUrl: options?.mediaUrl,
+        fileName: options?.fileName,
+        fileSize: options?.fileSize,
+        poll: options?.poll,
         audioUrl: options?.audioUrl,
         audioDuration: options?.audioDuration,
       }
@@ -117,6 +156,14 @@ export const messageService = {
       `/messages/item/${encodeURIComponent(messageId)}/pin`
     );
     return response.data;
+  },
+
+  async votePoll(messageId: string, optionId: string): Promise<MessageItem> {
+    const response = await api.post<{ status: string; message: MessageItem }>(
+      `/messages/item/${encodeURIComponent(messageId)}/vote`,
+      { optionId }
+    );
+    return response.data.message;
   },
 
   async clearConversation(userId: string): Promise<void> {

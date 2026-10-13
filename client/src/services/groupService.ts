@@ -17,12 +17,35 @@ export interface GroupMemberItem {
   user: GroupMemberUser | null;
 }
 
+export interface GroupPollOptionItem {
+  id: string;
+  text: string;
+  voterIds: string[];
+}
+
+export interface GroupPoll {
+  question: string;
+  options: GroupPollOptionItem[];
+}
+
 export interface GroupMessageItem {
   id: string;
   groupId: string;
   senderId?: string;
   content: string;
-  messageType: 'text' | 'image' | 'voice' | 'audio' | 'system';
+  messageType:
+    | 'text'
+    | 'image'
+    | 'video'
+    | 'document'
+    | 'poll'
+    | 'voice'
+    | 'audio'
+    | 'system';
+  mediaUrl?: string;
+  fileName?: string;
+  fileSize?: string | number;
+  poll?: GroupPoll;
   audioUrl?: string;
   audioDuration?: number;
   isPinned?: boolean;
@@ -118,7 +141,19 @@ export const groupService = {
     content: string,
     options?: {
       replyTo?: { id: string; senderId: string; senderName: string; content: string } | null;
-      messageType?: 'text' | 'image' | 'voice' | 'audio' | 'system';
+      messageType?:
+        | 'text'
+        | 'image'
+        | 'video'
+        | 'document'
+        | 'poll'
+        | 'voice'
+        | 'audio'
+        | 'system';
+      mediaUrl?: string;
+      fileName?: string;
+      fileSize?: string | number;
+      poll?: { question: string; options: string[] | GroupPollOptionItem[] };
       audioUrl?: string;
       audioDuration?: number;
     }
@@ -129,6 +164,10 @@ export const groupService = {
         content,
         replyTo: options?.replyTo,
         messageType: options?.messageType || 'text',
+        mediaUrl: options?.mediaUrl,
+        fileName: options?.fileName,
+        fileSize: options?.fileSize,
+        poll: options?.poll,
         audioUrl: options?.audioUrl,
         audioDuration: options?.audioDuration,
       }
@@ -154,6 +193,18 @@ export const groupService = {
       `/groups/${encodeURIComponent(groupId)}/messages/${encodeURIComponent(messageId)}/pin`
     );
     return response.data;
+  },
+
+  async votePoll(
+    groupId: string,
+    messageId: string,
+    optionId: string
+  ): Promise<GroupMessageItem> {
+    const response = await api.post<{ status: string; message: GroupMessageItem }>(
+      `/groups/${encodeURIComponent(groupId)}/messages/${encodeURIComponent(messageId)}/vote`,
+      { optionId }
+    );
+    return response.data.message;
   },
 
   async clearGroupChat(groupId: string): Promise<void> {
