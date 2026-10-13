@@ -5,6 +5,7 @@ import { MessageProvider } from './context/MessageContext';
 import AppLayout from './components/AppLayout';
 import Home from './pages/Home';
 import Search from './pages/Search';
+import Reels from './pages/Reels';
 import Messages from './pages/Messages';
 import Notifications from './pages/Notifications';
 import Favorites from './pages/Favorites';
@@ -75,6 +76,8 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/reels" element={<Reels />} />
+            <Route path="/reels/:reelId" element={<Reels />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/messages/:username" element={<Messages />} />
             <Route path="/notifications" element={<Notifications />} />
