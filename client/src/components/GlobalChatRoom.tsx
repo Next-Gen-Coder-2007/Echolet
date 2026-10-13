@@ -716,11 +716,11 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
   };
 
   // Poll creation handler
-  const handleCreatePoll = async (question: string, options: string[]) => {
+  const handleCreatePoll = async (question: string, options: string[], timer?: string | null) => {
     try {
       const sent = await globalChatService.sendMessage('', {
         messageType: 'poll',
-        poll: { question, options },
+        poll: { question, options, duration: timer || undefined },
       });
       setMessages((prev) => [...prev, sent]);
       showSuccess('Poll created');
@@ -1008,6 +1008,7 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
                         poll={msg.poll}
                         currentUserId={currentUser?.id}
                         onVote={(optionId) => handleVotePoll(msg.id, optionId)}
+                        isMe={isMe}
                       />
                     ) : msg.messageType === 'voice' || msg.audioUrl ? (
                       <VoiceNotePlayer

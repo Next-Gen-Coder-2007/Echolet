@@ -25,6 +25,7 @@ export interface GlobalPollOptionItem {
 export interface GlobalPoll {
   question: string;
   options: GlobalPollOptionItem[];
+  expiresAt?: string | null;
 }
 
 export interface GlobalMessageItem {
@@ -93,7 +94,12 @@ export const globalChatService = {
       mediaUrl?: string;
       fileName?: string;
       fileSize?: string | number;
-      poll?: { question: string; options: string[] | GlobalPollOptionItem[] };
+      poll?: {
+        question: string;
+        options: string[] | GlobalPollOptionItem[];
+        expiresAt?: string | null;
+        duration?: string | null;
+      };
       audioUrl?: string;
       audioDuration?: number;
     }

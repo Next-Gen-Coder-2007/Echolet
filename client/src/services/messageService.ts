@@ -17,6 +17,7 @@ export interface PollOptionItem {
 export interface MessagePoll {
   question: string;
   options: PollOptionItem[];
+  expiresAt?: string | null;
 }
 
 export interface MessageItem {
@@ -113,7 +114,12 @@ export const messageService = {
       mediaUrl?: string;
       fileName?: string;
       fileSize?: string | number;
-      poll?: { question: string; options: string[] | PollOptionItem[] };
+      poll?: {
+        question: string;
+        options: string[] | PollOptionItem[];
+        expiresAt?: string | null;
+        duration?: string | null;
+      };
       audioUrl?: string;
       audioDuration?: number;
     }

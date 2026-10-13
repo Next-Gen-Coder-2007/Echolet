@@ -26,6 +26,7 @@ export interface GroupPollOptionItem {
 export interface GroupPoll {
   question: string;
   options: GroupPollOptionItem[];
+  expiresAt?: string | null;
 }
 
 export interface GroupMessageItem {
@@ -153,7 +154,12 @@ export const groupService = {
       mediaUrl?: string;
       fileName?: string;
       fileSize?: string | number;
-      poll?: { question: string; options: string[] | GroupPollOptionItem[] };
+      poll?: {
+        question: string;
+        options: string[] | GroupPollOptionItem[];
+        expiresAt?: string | null;
+        duration?: string | null;
+      };
       audioUrl?: string;
       audioDuration?: number;
     }
