@@ -529,6 +529,46 @@ export const sendGroupMessage = async (
       return;
     }
 
+    let formattedPoll = null;
+    if (req.body.poll && typeof req.body.poll === 'object') {
+      const q = (req.body.poll.question || '').trim();
+      const rawOpts = Array.isArray(req.body.poll.options) ? req.body.poll.options : [];
+      const opts = rawOpts.map((opt: any, idx: number) => {
+        if (typeof opt === 'string') {
+          return { id: String(idx), text: opt.trim(), voterIds: [] };
+        }
+        return {
+          id: opt.id !== undefined ? String(opt.id) : String(idx),
+          text: (opt.text || '').trim(),
+          voterIds: Array.isArray(opt.voterIds) ? opt.voterIds : [],
+        };
+      });
+
+      let expiresAt: string | null = req.body.poll.expiresAt || null;
+      const dur = req.body.poll.duration || req.body.poll.expiresIn;
+      if (!expiresAt && dur && dur !== 'none') {
+        const durMap: Record<string, number> = {
+          '5m': 5 * 60 * 1000,
+          '1h': 60 * 60 * 1000,
+          '6h': 6 * 3600 * 1000,
+          '12h': 12 * 3600 * 1000,
+          '24h': 24 * 3600 * 1000,
+          '1d': 24 * 3600 * 1000,
+          '3d': 3 * 24 * 3600 * 1000,
+          '7d': 7 * 24 * 3600 * 1000,
+        };
+        if (durMap[dur]) {
+          expiresAt = new Date(Date.now() + durMap[dur]).toISOString();
+        }
+      }
+
+      formattedPoll = {
+        question: q,
+        options: opts,
+        expiresAt,
+      };
+    }
+
     const newMsg = messageRepository.create({
       groupId,
       senderId: currentUserId,
@@ -537,7 +577,7 @@ export const sendGroupMessage = async (
       mediaUrl: req.body.mediaUrl || null,
       fileName: req.body.fileName || null,
       fileSize: req.body.fileSize || null,
-      poll: req.body.poll || null,
+      poll: formattedPoll,
       audioUrl: req.body.audioUrl || null,
       audioDuration: req.body.audioDuration ? Number(req.body.audioDuration) : undefined,
       replyTo: req.body.replyTo || undefined,
@@ -874,6 +914,11 @@ export const voteGroupMessagePoll = async (
 
     if (!message || !message.poll || !Array.isArray(message.poll.options)) {
       res.status(404).json({ status: 'error', message: 'Poll message not found' });
+      return;
+    }
+
+    if (message.poll.expiresAt && new Date(message.poll.expiresAt).getTime() <= Date.now()) {
+      res.status(400).json({ status: 'error', message: 'This poll has ended and voting is closed' });
       return;
     }
 

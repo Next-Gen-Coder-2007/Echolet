@@ -187,6 +187,46 @@ export const sendGlobalMessage = async (
       return;
     }
 
+    let formattedPoll = undefined;
+    if (poll && typeof poll === 'object') {
+      const q = (poll.question || '').trim();
+      const rawOpts = Array.isArray(poll.options) ? poll.options : [];
+      const opts = rawOpts.map((opt: any, idx: number) => {
+        if (typeof opt === 'string') {
+          return { id: String(idx), text: opt.trim(), voterIds: [] };
+        }
+        return {
+          id: opt.id !== undefined ? String(opt.id) : String(idx),
+          text: (opt.text || '').trim(),
+          voterIds: Array.isArray(opt.voterIds) ? opt.voterIds : [],
+        };
+      });
+
+      let expiresAt: string | null = poll.expiresAt || null;
+      const dur = poll.duration || poll.expiresIn;
+      if (!expiresAt && dur && dur !== 'none') {
+        const durMap: Record<string, number> = {
+          '5m': 5 * 60 * 1000,
+          '1h': 60 * 60 * 1000,
+          '6h': 6 * 3600 * 1000,
+          '12h': 12 * 3600 * 1000,
+          '24h': 24 * 3600 * 1000,
+          '1d': 24 * 3600 * 1000,
+          '3d': 3 * 24 * 3600 * 1000,
+          '7d': 7 * 24 * 3600 * 1000,
+        };
+        if (durMap[dur]) {
+          expiresAt = new Date(Date.now() + durMap[dur]).toISOString();
+        }
+      }
+
+      formattedPoll = {
+        question: q,
+        options: opts,
+        expiresAt,
+      };
+    }
+
     const messageRepo = AppDataSource.getRepository(GlobalMessage);
     const newMsg = messageRepo.create({
       senderId: userId,
@@ -196,7 +236,7 @@ export const sendGlobalMessage = async (
       mediaUrl: mediaUrl || undefined,
       fileName: fileName || undefined,
       fileSize: fileSize || undefined,
-      poll: poll || undefined,
+      poll: formattedPoll,
       audioUrl: audioUrl || undefined,
       audioDuration: audioDuration ? Number(audioDuration) : undefined,
       replyTo: replyTo && replyTo.id ? replyTo : undefined,
@@ -417,6 +457,11 @@ export const voteGlobalMessagePoll = async (
 
     if (!msg || !msg.poll || !Array.isArray(msg.poll.options)) {
       res.status(404).json({ status: 'error', message: 'Poll message not found' });
+      return;
+    }
+
+    if (msg.poll.expiresAt && new Date(msg.poll.expiresAt).getTime() <= Date.now()) {
+      res.status(400).json({ status: 'error', message: 'This poll has ended and voting is closed' });
       return;
     }
 
