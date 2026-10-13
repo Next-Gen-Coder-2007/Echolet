@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams, useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate, useOutletContext, useLocation } from 'react-router-dom';
 import {
   HiOutlinePaperAirplane,
   HiOutlineMagnifyingGlass,
@@ -31,6 +31,7 @@ import {
   HiOutlineEllipsisVertical,
   HiOutlineEnvelope,
   HiOutlineEnvelopeOpen,
+  HiOutlineGlobeAlt,
 } from 'react-icons/hi2';
 import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
 import messageService, {
@@ -42,12 +43,20 @@ import groupService, {
   type GroupItem,
   type GroupMessageItem,
 } from '../services/groupService';
+import globalChatService, {
+  type GlobalMessageItem,
+} from '../services/globalChatService';
 import userService, { type UserProfileResponse } from '../services/userService';
 import type { User } from '../services/authService';
 import getSocket, { joinUserRoom } from '../services/socket';
 import { useMessage } from '../context/MessageContext';
 import CreateGroupModal from '../components/CreateGroupModal';
 import GroupInfoModal from '../components/GroupInfoModal';
+import GlobalChatRoom from '../components/GlobalChatRoom';
+import ChatPollWidget from '../components/ChatPollWidget';
+import ChatMediaAttachment from '../components/ChatMediaAttachment';
+import ChatAttachmentMenu from '../components/ChatAttachmentMenu';
+import CreateChatPollModal from '../components/CreateChatPollModal';
 
 // WhatsApp-like dual tick SVG indicator
 const MessageTicks: React.FC<{
@@ -136,16 +145,19 @@ const VoiceNotePlayer: React.FC<{
   audioUrl?: string;
   duration?: number;
   isMe?: boolean;
-}> = ({ audioUrl, duration = 0, isMe = false }) => {
+  extraRight?: React.ReactNode;
+}> = ({ audioUrl, duration = 0, isMe = false, extraRight }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(duration || 0);
+  const [playbackRate, setPlaybackRate] = useState<number>(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (!audioUrl) return;
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
+    audio.playbackRate = playbackRate;
 
     const handleLoadedMetadata = () => {
       if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
@@ -175,6 +187,12 @@ const VoiceNotePlayer: React.FC<{
     };
   }, [audioUrl]);
 
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackRate;
+    }
+  }, [playbackRate]);
+
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!audioRef.current) return;
@@ -200,6 +218,12 @@ const VoiceNotePlayer: React.FC<{
     setCurrentTime(Math.round(newTime));
   };
 
+  const toggleSpeed = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const nextRate = playbackRate === 1 ? 1.5 : playbackRate === 1.5 ? 2 : 1;
+    setPlaybackRate(nextRate);
+  };
+
   const formatSeconds = (sec: number) => {
     const mins = Math.floor(sec / 60);
     const s = Math.floor(sec % 60);
@@ -207,14 +231,17 @@ const VoiceNotePlayer: React.FC<{
   };
 
   const progressPct = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
-  const barHeights = [40, 70, 45, 90, 60, 100, 75, 50, 85, 60, 95, 40, 80, 55, 90, 65, 45, 75, 60, 85];
+  const waveformBars = [
+    24, 45, 68, 38, 55, 88, 42, 78, 96, 60, 82, 48, 92, 70, 46, 84,
+    58, 88, 42, 68, 98, 52, 76, 62, 86, 38, 72, 54, 82, 58, 36, 22
+  ];
 
   return (
-    <div className="flex items-center gap-3 py-1 px-1 min-w-[200px] sm:min-w-[230px]">
+    <div className="flex items-center gap-3 py-1.5 px-0.5 min-w-[240px] sm:min-w-[270px]">
       <button
         type="button"
         onClick={togglePlay}
-        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 shadow-xs transition-transform active:scale-95 cursor-pointer ${
+        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm transition-transform active:scale-90 cursor-pointer ${
           isMe
             ? 'bg-white text-slate-900 hover:bg-slate-100'
             : 'bg-purple-600 text-white hover:bg-purple-700'
@@ -222,46 +249,64 @@ const VoiceNotePlayer: React.FC<{
         title={isPlaying ? 'Pause' : 'Play voice message'}
       >
         {isPlaying ? (
-          <HiOutlinePause className="w-4 h-4 fill-current" />
+          <HiOutlinePause className="w-5 h-5 fill-current" />
         ) : (
-          <HiOutlinePlay className="w-4 h-4 fill-current ml-0.5" />
+          <HiOutlinePlay className="w-5 h-5 fill-current ml-0.5" />
         )}
       </button>
 
-      <div className="flex-1 min-w-0 flex flex-col gap-1">
+      <div className="flex-1 min-w-0 flex flex-col gap-1.5 justify-center">
         <div
           onClick={handleSeek}
-          className="h-6 flex items-center gap-[2px] cursor-pointer group/wave py-1"
+          className="h-6 flex items-center gap-[2.5px] cursor-pointer py-1 group/wave"
           title="Click to seek"
         >
-          {barHeights.map((h, i) => {
-            const barPct = (i / barHeights.length) * 100;
+          {waveformBars.map((h, i) => {
+            const barPct = (i / waveformBars.length) * 100;
             const isPlayed = barPct <= progressPct;
             return (
               <div
                 key={i}
                 style={{ height: `${h}%` }}
-                className={`flex-1 rounded-full transition-all duration-150 ${
+                className={`flex-1 rounded-full transition-all duration-100 ${
                   isPlayed
                     ? isMe
                       ? 'bg-purple-300'
                       : 'bg-purple-600'
                     : isMe
-                    ? 'bg-slate-700 group-hover/wave:bg-slate-600'
-                    : 'bg-slate-300 group-hover/wave:bg-slate-400'
-                } ${isPlaying && isPlayed ? 'animate-pulse' : ''}`}
+                    ? 'bg-slate-700/80 group-hover/wave:bg-slate-600'
+                    : 'bg-slate-200 group-hover/wave:bg-slate-300'
+                }`}
               />
             );
           })}
         </div>
 
         <div
-          className={`flex items-center justify-between text-[11px] font-medium leading-none ${
+          className={`flex items-center justify-between text-[11px] font-medium leading-none select-none ${
             isMe ? 'text-slate-300' : 'text-slate-500'
           }`}
         >
-          <span>{formatSeconds(currentTime)}</span>
-          <span>{formatSeconds(totalDuration || 0)}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[11px]">
+              {formatSeconds(isPlaying ? currentTime : totalDuration || 0)}
+            </span>
+            <button
+              type="button"
+              onClick={toggleSpeed}
+              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md transition-colors cursor-pointer ${
+                isMe
+                  ? 'bg-slate-800 text-purple-300 hover:bg-slate-700'
+                  : 'bg-slate-100 text-purple-600 hover:bg-purple-50'
+              }`}
+              title="Playback speed"
+            >
+              {playbackRate}x
+            </button>
+            <HiOutlineMicrophone className="w-3.5 h-3.5 opacity-60" />
+          </div>
+
+          {extraRight && <div className="ml-auto">{extraRight}</div>}
         </div>
       </div>
     </div>
@@ -457,13 +502,31 @@ const ChatActionDropdown: React.FC<{
   onToggleBlock,
   onClearChat,
 }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="absolute right-2 top-8 z-50 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-150"
-    >
+    <>
+      {/* Invisible backdrop to close on outside click */}
+      <div
+        className="fixed inset-0 z-40 bg-transparent"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+      />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="absolute right-2 top-8 z-50 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-150"
+      >
       <button
         type="button"
         onClick={() => {
@@ -564,6 +627,7 @@ const ChatActionDropdown: React.FC<{
         <span>Clear Chat</span>
       </button>
     </div>
+    </>
   );
 };
 
@@ -815,8 +879,19 @@ export default function Messages() {
     paramUsername || searchParams.get('user') || searchParams.get('username') || searchParams.get('userId');
   const targetGroupParam = searchParams.get('group') || searchParams.get('groupId');
 
-  // Filter tabs: 'all' | 'direct' | 'groups' | 'favourites' | 'archived'
-  const [chatTab, setChatTab] = useState<'all' | 'direct' | 'groups' | 'favourites' | 'archived'>('all');
+  // Filter tabs: 'all' | 'direct' | 'groups' | 'global' | 'favourites' | 'archived'
+  const [chatTab, setChatTab] = useState<
+    'all' | 'direct' | 'groups' | 'global' | 'favourites' | 'archived'
+  >(paramUsername === 'global' || searchParams.get('room') === 'global' ? 'global' : 'all');
+
+  // Global Chat state
+  const [isGlobalActive, setIsGlobalActive] = useState<boolean>(
+    paramUsername === 'global' || searchParams.get('room') === 'global' || searchParams.get('type') === 'global'
+  );
+  const [globalStats, setGlobalStats] = useState<{
+    onlineCount: number;
+    lastMessage?: GlobalMessageItem | null;
+  }>({ onlineCount: 1, lastMessage: null });
 
   // Chat preferences & settings state
   const [chatSettings, setChatSettings] = useState<ChatSettings>({
@@ -834,9 +909,17 @@ export default function Messages() {
   // Clear chat modal state
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
+  const location = useLocation();
+
   // Dropdown menu states
   const [openChatMenuId, setOpenChatMenuId] = useState<string | null>(null);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
+
+  // Close menus on route change
+  useEffect(() => {
+    setIsHeaderMenuOpen(false);
+    setOpenChatMenuId(null);
+  }, [location.pathname, location.search]);
 
   // Direct conversations state
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
@@ -881,6 +964,7 @@ export default function Messages() {
   const [forwardSearch, setForwardSearch] = useState('');
   const [forwardingTargetIds, setForwardingTargetIds] = useState<string[]>([]);
   const [forwardSuccess, setForwardSuccess] = useState(false);
+  const [isPollModalOpen, setIsPollModalOpen] = useState(false);
 
   // Deleting State (supports single and multiple)
   const [deletingMessages, setDeletingMessages] = useState<(MessageItem | GroupMessageItem)[]>([]);
@@ -1080,6 +1164,7 @@ export default function Messages() {
 
   const canDeleteSelectedForEveryone = useMemo(() => {
     if (deletingMessages.length === 0) return false;
+    if (deletingMessages.some((m) => m.isDeletedForEveryone)) return false;
     const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
     if (activeGroup) {
       if (activeGroup.currentUserRole === 'admin') return true;
@@ -1308,36 +1393,170 @@ export default function Messages() {
       if (activeGroup) {
         const res = await groupService.togglePinGroupMessage(activeGroup.id, msgId);
         setGroupMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId
-              ? {
-                  ...m,
-                  isPinned: res.message.isPinned,
-                  pinnedAt: res.message.pinnedAt,
-                  pinnedBy: res.message.pinnedBy,
-                }
-              : m
-          )
+          prev.map((m) => {
+            if (m.id === msgId) {
+              return {
+                ...m,
+                isPinned: res.message.isPinned,
+                pinnedAt: res.message.pinnedAt,
+                pinnedBy: res.message.pinnedBy,
+              };
+            }
+            if (res.isPinned) {
+              return {
+                ...m,
+                isPinned: false,
+                pinnedAt: undefined,
+                pinnedBy: undefined,
+              };
+            }
+            return m;
+          })
         );
         showFeedbackToast(res.isPinned ? 'Message pinned' : 'Message unpinned', 'success');
       } else {
         const res = await messageService.togglePinMessage(msgId);
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId
-              ? {
-                  ...m,
-                  isPinned: res.message.isPinned,
-                  pinnedAt: res.message.pinnedAt,
-                  pinnedBy: res.message.pinnedBy,
-                }
-              : m
-          )
+          prev.map((m) => {
+            if (m.id === msgId) {
+              return {
+                ...m,
+                isPinned: res.message.isPinned,
+                pinnedAt: res.message.pinnedAt,
+                pinnedBy: res.message.pinnedBy,
+              };
+            }
+            if (res.isPinned) {
+              return {
+                ...m,
+                isPinned: false,
+                pinnedAt: undefined,
+                pinnedBy: undefined,
+              };
+            }
+            return m;
+          })
         );
         showFeedbackToast(res.isPinned ? 'Message pinned' : 'Message unpinned', 'success');
       }
     } catch {
       showFeedbackToast('Failed to pin message', 'error');
+    }
+  };
+
+  const readFileAsDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleSelectMedia = async (file: File, type: 'image' | 'video') => {
+    if (file.size > 15 * 1024 * 1024) {
+      showFeedbackToast('File size exceeds 15MB limit', 'error');
+      return;
+    }
+    try {
+      showFeedbackToast('Uploading media...', 'info');
+      const dataUrl = await readFileAsDataUrl(file);
+      if (activeGroup) {
+        const sent = await groupService.sendGroupMessage(activeGroup.id, '', {
+          messageType: type,
+          mediaUrl: dataUrl,
+          fileName: file.name,
+          fileSize: file.size,
+        });
+        setGroupMessages((prev) => [...prev, sent]);
+        fetchGroups();
+      } else if (activeUser) {
+        const sent = await messageService.sendMessage(activeUser.id, '', {
+          messageType: type,
+          mediaUrl: dataUrl,
+          fileName: file.name,
+          fileSize: file.size,
+        });
+        setMessages((prev) => [...prev, sent]);
+        fetchConversations();
+      }
+      showFeedbackToast('Media sent', 'success');
+    } catch {
+      showFeedbackToast('Failed to send media', 'error');
+    }
+  };
+
+  const handleSelectDocument = async (file: File) => {
+    if (file.size > 15 * 1024 * 1024) {
+      showFeedbackToast('File size exceeds 15MB limit', 'error');
+      return;
+    }
+    try {
+      showFeedbackToast('Uploading document...', 'info');
+      const dataUrl = await readFileAsDataUrl(file);
+      if (activeGroup) {
+        const sent = await groupService.sendGroupMessage(activeGroup.id, '', {
+          messageType: 'document',
+          mediaUrl: dataUrl,
+          fileName: file.name,
+          fileSize: file.size,
+        });
+        setGroupMessages((prev) => [...prev, sent]);
+        fetchGroups();
+      } else if (activeUser) {
+        const sent = await messageService.sendMessage(activeUser.id, '', {
+          messageType: 'document',
+          mediaUrl: dataUrl,
+          fileName: file.name,
+          fileSize: file.size,
+        });
+        setMessages((prev) => [...prev, sent]);
+        fetchConversations();
+      }
+      showFeedbackToast('Document sent', 'success');
+    } catch {
+      showFeedbackToast('Failed to send document', 'error');
+    }
+  };
+
+  const handleCreatePoll = async (question: string, options: string[]) => {
+    try {
+      if (activeGroup) {
+        const sent = await groupService.sendGroupMessage(activeGroup.id, '', {
+          messageType: 'poll',
+          poll: { question, options },
+        });
+        setGroupMessages((prev) => [...prev, sent]);
+        fetchGroups();
+      } else if (activeUser) {
+        const sent = await messageService.sendMessage(activeUser.id, '', {
+          messageType: 'poll',
+          poll: { question, options },
+        });
+        setMessages((prev) => [...prev, sent]);
+        fetchConversations();
+      }
+      showFeedbackToast('Poll created', 'success');
+    } catch {
+      showFeedbackToast('Failed to create poll', 'error');
+    }
+  };
+
+  const handleVotePoll = async (messageId: string, optionId: string) => {
+    try {
+      if (activeGroup) {
+        const res = await groupService.votePoll(activeGroup.id, messageId, optionId);
+        setGroupMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, poll: res.poll } : m))
+        );
+      } else {
+        const res = await messageService.votePoll(messageId, optionId);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, poll: res.poll } : m))
+        );
+      }
+    } catch {
+      showFeedbackToast('Failed to vote on poll', 'error');
     }
   };
 
@@ -1413,8 +1632,19 @@ export default function Messages() {
       setGroups((prev) =>
         prev.map((g) => (g.id === targetGroupParam ? { ...g, unreadCount: 0 } : g))
       );
+    } else if (
+      targetUserParam === 'global' ||
+      searchParams.get('room') === 'global' ||
+      searchParams.get('type') === 'global'
+    ) {
+      // Global Chat Selected
+      setIsGlobalActive(true);
+      setActiveGroup(null);
+      setActiveUser(null);
+      setGroupMessages([]);
     } else if (targetUserParam) {
       // 2. Direct Chat selected
+      setIsGlobalActive(false);
       setActiveGroup(null);
       setGroupMessages([]);
 
@@ -1601,7 +1831,15 @@ export default function Messages() {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === messageId
-            ? { ...m, isDeletedForEveryone: true, content }
+            ? {
+                ...m,
+                isDeletedForEveryone: true,
+                content,
+                isPinned: false,
+                pinnedAt: undefined,
+                pinnedBy: undefined,
+                starredBy: [],
+              }
             : m
         )
       );
@@ -1704,7 +1942,15 @@ export default function Messages() {
           prev.map((m) =>
             m.id === messageId
               ? isDeletedForEveryone
-                ? { ...m, isDeletedForEveryone: true, content: 'This message was deleted' }
+                ? {
+                    ...m,
+                    isDeletedForEveryone: true,
+                    content: 'This message was deleted',
+                    isPinned: false,
+                    pinnedAt: undefined,
+                    pinnedBy: undefined,
+                    starredBy: [],
+                  }
                 : m
               : m
           )
@@ -1809,6 +2055,8 @@ export default function Messages() {
         prev.map((m) =>
           m.id === updated.id
             ? { ...m, isPinned: updated.isPinned, pinnedAt: updated.pinnedAt, pinnedBy: updated.pinnedBy }
+            : updated.isPinned
+            ? { ...m, isPinned: false, pinnedAt: undefined, pinnedBy: undefined }
             : m
         )
       );
@@ -1819,6 +2067,8 @@ export default function Messages() {
         prev.map((m) =>
           m.id === updated.id
             ? { ...m, isPinned: updated.isPinned, pinnedAt: updated.pinnedAt, pinnedBy: updated.pinnedBy }
+            : updated.isPinned
+            ? { ...m, isPinned: false, pinnedAt: undefined, pinnedBy: undefined }
             : m
         )
       );
@@ -1909,6 +2159,9 @@ export default function Messages() {
   // Select Direct Contact
   const selectUser = (u: UserProfileResponse) => {
     setShowEmojiPicker(false);
+    setIsGlobalActive(false);
+    setIsHeaderMenuOpen(false);
+    setOpenChatMenuId(null);
     setActiveGroup(null);
     setActiveUser(u);
     setText('');
@@ -1928,6 +2181,9 @@ export default function Messages() {
   // Select Group Chat
   const selectGroup = (g: GroupItem) => {
     setShowEmojiPicker(false);
+    setIsGlobalActive(false);
+    setIsHeaderMenuOpen(false);
+    setOpenChatMenuId(null);
     setActiveUser(null);
     setActiveGroup(g);
     setText('');
@@ -1943,6 +2199,57 @@ export default function Messages() {
     );
     navigate(`/messages?group=${encodeURIComponent(g.id)}`);
   };
+
+  // Select Global Chat
+  const selectGlobalChat = () => {
+    setShowEmojiPicker(false);
+    setActiveGroup(null);
+    setActiveUser(null);
+    setIsGlobalActive(true);
+    setText('');
+    setReplyingTo(null);
+    setEditingMessage(null);
+    setReplyingToGroupMsg(null);
+    setEditingGroupMsg(null);
+    setIsSelectionMode(false);
+    setSelectedMessageIds(new Set());
+    navigate('/messages/global');
+  };
+
+  // Global Chat preview loader & socket sync
+  useEffect(() => {
+    globalChatService
+      .getMessages(1)
+      .then((res) => {
+        setGlobalStats({
+          onlineCount: res.onlineCount || 1,
+          lastMessage: res.messages?.[res.messages.length - 1] || null,
+        });
+      })
+      .catch(() => {});
+
+    const socket = getSocket();
+    const handleGlobalNew = (msg: GlobalMessageItem) => {
+      setGlobalStats((prev) => ({
+        ...prev,
+        lastMessage: msg,
+      }));
+    };
+    const handleGlobalCount = ({ count }: { count: number }) => {
+      setGlobalStats((prev) => ({
+        ...prev,
+        onlineCount: count,
+      }));
+    };
+
+    socket.on('global_new_message', handleGlobalNew);
+    socket.on('global_online_count', handleGlobalCount);
+
+    return () => {
+      socket.off('global_new_message', handleGlobalNew);
+      socket.off('global_online_count', handleGlobalCount);
+    };
+  }, []);
 
   // Close emoji picker and exit selection on outside click or Esc
   useEffect(() => {
@@ -2192,7 +2499,15 @@ export default function Messages() {
           setGroupMessages((prev) =>
             prev.map((m) =>
               deletedIds.has(m.id)
-                ? { ...m, isDeletedForEveryone: true, content: 'This message was deleted' }
+                ? {
+                    ...m,
+                    isDeletedForEveryone: true,
+                    content: 'This message was deleted',
+                    isPinned: false,
+                    pinnedAt: undefined,
+                    pinnedBy: undefined,
+                    starredBy: [],
+                  }
                 : m
             )
           );
@@ -2208,7 +2523,15 @@ export default function Messages() {
           setMessages((prev) =>
             prev.map((m) =>
               deletedIds.has(m.id)
-                ? { ...m, isDeletedForEveryone: true, content: 'This message was deleted' }
+                ? {
+                    ...m,
+                    isDeletedForEveryone: true,
+                    content: 'This message was deleted',
+                    isPinned: false,
+                    pinnedAt: undefined,
+                    pinnedBy: undefined,
+                    starredBy: [],
+                  }
                 : m
             )
           );
@@ -2377,8 +2700,8 @@ export default function Messages() {
 
   // Active chat state helpers
   const activePinnedMessage = activeGroup
-    ? groupMessages.find((m) => m.isPinned)
-    : messages.find((m) => m.isPinned);
+    ? groupMessages.find((m) => m.isPinned && !m.isDeletedForEveryone)
+    : messages.find((m) => m.isPinned && !m.isDeletedForEveryone);
 
   const isContactBlocked = activeUser
     ? Boolean(chatSettings.blockedUsers?.includes(activeUser.id))
@@ -2430,7 +2753,7 @@ export default function Messages() {
     });
   };
 
-  const hasActiveChat = Boolean(activeUser || activeGroup);
+  const hasActiveChat = Boolean(activeUser || activeGroup || isGlobalActive);
 
   return (
     <div className="w-full h-[calc(100vh-2.5rem)] sm:h-[calc(100vh-3.5rem)] min-h-[580px] flex gap-4 select-none relative">
@@ -2442,7 +2765,21 @@ export default function Messages() {
       >
         <div className="p-4 sm:p-5 border-b border-slate-100 shrink-0">
           <div className="flex items-center justify-between mb-3">
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Messages</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Messages</h1>
+              <button
+                type="button"
+                onClick={selectGlobalChat}
+                className={`inline-flex items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer ${
+                  isGlobalActive
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                }`}
+                title="Global Chat"
+              > 
+                <HiOutlineGlobeAlt className="w-4 h-4" />
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -2474,76 +2811,114 @@ export default function Messages() {
             />
           </div>
 
-          {/* Category Tabs: All / Direct / Groups / Favourites / Archived */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100/80 rounded-xl overflow-x-auto scrollbar-none">
-            <button
-              type="button"
-              onClick={() => setChatTab('all')}
-              className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 cursor-pointer ${
-                chatTab === 'all'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              All
-            </button>
-            <button
-              type="button"
-              onClick={() => setChatTab('direct')}
-              className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all shrink-0 cursor-pointer ${
-                chatTab === 'direct'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Direct
-            </button>
-            <button
-              type="button"
-              onClick={() => setChatTab('groups')}
-              className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all relative shrink-0 cursor-pointer ${
-                chatTab === 'groups'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Groups
-              {groups.reduce((acc, g) => acc + g.unreadCount, 0) > 0 && (
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block ml-1 align-top" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setChatTab('favourites')}
-              className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 shrink-0 cursor-pointer ${
-                chatTab === 'favourites'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-              title="Favourite chats"
-            >
-              <HiStar className="w-3.5 h-3.5 text-amber-500" />
-              <span>Favs</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setChatTab('archived')}
-              className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1 shrink-0 cursor-pointer ${
-                chatTab === 'archived'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-              title="Archived chats"
-            >
-              <HiOutlineArchiveBox className="w-3.5 h-3.5 text-slate-600" />
-              <span>Archived</span>
-              {(chatSettings.archivedChats?.length || 0) > 0 && (
-                <span className="text-[10px] px-1 py-0.2 rounded-full bg-slate-200 text-slate-700 font-semibold">
-                  {chatSettings.archivedChats.length}
-                </span>
-              )}
-            </button>
+          {/* Category Tabs: All / Direct / Groups + Favs / Archived */}
+          <div className="w-full flex items-center justify-between p-1 bg-slate-100/80 rounded-xl gap-1">
+            <div className="flex-1 grid grid-cols-3 gap-1">
+              <button
+                type="button"
+                onClick={() => setChatTab('all')}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all text-center cursor-pointer ${
+                  chatTab === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setChatTab('direct')}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all text-center cursor-pointer ${
+                  chatTab === 'direct'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Direct
+              </button>
+              <button
+                type="button"
+                onClick={() => setChatTab('groups')}
+                className={`py-1.5 text-xs font-bold rounded-lg transition-all relative text-center cursor-pointer ${
+                  chatTab === 'groups'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>Groups</span>
+                {groups.reduce((acc, g) => acc + g.unreadCount, 0) > 0 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block ml-1 align-top" />
+                )}
+              </button>
+            </div>
+
+            <div className="w-[1px] h-4 bg-slate-200/90 shrink-0" />
+
+            <div className="flex items-center gap-0.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setChatTab(chatTab === 'favourites' ? 'all' : 'favourites')}
+                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                  chatTab === 'favourites'
+                    ? 'bg-white text-amber-500 shadow-xs'
+                    : 'text-slate-400 hover:text-amber-500'
+                }`}
+                title="Favourite chats"
+              >
+                <HiStar className="w-4 h-4 fill-current" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setChatTab(chatTab === 'archived' ? 'all' : 'archived')}
+                className={`p-1.5 rounded-lg transition-all relative cursor-pointer ${
+                  chatTab === 'archived'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-400 hover:text-slate-700'
+                }`}
+                title="Archived chats"
+              >
+                <HiOutlineArchiveBox className="w-4 h-4" />
+                {(chatSettings.archivedChats?.length || 0) > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">
+                    {chatSettings.archivedChats.length}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
+
+          {chatTab === 'favourites' && (
+            <div className="mt-2 px-3 py-1.5 bg-amber-50/80 border border-amber-200/60 rounded-xl flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-semibold text-amber-800">
+                <HiStar className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                Favourite Chats
+              </span>
+              <button
+                type="button"
+                onClick={() => setChatTab('all')}
+                className="text-amber-700 hover:text-amber-900 hover:underline text-[11px] font-bold cursor-pointer"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
+          {chatTab === 'archived' && (
+            <div className="mt-2 px-3 py-1.5 bg-slate-100/90 border border-slate-200/80 rounded-xl flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-semibold text-slate-800">
+                <HiOutlineArchiveBox className="w-3.5 h-3.5 text-slate-600" />
+                Archived Chats ({chatSettings.archivedChats?.length || 0})
+              </span>
+              <button
+                type="button"
+                onClick={() => setChatTab('all')}
+                className="text-purple-600 hover:text-purple-800 hover:underline text-[11px] font-bold cursor-pointer"
+              >
+                Show All
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Chat List Items */}
@@ -2784,16 +3159,81 @@ export default function Messages() {
             )
           ) : (
             // All / Favourites / Archived Chats
-            unifiedList.length === 0 ? (
-              <div className="p-8 text-center text-sm text-slate-400">
-                {chatTab === 'favourites'
-                  ? 'No favourite chats yet. Star conversations to access them quickly.'
-                  : chatTab === 'archived'
-                  ? 'No archived chats.'
-                  : 'No conversations yet. Start chatting or create a group!'}
-              </div>
-            ) : (
-              unifiedList.map((item) => {
+            <>
+              {/* Global Chat Item in Sidebar */}
+              {chatTab === 'all' && (!search || 'global chat'.includes(search.toLowerCase()) || 'public'.includes(search.toLowerCase())) && (
+                <div
+                  onClick={selectGlobalChat}
+                  className={`w-full p-3.5 text-left flex items-center gap-3 transition-colors cursor-pointer group relative border-b border-slate-100 ${
+                    isGlobalActive
+                      ? 'bg-purple-50/80'
+                      : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="relative shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                      <HiOutlineGlobeAlt className="w-6 h-6" />
+                    </div>
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-slate-900 truncate">
+                        Global Chat
+                      </span>
+                      {globalStats.lastMessage && (
+                        <span className="text-[11px] text-slate-400 shrink-0 ml-2">
+                          {new Date(globalStats.lastMessage.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-xs text-slate-500 truncate pr-2">
+                        {globalStats.lastMessage ? (
+                          <>
+                            <span className="font-semibold text-slate-700">
+                              {globalStats.lastMessage.sender?.fullName?.split(' ')[0] ||
+                                globalStats.lastMessage.sender?.username ||
+                                'User'}
+                              :{' '}
+                            </span>
+                            <span>
+                              {globalStats.lastMessage.messageType === 'voice'
+                                ? '🎵 Voice note'
+                                : globalStats.lastMessage.content}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-slate-400 font-normal">
+                            Connect with everyone in Echolet
+                          </span>
+                        )}
+                      </p>
+
+                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded-md shrink-0 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        {globalStats.onlineCount} online
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {unifiedList.length === 0 && chatTab !== 'all' ? (
+                <div className="p-8 text-center text-sm text-slate-400">
+                  {chatTab === 'favourites'
+                    ? 'No favourite chats yet. Star conversations to access them quickly.'
+                    : chatTab === 'archived'
+                    ? 'No archived chats.'
+                    : 'No conversations yet. Start chatting or create a group!'}
+                </div>
+              ) : (
+                unifiedList.map((item) => {
                 if (item.type === 'group') {
                   const g = item.data;
                   const isSelected = activeGroup?.id === g.id;
@@ -3003,18 +3443,28 @@ export default function Messages() {
                   </div>
                 );
               })
-            )
-          )}
-        </div>
+            )}
+          </>
+        )}
       </div>
+    </div>
 
-      {/* Right Pane: Active Chat Window (Direct OR Group) */}
+      {/* Right Pane: Active Chat Window (Global OR Direct OR Group) */}
       <div
         className={`flex-1 min-w-0 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-full ${
           !hasActiveChat ? 'hidden md:flex' : 'flex'
         }`}
       >
-        {activeGroup ? (
+        {isGlobalActive ? (
+          // ======================== GLOBAL CHAT ACTIVE ========================
+          <GlobalChatRoom
+            currentUser={currentUser}
+            onBack={() => {
+              setIsGlobalActive(false);
+              navigate('/messages');
+            }}
+          />
+        ) : activeGroup ? (
           // ======================== GROUP CHAT ACTIVE ========================
           <>
             {/* Group Header */}
@@ -3182,8 +3632,9 @@ export default function Messages() {
                   {deduplicatedGroupMessages.map((m) => {
                     const isSystem = m.messageType === 'system';
                     const isMe = m.senderId === currentUser?.id;
+                    const isText = (!m.messageType || m.messageType === 'text') && !m.audioUrl && !m.mediaUrl && !m.poll;
                     const elapsedMs = Date.now() - new Date(m.createdAt).getTime();
-                    const isEditable = isMe && !m.isDeletedForEveryone && elapsedMs <= 10 * 60 * 1000;
+                    const isEditable = isMe && !m.isDeletedForEveryone && isText && elapsedMs <= 10 * 60 * 1000;
                     const canDelete = isMe || activeGroup.currentUserRole === 'admin';
                     const isSelected = selectedMessageIds.has(m.id);
 
@@ -3261,6 +3712,20 @@ export default function Messages() {
                               >
                                 <HiOutlineArrowUturnLeft className="w-4 h-4" />
                               </button>
+
+                              {isText && m.content && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(m.content);
+                                    showSuccess('Message copied to clipboard');
+                                  }}
+                                  className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Copy text"
+                                >
+                                  <HiOutlineClipboardDocument className="w-4 h-4" />
+                                </button>
+                              )}
 
                               <button
                                 type="button"
@@ -3350,6 +3815,19 @@ export default function Messages() {
                             </div>
                           )}
 
+                          {isMe && m.isDeletedForEveryone && (
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setDeletingGroupMsg(m)}
+                                className="p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                                title="Delete for me"
+                              >
+                                <HiOutlineTrash className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+
                           {/* Bubble */}
                           <div className="flex flex-col max-w-[80%] sm:max-w-[70%]">
                             <div
@@ -3395,68 +3873,83 @@ export default function Messages() {
                                 </div>
                               )}
 
-                              {/* Message text or voice note content */}
-                              {m.messageType === 'voice' || m.audioUrl ? (
+                              {/* Message content: poll, voice, media, or text */}
+                              {!m.isDeletedForEveryone && m.messageType === 'poll' && m.poll ? (
+                                <ChatPollWidget
+                                  poll={m.poll}
+                                  currentUserId={currentUser?.id}
+                                  onVote={(optionId) => handleVotePoll(m.id, optionId)}
+                                />
+                              ) : m.messageType === 'voice' || m.audioUrl ? (
                                 <VoiceNotePlayer
                                   audioUrl={m.audioUrl}
                                   duration={m.audioDuration}
                                   isMe={isMe}
+                                  extraRight={
+                                    <div className="flex items-center gap-1.5 ml-auto select-none leading-none">
+                                      {m.starredBy?.includes(currentUser?.id || '') && (
+                                        <HiStar
+                                          className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
+                                          title="Starred message"
+                                        />
+                                      )}
+                                      {m.isPinned && (
+                                        <span title="Pinned message" className="text-purple-400">
+                                          <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] text-slate-400">
+                                        {new Date(m.createdAt).toLocaleTimeString([], {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        })}
+                                      </span>
+                                    </div>
+                                  }
                                 />
                               ) : (
-                                <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
-                                  <span className="whitespace-pre-wrap break-words flex-1 min-w-[60px]">
-                                    {renderMessageContent(
-                                      m.content,
-                                      Boolean(m.isDeletedForEveryone),
-                                      isMe
-                                    )}
-                                  </span>
-
-                                  <div className="flex items-center gap-1.5 ml-auto shrink-0 select-none pb-0.5 leading-none">
-                                    {m.starredBy?.includes(currentUser?.id || '') && (
-                                      <HiStar
-                                        className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
-                                        title="Starred message"
-                                      />
-                                    )}
-                                    {m.isPinned && (
-                                      <span title="Pinned message" className="text-purple-400">
-                                        <PinIcon className="w-3 h-3 shrink-0" filled={true} />
-                                      </span>
-                                    )}
-                                    {m.isEdited && !m.isDeletedForEveryone && (
-                                      <span className="text-[10px] italic text-slate-400">edited</span>
-                                    )}
-                                    <span className="text-[10px] text-slate-400">
-                                      {new Date(m.createdAt).toLocaleTimeString([], {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      })}
-                                    </span>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Timestamp and badges for voice note in group */}
-                              {(m.messageType === 'voice' || m.audioUrl) && (
-                                <div className="flex items-center justify-end gap-1.5 pt-0.5 select-none leading-none">
-                                  {m.starredBy?.includes(currentUser?.id || '') && (
-                                    <HiStar
-                                      className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
-                                      title="Starred message"
+                                <div>
+                                  {!m.isDeletedForEveryone && m.mediaUrl && (
+                                    <ChatMediaAttachment
+                                      type={m.messageType}
+                                      mediaUrl={m.mediaUrl}
+                                      fileName={m.fileName}
+                                      fileSize={m.fileSize}
+                                      authorName={isMe ? 'You' : m.sender?.fullName}
                                     />
                                   )}
-                                  {m.isPinned && (
-                                    <span title="Pinned message" className="text-purple-400">
-                                      <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                  <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1 mt-1">
+                                    <span className="whitespace-pre-wrap break-words flex-1 min-w-[60px]">
+                                      {renderMessageContent(
+                                        m.content,
+                                        Boolean(m.isDeletedForEveryone),
+                                        isMe
+                                      )}
                                     </span>
-                                  )}
-                                  <span className="text-[10px] text-slate-400">
-                                    {new Date(m.createdAt).toLocaleTimeString([], {
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    })}
-                                  </span>
+
+                                    <div className="flex items-center gap-1.5 ml-auto shrink-0 select-none pb-0.5 leading-none">
+                                      {m.starredBy?.includes(currentUser?.id || '') && (
+                                        <HiStar
+                                          className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
+                                          title="Starred message"
+                                        />
+                                      )}
+                                      {m.isPinned && (
+                                        <span title="Pinned message" className="text-purple-400">
+                                          <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                        </span>
+                                      )}
+                                      {m.isEdited && !m.isDeletedForEveryone && (
+                                        <span className="text-[10px] italic text-slate-400">edited</span>
+                                      )}
+                                      <span className="text-[10px] text-slate-400">
+                                        {new Date(m.createdAt).toLocaleTimeString([], {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        })}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -3476,6 +3969,20 @@ export default function Messages() {
                               >
                                 <HiOutlineArrowUturnLeft className="w-4 h-4" />
                               </button>
+
+                              {isText && m.content && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(m.content);
+                                    showSuccess('Message copied to clipboard');
+                                  }}
+                                  className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Copy text"
+                                >
+                                  <HiOutlineClipboardDocument className="w-4 h-4" />
+                                </button>
+                              )}
 
                               <button
                                 type="button"
@@ -3553,6 +4060,19 @@ export default function Messages() {
                                   <HiOutlineTrash className="w-4 h-4" />
                                 </button>
                               )}
+                            </div>
+                          )}
+
+                          {!isMe && m.isDeletedForEveryone && (
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setDeletingGroupMsg(m)}
+                                className="p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                                title="Delete for me"
+                              >
+                                <HiOutlineTrash className="w-4 h-4" />
+                              </button>
                             </div>
                           )}
                         </div>
@@ -3669,6 +4189,12 @@ export default function Messages() {
                         </div>
                       )}
                     </div>
+
+                    <ChatAttachmentMenu
+                      onSelectMedia={handleSelectMedia}
+                      onSelectDocument={handleSelectDocument}
+                      onOpenPollModal={() => setIsPollModalOpen(true)}
+                    />
 
                     <input
                       ref={inputRef}
@@ -3884,8 +4410,9 @@ export default function Messages() {
                 <>
                   {deduplicatedMessages.map((m) => {
                     const isMe = m.senderId === currentUser?.id;
+                    const isText = (!m.messageType || m.messageType === 'text') && !m.audioUrl && !m.mediaUrl && !m.poll;
                     const elapsedMs = Date.now() - new Date(m.createdAt).getTime();
-                    const isEditable = isMe && !m.isDeletedForEveryone && elapsedMs <= 10 * 60 * 1000;
+                    const isEditable = isMe && !m.isDeletedForEveryone && isText && elapsedMs <= 10 * 60 * 1000;
                     const isSelected = selectedMessageIds.has(m.id);
 
                     return (
@@ -3950,6 +4477,20 @@ export default function Messages() {
                               >
                                 <HiOutlineArrowUturnLeft className="w-4 h-4" />
                               </button>
+
+                              {isText && m.content && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(m.content);
+                                    showSuccess('Message copied to clipboard');
+                                  }}
+                                  className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Copy text"
+                                >
+                                  <HiOutlineClipboardDocument className="w-4 h-4" />
+                                </button>
+                              )}
 
                               <button
                                 type="button"
@@ -4029,6 +4570,19 @@ export default function Messages() {
                             </div>
                           )}
 
+                          {isMe && m.isDeletedForEveryone && (
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setDeletingMessage(m)}
+                                className="p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                                title="Delete for me"
+                              >
+                                <HiOutlineTrash className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+
                           {/* Bubble */}
                           <div className="flex flex-col max-w-[80%] sm:max-w-[70%]">
                             <div
@@ -4069,74 +4623,89 @@ export default function Messages() {
                                 </div>
                               )}
 
-                              {/* Voice Note or Text Content */}
-                              {m.messageType === 'voice' || m.audioUrl ? (
+                              {/* Message content: poll, voice, media, or text */}
+                              {!m.isDeletedForEveryone && m.messageType === 'poll' && m.poll ? (
+                                <ChatPollWidget
+                                  poll={m.poll}
+                                  currentUserId={currentUser?.id}
+                                  onVote={(optionId) => handleVotePoll(m.id, optionId)}
+                                />
+                              ) : m.messageType === 'voice' || m.audioUrl ? (
                                 <VoiceNotePlayer
                                   audioUrl={m.audioUrl}
                                   duration={m.audioDuration}
                                   isMe={isMe}
+                                  extraRight={
+                                    <div className="flex items-center gap-1.5 ml-auto select-none leading-none">
+                                      {m.starredBy?.includes(currentUser?.id || '') && (
+                                        <HiStar
+                                          className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
+                                          title="Starred message"
+                                        />
+                                      )}
+                                      {m.isPinned && (
+                                        <span title="Pinned message" className="text-purple-400">
+                                          <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] text-slate-400">
+                                        {new Date(m.createdAt).toLocaleTimeString([], {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        })}
+                                      </span>
+                                      {isMe && !m.isDeletedForEveryone && (
+                                        <MessageTicks status={m.status} isRead={m.isRead} />
+                                      )}
+                                    </div>
+                                  }
                                 />
                               ) : (
-                                <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
-                                  <span className="whitespace-pre-wrap break-words flex-1 min-w-[60px]">
-                                    {renderMessageContent(
-                                      m.content,
-                                      Boolean(m.isDeletedForEveryone),
-                                      isMe
-                                    )}
-                                  </span>
-
-                                  <div className="flex items-center gap-1.5 ml-auto shrink-0 select-none pb-0.5 leading-none">
-                                    {m.starredBy?.includes(currentUser?.id || '') && (
-                                      <HiStar
-                                        className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
-                                        title="Starred message"
-                                      />
-                                    )}
-                                    {m.isPinned && (
-                                      <span title="Pinned message" className="text-purple-400">
-                                        <PinIcon className="w-3 h-3 shrink-0" filled={true} />
-                                      </span>
-                                    )}
-                                    {m.isEdited && !m.isDeletedForEveryone && (
-                                      <span className="text-[10px] italic text-slate-400">edited</span>
-                                    )}
-                                    <span className="text-[10px] text-slate-400">
-                                      {new Date(m.createdAt).toLocaleTimeString([], {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      })}
-                                    </span>
-                                    {isMe && !m.isDeletedForEveryone && (
-                                      <MessageTicks status={m.status} isRead={m.isRead} />
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Timestamp and badges for voice note in direct chat */}
-                              {(m.messageType === 'voice' || m.audioUrl) && (
-                                <div className="flex items-center justify-end gap-1.5 pt-0.5 select-none leading-none">
-                                  {m.starredBy?.includes(currentUser?.id || '') && (
-                                    <HiStar
-                                      className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
-                                      title="Starred message"
+                                <div>
+                                  {!m.isDeletedForEveryone && m.mediaUrl && (
+                                    <ChatMediaAttachment
+                                      type={m.messageType}
+                                      mediaUrl={m.mediaUrl}
+                                      fileName={m.fileName}
+                                      fileSize={m.fileSize}
+                                      authorName={isMe ? 'You' : activeUser?.fullName}
                                     />
                                   )}
-                                  {m.isPinned && (
-                                    <span title="Pinned message" className="text-purple-400">
-                                      <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                  <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1 mt-1">
+                                    <span className="whitespace-pre-wrap break-words flex-1 min-w-[60px]">
+                                      {renderMessageContent(
+                                        m.content,
+                                        Boolean(m.isDeletedForEveryone),
+                                        isMe
+                                      )}
                                     </span>
-                                  )}
-                                  <span className="text-[10px] text-slate-400">
-                                    {new Date(m.createdAt).toLocaleTimeString([], {
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    })}
-                                  </span>
-                                  {isMe && !m.isDeletedForEveryone && (
-                                    <MessageTicks status={m.status} isRead={m.isRead} />
-                                  )}
+
+                                    <div className="flex items-center gap-1.5 ml-auto shrink-0 select-none pb-0.5 leading-none">
+                                      {m.starredBy?.includes(currentUser?.id || '') && (
+                                        <HiStar
+                                          className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
+                                          title="Starred message"
+                                        />
+                                      )}
+                                      {m.isPinned && (
+                                        <span title="Pinned message" className="text-purple-400">
+                                          <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                        </span>
+                                      )}
+                                      {m.isEdited && !m.isDeletedForEveryone && (
+                                        <span className="text-[10px] italic text-slate-400">edited</span>
+                                      )}
+                                      <span className="text-[10px] text-slate-400">
+                                        {new Date(m.createdAt).toLocaleTimeString([], {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        })}
+                                      </span>
+                                      {isMe && !m.isDeletedForEveryone && (
+                                        <MessageTicks status={m.status} isRead={m.isRead} />
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -4155,6 +4724,20 @@ export default function Messages() {
                               >
                                 <HiOutlineArrowUturnLeft className="w-4 h-4" />
                               </button>
+
+                              {isText && m.content && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(m.content);
+                                    showSuccess('Message copied to clipboard');
+                                  }}
+                                  className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                  title="Copy text"
+                                >
+                                  <HiOutlineClipboardDocument className="w-4 h-4" />
+                                </button>
+                              )}
 
                               <button
                                 type="button"
@@ -4217,6 +4800,19 @@ export default function Messages() {
                                 onClick={() => setDeletingMessage(m)}
                                 className="p-1 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                                 title="Delete message"
+                              >
+                                <HiOutlineTrash className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+
+                          {!isMe && m.isDeletedForEveryone && (
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setDeletingMessage(m)}
+                                className="p-1 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                                title="Delete for me"
                               >
                                 <HiOutlineTrash className="w-4 h-4" />
                               </button>
@@ -4350,6 +4946,12 @@ export default function Messages() {
                       )}
                     </div>
 
+                    <ChatAttachmentMenu
+                      onSelectMedia={handleSelectMedia}
+                      onSelectDocument={handleSelectDocument}
+                      showPoll={false}
+                    />
+
                     <input
                       ref={inputRef}
                       type="text"
@@ -4391,6 +4993,14 @@ export default function Messages() {
               Select a conversation from the left, start a new direct message, or create a group to chat with multiple members.
             </p>
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={selectGlobalChat}
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs active:scale-98 transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <HiOutlineGlobeAlt className="w-4 h-4" />
+                <span>Global Chat</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setIsCreateGroupOpen(true)}
@@ -4723,6 +5333,13 @@ export default function Messages() {
           </div>
         </div>
       )}
+
+      {/* Create Chat Poll Modal */}
+      <CreateChatPollModal
+        isOpen={isPollModalOpen}
+        onClose={() => setIsPollModalOpen(false)}
+        onSubmit={handleCreatePoll}
+      />
     </div>
   );
 }
