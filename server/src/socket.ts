@@ -429,6 +429,16 @@ export const emitNewComment = (comment: any) => {
   io.emit('new_comment', comment);
 };
 
+export const emitPostPollVoted = (data: {
+  postId: string;
+  pollOptions: any[];
+  userVotedOption?: number | null;
+  userId?: string;
+}) => {
+  if (!io) return;
+  io.emit('post_poll_voted', data);
+};
+
 export const emitNewGroupMessage = (message: any) => {
   if (!io) return;
   io.to(`group:${message.groupId}`).emit('new_group_message', message);
