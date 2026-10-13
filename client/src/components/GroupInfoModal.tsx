@@ -534,27 +534,43 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                           </button>
 
                           {isMenuOpen && (
-                            <div className="absolute right-0 top-full mt-1 w-44 rounded-xl bg-white border border-slate-200 shadow-lg py-1 z-30 divide-y divide-slate-100 animate-in fade-in duration-100">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleChangeRole(member.userId, isMemberAdmin ? 'member' : 'admin')
-                                }
-                                className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                            <>
+                              <div
+                                className="fixed inset-0 z-20 bg-transparent"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMemberMenuId(null);
+                                }}
+                              />
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute right-0 top-full mt-1 w-44 rounded-xl bg-white border border-slate-200 shadow-lg py-1 z-30 divide-y divide-slate-100 animate-in fade-in duration-100"
                               >
-                                <HiOutlineShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-                                <span>{isMemberAdmin ? 'Dismiss as Admin' : 'Make Admin'}</span>
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMemberMenuId(null);
+                                    handleChangeRole(member.userId, isMemberAdmin ? 'member' : 'admin');
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                                >
+                                  <HiOutlineShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span>{isMemberAdmin ? 'Dismiss as Admin' : 'Make Admin'}</span>
+                                </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveMember(member.userId)}
-                                className="w-full px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2"
-                              >
-                                <HiOutlineTrash className="w-3.5 h-3.5" />
-                                <span>Remove from Group</span>
-                              </button>
-                            </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMemberMenuId(null);
+                                    handleRemoveMember(member.userId);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2"
+                                >
+                                  <HiOutlineTrash className="w-3.5 h-3.5" />
+                                  <span>Remove from Group</span>
+                                </button>
+                              </div>
+                            </>
                           )}
                         </div>
                       )}

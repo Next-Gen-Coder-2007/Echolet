@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   HiHeart,
   HiOutlineHeart,
@@ -277,9 +277,26 @@ export default function PostCard({
   const [isBookmarked, setIsBookmarked] = useState(Boolean(post.isBookmarked));
   const [bookmarksCount, setBookmarksCount] = useState(post.bookmarksCount || 0);
 
+  const location = useLocation();
+
   // Dropdown & Menu
   const [showMenu, setShowMenu] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Close menu on route change
+  useEffect(() => {
+    setShowMenu(false);
+  }, [location.pathname, location.search]);
+
+  // Close menu on Escape key
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowMenu(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showMenu]);
 
   // Media Viewer modal for viewing photos
   const [activeMediaIndex, setActiveMediaIndex] = useState<number | null>(null);
@@ -649,28 +666,47 @@ export default function PostCard({
             </button>
 
             {showMenu && (
-              <div className="absolute right-0 top-9 w-44 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-20 animate-in fade-in">
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  className="w-full px-4 py-2.5 text-left text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+              <>
+                {/* Backdrop to close on click outside */}
+                <div
+                  className="fixed inset-0 z-10 bg-transparent"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                  }}
+                />
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute right-0 top-9 w-44 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-20 animate-in fade-in"
                 >
-                  <HiOutlineLink className="w-4 h-4 text-slate-500" />
-                  Copy link
-                </button>
-
-                {isAuthor && (
                   <button
                     type="button"
-                    onClick={handleDeletePost}
-                    disabled={isDeleting}
-                    className="w-full px-4 py-2.5 text-left text-xs sm:text-sm font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+                    onClick={() => {
+                      setShowMenu(false);
+                      handleCopyLink();
+                    }}
+                    className="w-full px-4 py-2.5 text-left text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
                   >
-                    <HiOutlineTrash className="w-4 h-4 text-rose-500" />
-                    Delete Echo
+                    <HiOutlineLink className="w-4 h-4 text-slate-500" />
+                    Copy link
                   </button>
-                )}
-              </div>
+
+                  {isAuthor && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMenu(false);
+                        handleDeletePost();
+                      }}
+                      disabled={isDeleting}
+                      className="w-full px-4 py-2.5 text-left text-xs sm:text-sm font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <HiOutlineTrash className="w-4 h-4 text-rose-500" />
+                      Delete Echo
+                    </button>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </div>
