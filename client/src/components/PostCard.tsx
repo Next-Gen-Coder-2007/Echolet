@@ -16,11 +16,15 @@ import {
   HiOutlineArrowsPointingOut,
   HiChevronDown,
   HiChevronUp,
+  HiOutlineChartBar,
+  HiOutlineClock,
+  HiCheck,
 } from 'react-icons/hi2';
-import postService, { type Post, type PostComment } from '../services/postService';
+import postService, { type Post, type PostComment, type PollOptionItem } from '../services/postService';
 import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
 import MediaViewerModal from './MediaViewerModal';
+import getSocket from '../services/socket';
 
 interface PostCardProps {
   post: Post;
@@ -308,6 +312,172 @@ export default function PostCard({
   const [loadingComments, setLoadingComments] = useState(false);
   const [newCommentText, setNewCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+
+  // Poll State & Realtime Updates
+  const [pollOptions, setPollOptions] = useState<PollOptionItem[]>(post.pollOptions || []);
+  const [userVotedOption, setUserVotedOption] = useState<number | null>(
+    post.userVotedOption !== undefined ? post.userVotedOption : null
+  );
+  const [isVoting, setIsVoting] = useState(false);
+
+  useEffect(() => {
+    if (post.pollOptions) {
+      setPollOptions(post.pollOptions);
+    }
+    if (post.userVotedOption !== undefined) {
+      setUserVotedOption(post.userVotedOption);
+    }
+  }, [post.pollOptions, post.userVotedOption]);
+
+  // Real-time socket listener for poll updates
+  useEffect(() => {
+    const socket = getSocket();
+    const handlePollVoted = (data: {
+      postId: string;
+      pollOptions: PollOptionItem[];
+      userVotedOption?: number | null;
+      userId?: string;
+    }) => {
+      if (data.postId === post.id) {
+        setPollOptions(data.pollOptions);
+        if (data.userId === currentUser?.id && data.userVotedOption !== undefined) {
+          setUserVotedOption(data.userVotedOption);
+        }
+      }
+    };
+
+    socket.on('post_poll_voted', handlePollVoted);
+    return () => {
+      socket.off('post_poll_voted', handlePollVoted);
+    };
+  }, [post.id, currentUser?.id]);
+
+  // Poll Expiration Timer Live Countdown
+  const [isPollExpired, setIsPollExpired] = useState<boolean>(() => {
+    if (!post.pollExpiresAt) return Boolean(post.isPollExpired);
+    return new Date(post.pollExpiresAt).getTime() <= Date.now();
+  });
+  const [pollTimeRemainingText, setPollTimeRemainingText] = useState<string>('');
+
+  useEffect(() => {
+    if (!post.pollExpiresAt) {
+      setIsPollExpired(false);
+      setPollTimeRemainingText('');
+      return;
+    }
+
+    const updateTimer = () => {
+      const expiresAtMs = new Date(post.pollExpiresAt!).getTime();
+      const now = Date.now();
+      const diff = expiresAtMs - now;
+
+      if (diff <= 0) {
+        setIsPollExpired(true);
+        setPollTimeRemainingText('Poll ended');
+        return;
+      }
+
+      setIsPollExpired(false);
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+
+      if (days > 0) {
+        const remH = Math.floor((diff % 86400000) / 3600000);
+        setPollTimeRemainingText(`${days}d ${remH}h left`);
+      } else if (hours > 0) {
+        const remM = Math.floor((diff % 3600000) / 60000);
+        setPollTimeRemainingText(`${hours}h ${remM}m left`);
+      } else if (minutes > 0) {
+        const remS = Math.floor((diff % 60000) / 1000);
+        setPollTimeRemainingText(`${minutes}m ${remS}s left`);
+      } else {
+        const seconds = Math.max(0, Math.floor(diff / 1000));
+        setPollTimeRemainingText(`${seconds}s left`);
+      }
+    };
+
+    updateTimer();
+    const expiresDiff = new Date(post.pollExpiresAt).getTime() - Date.now();
+    const intervalTime = expiresDiff < 3600000 ? 1000 : 10000;
+    const interval = setInterval(updateTimer, intervalTime);
+
+    return () => clearInterval(interval);
+  }, [post.pollExpiresAt]);
+
+  const handleVotePoll = async (optionIndex: number) => {
+    if (!currentUser) {
+      notify('Please log in to vote in this poll', 'info');
+      navigate('/login');
+      return;
+    }
+
+    if (isPollExpired) {
+      notify('This poll has ended and voting is closed', 'error');
+      return;
+    }
+
+    if (isVoting) return;
+
+    // Optimistic update
+    const previousOptions = [...pollOptions];
+    const previousVote = userVotedOption;
+
+    let optimisticOptions = [...pollOptions];
+    let optimisticVote: number | null = optionIndex;
+
+    if (userVotedOption === optionIndex) {
+      // Toggle off / remove vote
+      optimisticVote = null;
+      optimisticOptions = pollOptions.map((opt, idx) => {
+        if (idx === optionIndex) {
+          return { ...opt, votes: Math.max(0, (opt.votes || 0) - 1) };
+        }
+        return opt;
+      });
+    } else if (userVotedOption !== null) {
+      // Switch vote from previous option to new option
+      const prev = userVotedOption;
+      optimisticOptions = pollOptions.map((opt, idx) => {
+        if (idx === prev) {
+          return { ...opt, votes: Math.max(0, (opt.votes || 0) - 1) };
+        }
+        if (idx === optionIndex) {
+          return { ...opt, votes: (opt.votes || 0) + 1 };
+        }
+        return opt;
+      });
+    } else {
+      // First vote
+      optimisticOptions = pollOptions.map((opt, idx) => {
+        if (idx === optionIndex) {
+          return { ...opt, votes: (opt.votes || 0) + 1 };
+        }
+        return opt;
+      });
+    }
+
+    setPollOptions(optimisticOptions);
+    setUserVotedOption(optimisticVote);
+    setIsVoting(true);
+
+    try {
+      const res = await postService.votePoll(post.id, optionIndex);
+      setPollOptions(res.pollOptions);
+      setUserVotedOption(res.userVotedOption);
+      if (res.userVotedOption === null) {
+        notify('Your vote was removed', 'info');
+      } else {
+        notify('Your vote has been recorded!', 'success');
+      }
+    } catch (err: any) {
+      setPollOptions(previousOptions);
+      setUserVotedOption(previousVote);
+      notify(err.response?.data?.message || 'Failed to record vote. Please try again.', 'error');
+    } finally {
+      setIsVoting(false);
+    }
+  };
 
   const isAuthor = currentUser?.id === post.userId;
   const authorInitial = post.user?.fullName?.[0] || post.user?.username?.[0] || 'U';
@@ -645,6 +815,7 @@ export default function PostCard({
                 <span className="text-xs text-slate-400 font-medium">
                   {formatTime(post.createdAt)}
                 </span>
+
               </div>
               <Link
                 to={`/profile/${post.user?.username}`}
@@ -835,6 +1006,146 @@ export default function PostCard({
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Interactive Poll Widget */}
+        {pollOptions && pollOptions.length >= 2 && (
+          <div className="mb-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-purple-50/60 via-slate-50 to-indigo-50/40 border border-purple-200/80 shadow-2xs">
+            {/* Poll Status Header */}
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-purple-900">
+                <div className="w-5 h-5 rounded-md bg-purple-600 text-white flex items-center justify-center text-[10px] shadow-2xs">
+                  <HiOutlineChartBar className="w-3.5 h-3.5" />
+                </div>
+                <span>Poll</span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {isPollExpired ? (
+                  <span className="text-[11px] font-bold text-slate-500 bg-slate-200/80 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-2xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                    <span>Poll Ended</span>
+                  </span>
+                ) : post.pollExpiresAt ? (
+                  <span className="text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-2xs">
+                    <HiOutlineClock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                    <span>Closes in: {pollTimeRemainingText || 'Active'}</span>
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-2xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>No timer</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Poll Options List */}
+            <div className="space-y-2.5">
+              {(() => {
+                const totalVotes = pollOptions.reduce((sum, opt) => sum + (opt.votes || 0), 0);
+                const hasUserVoted = userVotedOption !== null;
+
+                return pollOptions.map((opt, idx) => {
+                  const votesCount = opt.votes || 0;
+                  const pct = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
+                  const isThisVoted = userVotedOption === idx;
+                  const canClick = !isPollExpired && !isVoting;
+
+                  return (
+                    <button
+                      key={opt.id ?? idx}
+                      type="button"
+                      disabled={!canClick}
+                      onClick={() => handleVotePoll(idx)}
+                      className={`relative w-full overflow-hidden text-left p-3 rounded-xl border transition-all text-xs sm:text-sm select-none ${
+                        isThisVoted
+                          ? 'border-purple-500 bg-purple-50/80 ring-2 ring-purple-500/30 font-bold shadow-2xs'
+                          : canClick
+                          ? 'border-slate-200/90 bg-white hover:border-purple-300 hover:bg-purple-50/40 cursor-pointer active:scale-[0.995]'
+                          : 'border-slate-200 bg-white/80 cursor-default'
+                      }`}
+                    >
+                      {/* Animated Percentage Fill Bar */}
+                      {(hasUserVoted || isPollExpired) && (
+                        <div
+                          style={{ width: `${pct}%` }}
+                          className={`absolute top-0 bottom-0 left-0 transition-all duration-500 rounded-xl ${
+                            isThisVoted
+                              ? 'bg-purple-200/70'
+                              : 'bg-slate-200/60'
+                          }`}
+                        />
+                      )}
+
+                      {/* Option Content Row */}
+                      <div className="relative z-10 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {/* Option Badge (A, B, C or Checkmark) */}
+                          <div
+                            className={`w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 transition-colors ${
+                              isThisVoted
+                                ? 'bg-purple-600 text-white shadow-2xs'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {isThisVoted ? (
+                              <HiCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                            ) : (
+                              String.fromCharCode(65 + idx)
+                            )}
+                          </div>
+
+                          <span className={`truncate ${isThisVoted ? 'text-purple-950 font-bold' : 'text-slate-800 font-medium'}`}>
+                            {opt.text}
+                          </span>
+                        </div>
+
+                        {/* Votes Count & Percentage */}
+                        <div className="flex items-center gap-2 shrink-0 text-xs font-semibold">
+                          {(hasUserVoted || isPollExpired) ? (
+                            <>
+                              <span className={isThisVoted ? 'text-purple-800 font-bold' : 'text-slate-600'}>
+                                {pct}%
+                              </span>
+                              <span className="text-[11px] text-slate-400 font-normal">
+                                ({votesCount})
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-purple-600 font-semibold group-hover:underline">
+                              Vote
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Poll Footer Information */}
+            <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium mt-3 pt-2.5 border-t border-purple-100/80">
+              {(() => {
+                const totalVotes = pollOptions.reduce((sum, opt) => sum + (opt.votes || 0), 0);
+                return (
+                  <>
+                    <span>
+                      {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+                    </span>
+                    <span>
+                      {isPollExpired
+                        ? 'Poll closed · Final results'
+                        : userVotedOption !== null
+                        ? '✓ You voted on this poll (click to change)'
+                        : 'Click an option to vote'}
+                    </span>
+                  </>
+                );
+              })()}
+            </div>
           </div>
         )}
 

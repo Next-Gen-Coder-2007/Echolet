@@ -35,6 +35,8 @@ export interface Post {
   mediaUrls: string[] | null;
   mediaType: 'text' | 'image' | 'video' | 'gif' | 'poll';
   pollOptions: PollOptionItem[] | null;
+  pollExpiresAt?: string | null;
+  isPollExpired?: boolean;
   likesCount: number;
   commentsCount: number;
   repostsCount: number;
@@ -52,6 +54,9 @@ export interface CreatePostData {
   mediaUrls?: string[];
   mediaType?: 'text' | 'image' | 'video' | 'gif' | 'poll';
   pollOptions?: string[];
+  pollDuration?: string | null;
+  pollExpiresIn?: string | number | null;
+  pollExpiresAt?: string | null;
 }
 
 export interface FeedResponse {

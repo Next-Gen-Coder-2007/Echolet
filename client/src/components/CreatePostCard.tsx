@@ -7,10 +7,24 @@ import {
   HiOutlineGlobeAmericas,
   HiCheckCircle,
   HiPlus,
+  HiOutlineChartBar,
+  HiOutlineClock,
+  HiOutlineTrash,
 } from 'react-icons/hi2';
 import postService, { type Post } from '../services/postService';
 import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
+
+export const POLL_TIMER_DURATIONS = [
+  { value: 'none', label: 'No timer (Never ends)' },
+  { value: '5m', label: '5 minutes' },
+  { value: '1h', label: '1 hour' },
+  { value: '6h', label: '6 hours' },
+  { value: '12h', label: '12 hours' },
+  { value: '24h', label: '24 hours (1 day)' },
+  { value: '3d', label: '3 days' },
+  { value: '7d', label: '7 days (1 week)' },
+];
 
 interface CreatePostCardProps {
   currentUser: User | null | undefined;
@@ -95,6 +109,9 @@ export default function CreatePostCard({
 
   const [content, setContent] = useState('');
   const [images, setImages] = useState<SelectedImage[]>([]);
+  const [showPoll, setShowPoll] = useState(false);
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [pollTimer, setPollTimer] = useState<string>('none');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -222,8 +239,25 @@ export default function CreatePostCard({
 
     const trimmed = content.trim();
     const hasImages = images.length > 0;
+    const trimmedPollOptions = showPoll
+      ? pollOptions.map((o) => o.trim()).filter((o) => o.length > 0)
+      : [];
 
-    if (!trimmed && !hasImages) {
+    if (showPoll) {
+      if (!trimmed) {
+        notify('Please enter a question or topic for your poll above', 'error');
+        return;
+      }
+      if (trimmedPollOptions.length < 2) {
+        notify('Poll must have at least 2 non-empty options', 'error');
+        return;
+      }
+      const uniqueOptions = new Set(trimmedPollOptions.map((o) => o.toLowerCase()));
+      if (uniqueOptions.size < trimmedPollOptions.length) {
+        notify('All poll options must be unique', 'error');
+        return;
+      }
+    } else if (!trimmed && !hasImages) {
       notify('Please write something or attach an image', 'error');
       return;
     }
@@ -233,12 +267,17 @@ export default function CreatePostCard({
       const createdPost = await postService.createPost({
         content: trimmed,
         mediaUrls: hasImages ? images.map((img) => img.url) : undefined,
-        mediaType: hasImages ? 'image' : 'text',
+        mediaType: showPoll ? 'poll' : hasImages ? 'image' : 'text',
+        pollOptions: showPoll ? trimmedPollOptions : undefined,
+        pollDuration: showPoll && pollTimer !== 'none' ? pollTimer : undefined,
       });
 
       onPostCreated(createdPost);
       setContent('');
       setImages([]);
+      setShowPoll(false);
+      setPollOptions(['', '']);
+      setPollTimer('none');
       notify('Echo published successfully!', 'success');
     } catch (err: any) {
       console.error('Failed to create post:', err);
@@ -344,12 +383,135 @@ export default function CreatePostCard({
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onPaste={handlePaste}
-            placeholder={`What's on your mind? Share thoughts, links, or drop images (max 1MB each)...`}
+            placeholder={
+              showPoll
+                ? 'Ask a poll question... (e.g. Which team will win tomorrow?)'
+                : `What's on your mind? Share thoughts, links, or drop images (max 1MB each)...`
+            }
             rows={3}
             maxLength={500}
             className="w-full text-slate-900 placeholder-slate-400 bg-slate-50/70 hover:bg-slate-50 focus:bg-white rounded-2xl p-4 text-sm sm:text-base focus:outline-none border border-slate-200/80 focus:border-slate-400 transition-all resize-none leading-relaxed"
           />
         </div>
+
+        {/* Poll Creator Block */}
+        {showPoll && (
+          <div className="mt-3.5 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-purple-50/80 via-slate-50/50 to-indigo-50/50 border border-purple-200/90 space-y-3.5 animate-in fade-in shadow-2xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center text-xs font-bold shadow-2xs shrink-0">
+                  <HiOutlineChartBar className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 block leading-tight">
+                    Create Poll
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-normal">
+                    Text above is your question. Add options and optional duration timer below.
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPoll(false);
+                  setPollOptions(['', '']);
+                  setPollTimer('none');
+                }}
+                className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <HiOutlineTrash className="w-3.5 h-3.5" />
+                <span>Remove Poll</span>
+              </button>
+            </div>
+
+            {/* Poll options inputs */}
+            <div className="space-y-2">
+              {pollOptions.map((opt, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-500/10 shadow-2xs transition-all"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-purple-50 border border-purple-200 text-purple-700 font-bold text-xs flex items-center justify-center shrink-0">
+                    {String.fromCharCode(65 + idx)}
+                  </div>
+                  <input
+                    type="text"
+                    value={opt}
+                    onChange={(e) => {
+                      const updated = [...pollOptions];
+                      updated[idx] = e.target.value;
+                      setPollOptions(updated);
+                    }}
+                    placeholder={`Option ${idx + 1}`}
+                    maxLength={100}
+                    className="flex-1 bg-transparent px-2 py-1 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                  />
+                  {pollOptions.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setPollOptions((prev) => prev.filter((_, i) => i !== idx))}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                      title="Delete option"
+                    >
+                      <HiOutlineTrash className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {pollOptions.length < 6 && (
+              <button
+                type="button"
+                onClick={() => setPollOptions((prev) => [...prev, ''])}
+                className="w-full py-2 px-3 rounded-xl border border-dashed border-purple-300 hover:border-purple-400 hover:bg-purple-100/60 text-purple-700 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <HiPlus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Add Option ({pollOptions.length}/6)</span>
+              </button>
+            )}
+
+            {/* Poll Duration / Timer Setting */}
+            <div className="pt-3 border-t border-purple-200/80">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <HiOutlineClock className="w-4 h-4 text-purple-600" />
+                  Poll Timer:
+                </span>
+                <span className="text-[11px] font-semibold text-purple-700 bg-purple-100/90 px-2 py-0.5 rounded-md">
+                  {POLL_TIMER_DURATIONS.find((d) => d.value === pollTimer)?.label || 'No timer'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {POLL_TIMER_DURATIONS.map((d) => {
+                  const isSelected = pollTimer === d.value;
+                  return (
+                    <button
+                      key={d.value}
+                      type="button"
+                      onClick={() => setPollTimer(d.value)}
+                      className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold text-center transition-all cursor-pointer border ${
+                        isSelected
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-2xs font-bold'
+                          : 'bg-white hover:bg-purple-50/80 text-slate-700 border-slate-200 hover:border-purple-300'
+                      }`}
+                    >
+                      {d.value === 'none' ? 'No timer' : d.label.split(' ')[0] + (d.label.split(' ')[1] ? ' ' + d.label.split(' ')[1] : '')}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1.5 font-medium">
+                {pollTimer === 'none'
+                  ? 'Voting remains open permanently until deleted.'
+                  : `Voting automatically closes after ${POLL_TIMER_DURATIONS.find((d) => d.value === pollTimer)?.label}. The post remains on the feed.`}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Processing Indicator */}
         {isProcessing && (
@@ -427,8 +589,8 @@ export default function CreatePostCard({
 
         {/* Footer Actions */}
         <div className="flex items-center justify-between pt-3.5 mt-3 border-t border-slate-100">
-          {/* Media Attach Tools */}
-          <div className="flex items-center gap-2">
+          {/* Action Tools: Images, Poll, Timer */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             <input
               ref={fileInputRef}
               type="file"
@@ -438,6 +600,7 @@ export default function CreatePostCard({
               className="hidden"
             />
 
+            {/* Images Button */}
             <button
               type="button"
               disabled={images.length >= MAX_IMAGES_COUNT}
@@ -446,17 +609,42 @@ export default function CreatePostCard({
               title="Upload Images (Max 1MB each, up to 4)"
             >
               <HiOutlinePhoto className="w-5 h-5 text-slate-700 group-hover:text-slate-900" />
-              <span className="text-xs font-semibold">Images</span>
-              <span className="text-[10px] text-slate-400 font-medium">
-                (max 1MB)
+              <span className="text-xs font-semibold hidden sm:inline">Images</span>
+              <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
+                (≤ 1MB)
               </span>
+            </button>
+
+            {/* Poll Toggle Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowPoll((prev) => !prev);
+                if (!showPoll && pollOptions.length < 2) {
+                  setPollOptions(['', '']);
+                }
+              }}
+              className={`p-2 sm:px-3 sm:py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 group ${
+                showPoll
+                  ? 'bg-purple-100 text-purple-700 font-bold ring-1 ring-purple-300'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-semibold'
+              }`}
+              title="Add interactive poll to post"
+            >
+              <HiOutlineChartBar className={`w-5 h-5 ${showPoll ? 'text-purple-600' : 'text-slate-700 group-hover:text-slate-900'}`} />
+              <span className="text-xs font-semibold">Poll</span>
             </button>
           </div>
 
           {/* Submit Action */}
           <button
             type="submit"
-            disabled={submitting || isProcessing || (!content.trim() && images.length === 0)}
+            disabled={
+              submitting ||
+              isProcessing ||
+              (!content.trim() && images.length === 0 && !showPoll) ||
+              (showPoll && (pollOptions.filter((o) => o.trim().length > 0).length < 2 || !content.trim()))
+            }
             className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-slate-900 text-white hover:bg-slate-800 active:scale-95 transition-all cursor-pointer shadow-sm disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
           >
             {submitting ? (
