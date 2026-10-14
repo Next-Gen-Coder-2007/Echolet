@@ -128,8 +128,9 @@ export default function Modal({
     <div
       role="dialog"
       aria-modal="true"
+      data-lenis-prevent
       style={{ zIndex }}
-      className="fixed inset-0 flex items-center justify-center p-2 sm:p-4 select-none"
+      className="fixed inset-0 flex items-center justify-center p-2 sm:p-4 select-none touch-pan-y"
     >
       <div
         className={`fixed inset-0 transition-opacity duration-300 animate-modal-backdrop cursor-pointer ${resolvedBackdropClass}`}
@@ -150,6 +151,7 @@ export default function Modal({
 
       <div
         onClick={(e) => e.stopPropagation()}
+        data-lenis-prevent
         className={`relative z-10 w-full ${resolvedSizeClass} animate-modal-content transition-all ${className}`}
       >
         {(title || description || (showCloseButton && closeButtonPosition === 'inside')) && !className.includes('bg-') ? (
@@ -190,7 +192,10 @@ export default function Modal({
               </div>
             )}
 
-            <div className="p-4 sm:p-5 overflow-y-auto max-h-[82vh]">
+            <div
+              data-lenis-prevent
+              className="p-4 sm:p-5 overflow-y-auto max-h-[82vh] touch-pan-y overscroll-contain"
+            >
               {children}
             </div>
           </div>

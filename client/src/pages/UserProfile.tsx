@@ -6,13 +6,12 @@ import {
   HiOutlineEnvelope,
   HiOutlineChatBubbleOvalLeftEllipsis,
   HiOutlinePencilSquare,
-  HiOutlinePlay,
-  HiOutlineHeart,
 } from 'react-icons/hi2';
 import userService, { type UserProfileResponse } from '../services/userService';
 import postService, { type Post } from '../services/postService';
 import reelService, { type Reel } from '../services/reelService';
 import PostCard from '../components/PostCard';
+import ReelGridCard from '../components/ReelGridCard';
 import type { User } from '../services/authService';
 
 export default function UserProfile() {
@@ -28,9 +27,11 @@ export default function UserProfile() {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [isFollowSubmitting, setIsFollowSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'echoes' | 'media' | 'reels' | 'likes'>('echoes');
+  const [activeTab, setActiveTab] = useState<'echoes' | 'reels'>('echoes');
   const [posts, setPosts] = useState<Post[]>([]);
   const [userReels, setUserReels] = useState<Reel[]>([]);
+  const [reelsHasMore, setReelsHasMore] = useState(false);
+  const [loadingMoreReels, setLoadingMoreReels] = useState(false);
   const [postsLoading, setPostsLoading] = useState(false);
   const [echoesCount, setEchoesCount] = useState(0);
 
@@ -80,16 +81,18 @@ export default function UserProfile() {
 
     if (activeTab === 'reels') {
       reelService
-        .getUserReels(profileUser.username)
-        .then((data) => {
+        .getUserReels(profileUser.username, 0, 15)
+        .then((res) => {
           if (isMounted) {
-            setUserReels(data || []);
+            setUserReels(res.reels || []);
+            setReelsHasMore(res.hasMore);
             setPostsLoading(false);
           }
         })
         .catch(() => {
           if (isMounted) {
             setUserReels([]);
+            setReelsHasMore(false);
             setPostsLoading(false);
           }
         });
@@ -144,6 +147,20 @@ export default function UserProfile() {
       setFollowersCount((prev) => (!nextState ? prev + 1 : Math.max(0, prev - 1)));
     } finally {
       setIsFollowSubmitting(false);
+    }
+  };
+
+  const handleLoadMoreReels = async () => {
+    if (!profileUser?.username || loadingMoreReels || !reelsHasMore) return;
+    setLoadingMoreReels(true);
+    try {
+      const res = await reelService.getUserReels(profileUser.username, userReels.length, 15);
+      setUserReels((prev) => [...prev, ...res.reels]);
+      setReelsHasMore(res.hasMore);
+    } catch (err) {
+      console.error('Failed to load more reels:', err);
+    } finally {
+      setLoadingMoreReels(false);
     }
   };
 
@@ -339,7 +356,7 @@ export default function UserProfile() {
         <div className="lg:col-span-8">
           <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-2 mb-6">
             <div className="flex border-b border-slate-100">
-              {(['echoes', 'media', 'reels', 'likes'] as const).map((tab) => (
+              {(['echoes', 'reels'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -349,7 +366,7 @@ export default function UserProfile() {
                       : 'border-transparent text-slate-400 hover:text-slate-700'
                   }`}
                 >
-                  {tab}
+                  {tab === 'echoes' ? 'Posts' : 'Reels'}
                 </button>
               ))}
             </div>
@@ -368,40 +385,37 @@ export default function UserProfile() {
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 pt-2">
-                    {userReels.map((reel) => (
-                      <div
-                        key={reel.id}
-                        onClick={() => navigate(`/reels/${reel.id}`)}
-                        className="group relative aspect-[9/16] bg-slate-950 rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-purple-400 transition-all cursor-pointer"
-                      >
-                        {reel.thumbnailUrl ? (
-                          <img
-                            src={reel.thumbnailUrl}
-                            alt={reel.caption || 'Reel'}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        ) : (
-                          <video
-                            src={reel.videoUrl}
-                            className="w-full h-full object-cover"
-                            muted
-                            preload="metadata"
-                          />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                        <div className="absolute bottom-2.5 left-2.5 right-2.5 text-white flex items-center justify-between text-xs font-bold">
-                          <span className="flex items-center gap-1 drop-shadow-sm">
-                            <HiOutlineHeart className="w-3.5 h-3.5 text-rose-400" />
-                            {reel.likesCount || 0}
-                          </span>
-                          <span className="flex items-center gap-1 text-[10px] bg-black/50 px-1.5 py-0.5 rounded-md">
-                            <HiOutlinePlay className="w-3 h-3 text-purple-400" />
-                            {reel.duration ? `${reel.duration}s` : 'Reel'}
-                          </span>
-                        </div>
+                  <div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 pt-2">
+                      {userReels.map((reel) => (
+                        <ReelGridCard
+                          key={reel.id}
+                          reel={reel}
+                          currentUser={currentUser}
+                          mode="profile"
+                        />
+                      ))}
+                    </div>
+
+                    {/* Pagination / Load More 15 Reels */}
+                    {reelsHasMore && (
+                      <div className="pt-6 pb-2 text-center">
+                        <button
+                          onClick={handleLoadMoreReels}
+                          disabled={loadingMoreReels}
+                          className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-white border border-slate-200 shadow-xs hover:border-purple-300 text-slate-700 hover:text-purple-600 transition-all cursor-pointer inline-flex items-center gap-2"
+                        >
+                          {loadingMoreReels ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" />
+                              <span>Loading next 15 reels...</span>
+                            </>
+                          ) : (
+                            <span>Load More Reels</span>
+                          )}
+                        </button>
                       </div>
-                    ))}
+                    )}
                   </div>
                 )
               ) : posts.length === 0 ? (
