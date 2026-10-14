@@ -540,11 +540,6 @@ export const emitGlobalReactionUpdated = (
   io.emit('global_reaction_updated', { messageId, reactions });
 };
 
-export const emitGlobalMessagePinned = (message: GlobalMessage) => {
-  if (!io) return;
-  io.emit('global_message_pinned', message);
-};
-
 export const emitGlobalChatCleared = () => {
   if (!io) return;
   io.emit('global_chat_cleared', {});
