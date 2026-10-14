@@ -43,6 +43,7 @@ export interface ModalProps {
   closeOnEscape?: boolean;
   preventScroll?: boolean;
   zIndex?: number;
+  style?: React.CSSProperties;
 }
 
 const BACKDROP_STYLES: Record<BackdropVariant, string> = {
@@ -88,6 +89,7 @@ export default function Modal({
   closeOnEscape = true,
   preventScroll = true,
   zIndex = 50,
+  style,
 }: ModalProps) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -153,6 +155,7 @@ export default function Modal({
         onClick={(e) => e.stopPropagation()}
         data-lenis-prevent
         className={`relative z-10 w-full ${resolvedSizeClass} animate-modal-content transition-all ${className}`}
+        style={style}
       >
         {(title || description || (showCloseButton && closeButtonPosition === 'inside')) && !className.includes('bg-') ? (
           <div className={`bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col ${contentClassName}`}>

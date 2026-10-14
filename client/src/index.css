@@ -149,3 +149,12 @@
 .animate-reaction-burst {
   animation: reactionFloatUp 0.9s ease-out forwards;
 }
+
+@keyframes storyProgressBar {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
