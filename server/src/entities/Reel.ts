@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './User';
 import { ReelLike } from './ReelLike';
+import { ReelBookmark } from './ReelBookmark';
 
 @Entity('reels')
 export class Reel {
@@ -38,11 +39,17 @@ export class Reel {
   @Column({ type: 'float', nullable: true })
   duration?: number | null;
 
+  @Column({ type: 'varchar', length: 20, default: 'cover' })
+  displayMode: 'cover' | 'contain';
+
   @Column({ type: 'int', default: 0 })
   likesCount: number;
 
   @Column({ type: 'int', default: 0 })
   commentsCount: number;
+
+  @Column({ type: 'int', default: 0 })
+  bookmarksCount: number;
 
   @Column({ type: 'int', default: 0 })
   sharesCount: number;
@@ -52,6 +59,9 @@ export class Reel {
 
   @OneToMany(() => ReelLike, (like) => like.reel)
   likes: ReelLike[];
+
+  @OneToMany(() => ReelBookmark, (bookmark) => bookmark.reel)
+  bookmarks: ReelBookmark[];
 
   @CreateDateColumn()
   createdAt: Date;

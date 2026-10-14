@@ -17,7 +17,9 @@ import { GroupMessage } from '../entities/GroupMessage';
 import { GlobalMessage } from '../entities/GlobalMessage';
 import { Reel } from '../entities/Reel';
 import { ReelLike } from '../entities/ReelLike';
+import { ReelBookmark } from '../entities/ReelBookmark';
 import { ReelComment } from '../entities/ReelComment';
+import { ReelCommentReaction } from '../entities/ReelCommentReaction';
 
 dotenv.config();
 
@@ -41,8 +43,15 @@ const entitiesList = [
   GlobalMessage,
   Reel,
   ReelLike,
+  ReelBookmark,
   ReelComment,
+  ReelCommentReaction,
 ];
+
+const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const sqlitePath = isVercel
+  ? path.join('/tmp', 'echolet.sqlite')
+  : path.join(__dirname, '../../echolet.sqlite');
 
 export const AppDataSource = isPostgres
   ? new DataSource({
@@ -57,22 +66,36 @@ export const AppDataSource = isPostgres
     })
   : new DataSource({
       type: 'better-sqlite3',
-      database: path.join(__dirname, '../../echolet.sqlite'),
+      database: sqlitePath,
       synchronize: true,
       logging: false,
       entities: entitiesList,
     });
 
+let initPromise: Promise<DataSource> | null = null;
+
 export const connectDatabase = async (): Promise<DataSource> => {
   try {
-    if (!AppDataSource.isInitialized) {
-      await AppDataSource.initialize();
-      const dbType = isPostgres ? 'PostgreSQL' : 'Local SQLite (better-sqlite3)';
-      console.log(`${dbType} database connected successfully.`);
+    if (AppDataSource.isInitialized) {
+      return AppDataSource;
     }
-    return AppDataSource;
+    if (!initPromise) {
+      initPromise = AppDataSource.initialize()
+        .then((ds) => {
+          const dbType = isPostgres ? 'PostgreSQL' : `Local SQLite (${sqlitePath})`;
+          console.log(`${dbType} database connected successfully.`);
+          return ds;
+        })
+        .catch((error) => {
+          initPromise = null;
+          console.error('Error connecting to database:', error);
+          throw error;
+        });
+    }
+    return await initPromise;
   } catch (error) {
     console.error('Error connecting to database:', error);
     throw error;
   }
 };
+
