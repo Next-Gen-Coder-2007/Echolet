@@ -361,6 +361,21 @@ export const getUserPosts = async (
     let posts: Post[] = [];
 
     if (type === 'likes') {
+      // Likes are strictly private! A user's liked posts are never exposed to public visitors.
+      if (!currentUserId || currentUserId !== targetUser.id) {
+        res.json({
+          status: 'success',
+          user: {
+            id: targetUser.id,
+            username: targetUser.username,
+            fullName: targetUser.fullName,
+          },
+          type: 'likes',
+          posts: [],
+        });
+        return;
+      }
+
       posts = await postRepo
         .createQueryBuilder('post')
         .innerJoin(PostLike, 'pl', 'pl.postId = post.id AND pl.userId = :targetUserId', {

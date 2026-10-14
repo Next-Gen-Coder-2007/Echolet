@@ -3,6 +3,7 @@ import {
   searchUsers,
   getUserByUsername,
   getUserById,
+  getFollowingUsers,
   followUser,
   unfollowUser,
   updateProfile,
@@ -13,6 +14,7 @@ const router = Router();
 
 router.put('/profile', authMiddleware, updateProfile);
 router.get('/search', authMiddleware, searchUsers);
+router.get('/following', authMiddleware, getFollowingUsers);
 router.get('/id/:userId', authMiddleware, getUserById);
 router.get('/:username', authMiddleware, getUserByUsername);
 router.post('/:userId/follow', authMiddleware, followUser);

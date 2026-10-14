@@ -254,6 +254,45 @@ export const getUserById = async (req: AuthenticatedRequest, res: Response): Pro
   }
 };
 
+export const getFollowingUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const followRepository = AppDataSource.getRepository(Follow);
+    const follows = await followRepository.find({
+      where: { followerId: currentUserId },
+      relations: { following: true },
+      order: { createdAt: 'DESC' },
+    });
+
+    const followingUsers = follows
+      .map((f) => f.following)
+      .filter(Boolean)
+      .map((user) => ({
+        id: user.id,
+        fullName: user.fullName,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio,
+      }));
+
+    res.json({
+      status: 'success',
+      users: followingUsers,
+    });
+  } catch (error) {
+    console.error('Get following users error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch following users',
+    });
+  }
+};
+
 export const followUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const currentUserId = req.user?.id;
