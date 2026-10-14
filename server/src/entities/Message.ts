@@ -32,6 +32,7 @@ export class Message {
     | 'voice'
     | 'audio'
     | 'reel'
+    | 'story_reply'
     | 'system';
 
   @Column({ type: 'text', nullable: true })
@@ -82,6 +83,21 @@ export class Message {
 
   @Column({ type: 'simple-json', nullable: true })
   replyTo?: { id: string; senderId: string; senderName: string; content: string };
+
+  @Column({ type: 'simple-json', nullable: true })
+  story?: {
+    id: string;
+    mediaType: 'image' | 'video' | 'text';
+    mediaUrl?: string;
+    duration?: number;
+    content?: string;
+    backgroundColor?: string;
+    fontStyle?: string;
+    expiresAt: string;
+    authorName?: string;
+    authorUsername?: string;
+    authorAvatar?: string;
+  } | null;
 
   @Column({ type: 'boolean', default: false })
   isForwarded: boolean;

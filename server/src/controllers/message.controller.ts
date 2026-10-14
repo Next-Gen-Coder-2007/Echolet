@@ -280,9 +280,11 @@ export const sendMessage = async (
       content = req.body.fileName || 'Document';
     } else if (!content && messageType === 'poll') {
       content = req.body.poll?.question || 'Poll';
+    } else if (!content && messageType === 'story_reply') {
+      content = req.body.story ? 'Replied to story' : 'Story reaction';
     }
 
-    if (!content && !req.body.mediaUrl && !req.body.poll) {
+    if (!content && !req.body.mediaUrl && !req.body.poll && !req.body.story) {
       res.status(400).json({ status: 'error', message: 'Message content or attachment is required' });
       return;
     }
@@ -372,6 +374,7 @@ export const sendMessage = async (
       isRead: false,
       status: initialStatus,
       replyTo: req.body.replyTo || null,
+      story: req.body.story || null,
       isForwarded: Boolean(req.body.isForwarded),
     });
 

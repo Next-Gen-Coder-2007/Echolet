@@ -20,6 +20,20 @@ export interface MessagePoll {
   expiresAt?: string | null;
 }
 
+export interface StoryMessageData {
+  id: string;
+  mediaType: 'image' | 'video' | 'text';
+  mediaUrl?: string | null;
+  duration?: number | null;
+  content?: string | null;
+  backgroundColor?: string | null;
+  fontStyle?: string | null;
+  expiresAt: string;
+  authorName?: string | null;
+  authorUsername?: string | null;
+  authorAvatar?: string | null;
+}
+
 export interface MessageItem {
   id: string;
   senderId: string;
@@ -34,6 +48,7 @@ export interface MessageItem {
     | 'voice'
     | 'audio'
     | 'reel'
+    | 'story_reply'
     | 'system';
   mediaUrl?: string;
   fileName?: string;
@@ -50,6 +65,7 @@ export interface MessageItem {
   pinnedBy?: string;
   starredBy?: string[];
   replyTo?: MessageReplyInfo | null;
+  story?: StoryMessageData | null;
   isForwarded?: boolean;
   isDeletedForEveryone?: boolean;
   deletedFor?: string[];
@@ -103,6 +119,7 @@ export const messageService = {
     options?: {
       replyTo?: MessageReplyInfo | null;
       isForwarded?: boolean;
+      story?: StoryMessageData | null;
       messageType?:
         | 'text'
         | 'image'
@@ -112,6 +129,7 @@ export const messageService = {
         | 'voice'
         | 'audio'
         | 'reel'
+        | 'story_reply'
         | 'system';
       mediaUrl?: string;
       fileName?: string;
@@ -132,6 +150,7 @@ export const messageService = {
         content,
         replyTo: options?.replyTo,
         isForwarded: options?.isForwarded,
+        story: options?.story,
         messageType: options?.messageType || 'text',
         mediaUrl: options?.mediaUrl,
         fileName: options?.fileName,

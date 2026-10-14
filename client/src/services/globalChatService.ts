@@ -1,4 +1,5 @@
 import api from './api';
+import type { StoryMessageData } from './messageService';
 
 export interface GlobalMessageSender {
   id: string;
@@ -42,6 +43,7 @@ export interface GlobalMessageItem {
     | 'voice'
     | 'audio'
     | 'reel'
+    | 'story_reply'
     | 'system';
   mediaUrl?: string;
   fileName?: string;
@@ -50,6 +52,7 @@ export interface GlobalMessageItem {
   audioUrl?: string;
   audioDuration?: number;
   replyTo?: GlobalMessageReplyInfo | null;
+  story?: StoryMessageData | null;
   reactions?: Record<string, string[]>;
   isEdited?: boolean;
   editedAt?: string;

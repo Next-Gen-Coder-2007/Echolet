@@ -1,4 +1,5 @@
 import api from './api';
+import type { StoryMessageData } from './messageService';
 
 export interface GroupMemberUser {
   id: string;
@@ -43,6 +44,7 @@ export interface GroupMessageItem {
     | 'voice'
     | 'audio'
     | 'reel'
+    | 'story_reply'
     | 'system';
   mediaUrl?: string;
   fileName?: string;
@@ -55,6 +57,7 @@ export interface GroupMessageItem {
   pinnedBy?: string;
   starredBy?: string[];
   replyTo?: { id: string; senderId: string; senderName: string; content: string } | null;
+  story?: StoryMessageData | null;
   isEdited?: boolean;
   editedAt?: string;
   isDeletedForEveryone?: boolean;
