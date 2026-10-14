@@ -1,13 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   HiOutlineFilm,
   HiOutlineArrowUpTray,
   HiOutlineMusicalNote,
-  HiOutlineSparkles,
   HiOutlinePlay,
   HiOutlinePause,
   HiOutlineSpeakerWave,
   HiOutlineSpeakerXMark,
+  HiOutlineArrowsPointingOut,
+  HiOutlineArrowsPointingIn,
+  HiOutlinePhoto,
+  HiOutlineCamera,
+  HiCheck,
 } from 'react-icons/hi2';
 import Modal from './Modal';
 import reelService, { type Reel } from '../services/reelService';
@@ -30,10 +34,16 @@ export default function CreateReelModal({
 }: CreateReelModalProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>('');
-  const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
+  const [thumbnailMode, setThumbnailMode] = useState<'video_frame' | 'custom'>('video_frame');
+  const [videoThumbnail, setVideoThumbnail] = useState<string>('');
+  const [customThumbnail, setCustomThumbnail] = useState<string>('');
   const [caption, setCaption] = useState<string>('');
   const [audioTitle, setAudioTitle] = useState<string>('');
   const [duration, setDuration] = useState<number | null>(null);
+  const [displayMode, setDisplayMode] = useState<'cover' | 'contain'>('cover');
+  const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(
+    null
+  );
 
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -43,6 +53,7 @@ export default function CreateReelModal({
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const customImageInputRef = useRef<HTMLInputElement | null>(null);
   const videoPlayerRef = useRef<HTMLVideoElement | null>(null);
 
   // Set default audio title when user is available
@@ -67,9 +78,13 @@ export default function CreateReelModal({
     }
     setVideoFile(null);
     setVideoPreviewUrl('');
-    setThumbnailUrl('');
+    setThumbnailMode('video_frame');
+    setVideoThumbnail('');
+    setCustomThumbnail('');
     setCaption('');
     setDuration(null);
+    setDisplayMode('cover');
+    setVideoDimensions(null);
     setIsSubmitting(false);
     setUploadProgress('');
     setError(null);
@@ -109,30 +124,151 @@ export default function CreateReelModal({
     const objectUrl = URL.createObjectURL(file);
     setVideoFile(file);
     setVideoPreviewUrl(objectUrl);
+    setThumbnailMode('video_frame');
+    setVideoThumbnail('');
     setIsPlaying(true);
   };
 
+  const extractThumbnail = useCallback(
+    (video: HTMLVideoElement, mode: 'cover' | 'contain', force = false) => {
+      try {
+        const targetW = 540;
+        const targetH = 960;
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Fill background with black for clean letterboxing
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, targetW, targetH);
+
+        const vWidth = video.videoWidth || 720;
+        const vHeight = video.videoHeight || 1280;
+
+        if (mode === 'contain') {
+          // Fit whole video in center with black bars top and bottom (or sides)
+          const scale = Math.min(targetW / vWidth, targetH / vHeight);
+          const drawW = vWidth * scale;
+          const drawH = vHeight * scale;
+          const drawX = (targetW - drawW) / 2;
+          const drawY = (targetH - drawH) / 2;
+          ctx.drawImage(video, drawX, drawY, drawW, drawH);
+        } else {
+          // Crop to fill full 9:16 frame
+          const scale = Math.max(targetW / vWidth, targetH / vHeight);
+          const drawW = vWidth * scale;
+          const drawH = vHeight * scale;
+          const drawX = (targetW - drawW) / 2;
+          const drawY = (targetH - drawH) / 2;
+          ctx.drawImage(video, drawX, drawY, drawW, drawH);
+        }
+
+        const frameData = canvas.toDataURL('image/jpeg', 0.85);
+
+        if (force) {
+          setVideoThumbnail(frameData);
+          return;
+        }
+
+        // Check if extracted frame is actually non-black
+        const data = ctx.getImageData(0, 0, targetW, targetH).data;
+        let brightness = 0;
+        for (let i = 0; i < data.length; i += 400) {
+          brightness += data[i] + data[i + 1] + data[i + 2];
+        }
+
+        if (brightness > 35) {
+          setVideoThumbnail(frameData);
+        }
+      } catch (err) {
+        console.warn('Could not extract video thumbnail:', err);
+      }
+    },
+    []
+  );
+
   const handleVideoLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
+    const width = video.videoWidth || 0;
+    const height = video.videoHeight || 0;
+    setVideoDimensions({ width, height });
     setDuration(Math.round(video.duration || 0));
+
+    // If video is landscape/horizontal, recommend 'contain' (fit in center with black spaces)
+    const initialMode = width > height ? 'contain' : 'cover';
+    setDisplayMode(initialMode);
+
     video.currentTime = Math.min(0.5, (video.duration || 1) / 2);
   };
 
   const handleVideoSeeked = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth || 720;
-      canvas.height = video.videoHeight || 1280;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const frameData = canvas.toDataURL('image/jpeg', 0.85);
-        setThumbnailUrl(frameData);
-      }
-    } catch (err) {
-      console.warn('Could not extract video thumbnail:', err);
+    extractThumbnail(video, displayMode);
+  };
+
+  const handleVideoTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    if (!videoThumbnail && video.currentTime > 0.1) {
+      extractThumbnail(video, displayMode);
     }
+  };
+
+  const handleDisplayModeChange = (mode: 'cover' | 'contain') => {
+    setDisplayMode(mode);
+    if (videoPlayerRef.current) {
+      extractThumbnail(videoPlayerRef.current, mode);
+    }
+  };
+
+  const handleCaptureCurrentFrame = () => {
+    if (videoPlayerRef.current) {
+      extractThumbnail(videoPlayerRef.current, displayMode, true);
+      setThumbnailMode('video_frame');
+      showToast?.('Captured frame from video as thumbnail!', 'info');
+    }
+  };
+
+  const handleCustomImageSelect = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      showToast?.('Please select a valid image file (JPEG, PNG, WebP).', 'error');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      showToast?.('Cover image is too large. Please select an image under 10MB.', 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        // Standardize to 9:16 vertical cover
+        const canvas = document.createElement('canvas');
+        canvas.width = 540;
+        canvas.height = 960;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, 540, 960);
+          const scale = Math.max(540 / img.width, 960 / img.height);
+          const drawW = img.width * scale;
+          const drawH = img.height * scale;
+          const drawX = (540 - drawW) / 2;
+          const drawY = (960 - drawH) / 2;
+          ctx.drawImage(img, drawX, drawY, drawW, drawH);
+          setCustomThumbnail(canvas.toDataURL('image/jpeg', 0.88));
+        } else {
+          setCustomThumbnail(reader.result as string);
+        }
+        setThumbnailMode('custom');
+        showToast?.('Custom cover image uploaded!', 'success');
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
   const togglePlay = () => {
@@ -176,12 +312,18 @@ export default function CreateReelModal({
       const videoDataUrl = await readFileAsDataURL(videoFile);
 
       setUploadProgress('Publishing reel...');
+      const finalThumbnail =
+        thumbnailMode === 'custom' && customThumbnail
+          ? customThumbnail
+          : videoThumbnail || null;
+
       const newReel = await reelService.createReel({
         videoUrl: videoDataUrl,
-        thumbnailUrl: thumbnailUrl || null,
+        thumbnailUrl: finalThumbnail,
         caption: caption.trim() || undefined,
         audioTitle: audioTitle.trim() || undefined,
         duration: duration || null,
+        displayMode,
       });
 
       showToast?.('Reel published successfully!', 'success');
@@ -202,6 +344,9 @@ export default function CreateReelModal({
     }
   };
 
+  const isHorizontalVideo =
+    Boolean(videoDimensions && videoDimensions.width > videoDimensions.height);
+
   return (
     <Modal
       isOpen={isOpen}
@@ -217,7 +362,7 @@ export default function CreateReelModal({
           </span>
         </div>
       }
-      description="Share high-energy vertical video moments with sound"
+      description="Share vertical moments or widescreen clips formatted for Reels"
       showCloseButton={!isSubmitting}
       closeButtonPosition="inside"
     >
@@ -275,7 +420,7 @@ export default function CreateReelModal({
               Drag and drop your video here, or browse
             </h3>
             <p className="text-xs text-slate-500 max-w-sm mb-5 leading-relaxed">
-              Supports 9:16 vertical MP4, WebM, and QuickTime clips up to 35MB.
+              Supports vertical or horizontal MP4, WebM, and QuickTime clips up to 35MB.
             </p>
 
             <button
@@ -290,7 +435,7 @@ export default function CreateReelModal({
           <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-5">
             {/* Left Column: Vertical Video Preview */}
             <div className="sm:w-[220px] shrink-0 flex flex-col items-center">
-              <div className="relative w-full aspect-[9/16] max-w-[200px] bg-black rounded-2xl overflow-hidden border border-slate-300 shadow-md group">
+              <div className="relative w-full aspect-[9/16] max-w-[200px] bg-black rounded-2xl overflow-hidden border border-slate-800 shadow-md group">
                 <video
                   ref={videoPlayerRef}
                   src={videoPreviewUrl}
@@ -299,7 +444,10 @@ export default function CreateReelModal({
                   playsInline
                   onLoadedMetadata={handleVideoLoadedMetadata}
                   onSeeked={handleVideoSeeked}
-                  className="w-full h-full object-cover"
+                  onTimeUpdate={handleVideoTimeUpdate}
+                  className={`w-full h-full bg-black transition-all duration-300 ${
+                    displayMode === 'contain' ? 'object-contain' : 'object-cover'
+                  }`}
                 />
 
                 {/* Play/Pause overlay */}
@@ -317,11 +465,11 @@ export default function CreateReelModal({
                 </div>
 
                 {/* Bottom Video Controls overlay */}
-                <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white/90 z-10">
+                <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white/90 z-10 pointer-events-none">
                   <button
                     type="button"
                     onClick={toggleMute}
-                    className="p-1 rounded-lg bg-black/60 backdrop-blur-md hover:bg-black/80 transition-colors cursor-pointer text-xs flex items-center"
+                    className="p-1 rounded-lg bg-black/60 backdrop-blur-md hover:bg-black/80 transition-colors cursor-pointer text-xs flex items-center pointer-events-auto"
                     title={isMuted ? 'Unmute' : 'Mute'}
                   >
                     {isMuted ? (
@@ -340,15 +488,28 @@ export default function CreateReelModal({
                 </div>
               </div>
 
-              {/* Change video button */}
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isSubmitting}
-                className="mt-2.5 text-xs text-slate-500 hover:text-purple-600 font-semibold transition-colors cursor-pointer"
-              >
-                Change video clip
-              </button>
+              {/* Video Actions */}
+              <div className="flex items-center gap-2 mt-2.5">
+                <button
+                  type="button"
+                  onClick={handleCaptureCurrentFrame}
+                  disabled={isSubmitting}
+                  className="text-xs text-purple-600 hover:text-purple-700 font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                  title="Capture current video frame as cover"
+                >
+                  <HiOutlineCamera className="w-3.5 h-3.5" />
+                  <span>Set as cover</span>
+                </button>
+                <span className="text-slate-300">·</span>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isSubmitting}
+                  className="text-xs text-slate-500 hover:text-purple-600 font-semibold transition-colors cursor-pointer"
+                >
+                  Change clip
+                </button>
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -361,9 +522,63 @@ export default function CreateReelModal({
               />
             </div>
 
-            {/* Right Column: Details & Submit */}
+            {/* Right Column: Details & Framing & Submit */}
             <div className="flex-1 flex flex-col justify-between gap-4">
               <div className="space-y-3.5">
+                {/* Framing & Crop Mode Selector */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Video Framing
+                    </label>
+                    {isHorizontalVideo && (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/90 px-2 py-0.5 rounded-md">
+                        Landscape ({videoDimensions?.width}×{videoDimensions?.height})
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Crop to Vertical Option */}
+                    <button
+                      type="button"
+                      onClick={() => handleDisplayModeChange('cover')}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
+                        displayMode === 'cover'
+                          ? 'bg-purple-50/80 border-purple-500 text-purple-900 shadow-2xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <HiOutlineArrowsPointingOut className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                        <span className="truncate">Crop to Vertical</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Fills entire 9:16 screen, sides cropped
+                      </p>
+                    </button>
+
+                    {/* Fit in Center with Top & Bottom Black Spaces */}
+                    <button
+                      type="button"
+                      onClick={() => handleDisplayModeChange('contain')}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col gap-1 ${
+                        displayMode === 'contain'
+                          ? 'bg-purple-50/80 border-purple-500 text-purple-900 shadow-2xs'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <HiOutlineArrowsPointingIn className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                        <span className="truncate">Fit in Center</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-tight">
+                        Spaces top & bottom black, no side crop
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Caption Input */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
@@ -374,9 +589,9 @@ export default function CreateReelModal({
                     onChange={(e) => setCaption(e.target.value)}
                     placeholder="Write a caption, tags (#echolet, #reels)..."
                     maxLength={500}
-                    rows={3}
+                    rows={2}
                     disabled={isSubmitting}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 resize-none transition-all"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 resize-none transition-all"
                   />
                   <div className="flex justify-end mt-0.5 text-[11px] text-slate-400">
                     {caption.length}/500
@@ -400,25 +615,140 @@ export default function CreateReelModal({
                   />
                 </div>
 
-                {/* Auto Cover Frame */}
-                {thumbnailUrl && (
-                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
-                    <img
-                      src={thumbnailUrl}
-                      alt="Reel Cover"
-                      className="w-10 h-14 object-cover rounded-lg border border-slate-200 shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1 text-xs font-bold text-slate-800">
-                        <HiOutlineSparkles className="w-3.5 h-3.5 text-purple-600" />
-                        <span>Auto-Generated Cover</span>
+                {/* Thumbnail Selection */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <HiOutlinePhoto className="w-3.5 h-3.5 text-purple-600" />
+                      Cover Thumbnail
+                    </label>
+                    <span className="text-[10px] text-purple-700 font-semibold bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                      {thumbnailMode === 'custom' && customThumbnail
+                        ? 'Custom Cover'
+                        : 'Video Frame'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Option 1: Video Frame (First Frame / Captured Frame) */}
+                    <div
+                      onClick={() => setThumbnailMode('video_frame')}
+                      className={`relative p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2.5 ${
+                        thumbnailMode === 'video_frame'
+                          ? 'bg-purple-50/70 border-purple-500 ring-2 ring-purple-500/20 shadow-2xs'
+                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70 text-slate-600'
+                      }`}
+                    >
+                      <div className="relative w-10 h-14 rounded-lg bg-black overflow-hidden shrink-0 border border-slate-200">
+                        {videoThumbnail ? (
+                          <img
+                            src={videoThumbnail}
+                            alt="Video Frame"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            <HiOutlineFilm className="w-4 h-4" />
+                          </div>
+                        )}
+                        {thumbnailMode === 'video_frame' && (
+                          <div className="absolute top-1 right-1 w-3.5 h-3.5 bg-purple-600 text-white rounded-full flex items-center justify-center">
+                            <HiCheck className="w-2.5 h-2.5 stroke-[3]" />
+                          </div>
+                        )}
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                        Selected automatically from the video for feed & search.
-                      </p>
+
+                      <div className="min-w-0 flex-1">
+                        <span className="block text-xs font-bold text-slate-800 truncate">
+                          Video Frame
+                        </span>
+                        <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
+                          First frame
+                        </p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCaptureCurrentFrame();
+                          }}
+                          className="mt-1 text-[10px] font-bold text-purple-600 hover:text-purple-700 hover:underline flex items-center gap-1 cursor-pointer"
+                          title="Capture current playing or paused video frame"
+                        >
+                          <HiOutlineCamera className="w-3 h-3" />
+                          <span>Capture frame</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Option 2: Custom Uploaded Thumbnail */}
+                    <div
+                      onClick={() => {
+                        if (!customThumbnail) {
+                          customImageInputRef.current?.click();
+                        } else {
+                          setThumbnailMode('custom');
+                        }
+                      }}
+                      className={`relative p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-2.5 ${
+                        thumbnailMode === 'custom'
+                          ? 'bg-purple-50/70 border-purple-500 ring-2 ring-purple-500/20 shadow-2xs'
+                          : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70 text-slate-600'
+                      }`}
+                    >
+                      <div className="relative w-10 h-14 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center">
+                        {customThumbnail ? (
+                          <img
+                            src={customThumbnail}
+                            alt="Custom Cover"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-slate-400 gap-0.5">
+                            <HiOutlineArrowUpTray className="w-3.5 h-3.5" />
+                            <span className="text-[9px] font-bold">Upload</span>
+                          </div>
+                        )}
+                        {thumbnailMode === 'custom' && customThumbnail && (
+                          <div className="absolute top-1 right-1 w-3.5 h-3.5 bg-purple-600 text-white rounded-full flex items-center justify-center">
+                            <HiCheck className="w-2.5 h-2.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <span className="block text-xs font-bold text-slate-800 truncate">
+                          Upload Custom
+                        </span>
+                        <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
+                          {customThumbnail ? 'Image selected' : 'JPEG or PNG'}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            customImageInputRef.current?.click();
+                          }}
+                          className="mt-1 text-[10px] font-bold text-purple-600 hover:text-purple-700 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <HiOutlineArrowUpTray className="w-3 h-3" />
+                          <span>{customThumbnail ? 'Change image' : 'Choose image'}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                )}
+
+                  <input
+                    ref={customImageInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/jpg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleCustomImageSelect(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Submit Buttons */}
