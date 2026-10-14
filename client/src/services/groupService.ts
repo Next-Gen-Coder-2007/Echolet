@@ -42,6 +42,7 @@ export interface GroupMessageItem {
     | 'poll'
     | 'voice'
     | 'audio'
+    | 'reel'
     | 'system';
   mediaUrl?: string;
   fileName?: string;
@@ -150,6 +151,7 @@ export const groupService = {
         | 'poll'
         | 'voice'
         | 'audio'
+        | 'reel'
         | 'system';
       mediaUrl?: string;
       fileName?: string;

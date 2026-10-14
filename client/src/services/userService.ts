@@ -21,6 +21,13 @@ export const userService = {
     return response.data.users || [];
   },
 
+  async getFollowing(): Promise<UserProfileResponse[]> {
+    const response = await api.get<{ status: string; users: UserProfileResponse[] }>(
+      '/users/following'
+    );
+    return response.data.users || [];
+  },
+
   async getUserByUsername(username: string): Promise<UserProfileResponse> {
     const response = await api.get<{ status: string; user: UserProfileResponse }>(
       `/users/${encodeURIComponent(username)}`

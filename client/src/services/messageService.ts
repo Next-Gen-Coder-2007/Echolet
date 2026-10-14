@@ -33,6 +33,7 @@ export interface MessageItem {
     | 'poll'
     | 'voice'
     | 'audio'
+    | 'reel'
     | 'system';
   mediaUrl?: string;
   fileName?: string;
@@ -110,6 +111,7 @@ export const messageService = {
         | 'poll'
         | 'voice'
         | 'audio'
+        | 'reel'
         | 'system';
       mediaUrl?: string;
       fileName?: string;

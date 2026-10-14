@@ -41,6 +41,7 @@ export interface GlobalMessageItem {
     | 'poll'
     | 'voice'
     | 'audio'
+    | 'reel'
     | 'system';
   mediaUrl?: string;
   fileName?: string;
@@ -62,7 +63,7 @@ export interface GlobalMessageItem {
 export interface GlobalMessagesResponse {
   status: string;
   messages: GlobalMessageItem[];
-  pinnedMessage: GlobalMessageItem | null;
+  pinnedMessage?: GlobalMessageItem | null;
   onlineCount: number;
 }
 
@@ -127,14 +128,6 @@ export const globalChatService = {
       reactions: Record<string, string[]>;
     }>(`/global-chat/messages/${encodeURIComponent(messageId)}/react`, { emoji });
     return response.data.reactions;
-  },
-
-  async togglePinMessage(messageId: string): Promise<GlobalMessageItem> {
-    const response = await api.post<{
-      status: string;
-      message: GlobalMessageItem;
-    }>(`/global-chat/messages/${encodeURIComponent(messageId)}/pin`);
-    return response.data.message;
   },
 
   async votePoll(messageId: string, optionId: string): Promise<GlobalMessageItem> {
