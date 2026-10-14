@@ -20,6 +20,7 @@ import { ReelLike } from '../entities/ReelLike';
 import { ReelBookmark } from '../entities/ReelBookmark';
 import { ReelComment } from '../entities/ReelComment';
 import { ReelCommentReaction } from '../entities/ReelCommentReaction';
+import { Story } from '../entities/Story';
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ const entitiesList = [
   ReelBookmark,
   ReelComment,
   ReelCommentReaction,
+  Story,
 ];
 
 const isVercel = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
