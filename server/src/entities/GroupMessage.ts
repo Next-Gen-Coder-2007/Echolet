@@ -32,6 +32,7 @@ export class GroupMessage {
     | 'poll'
     | 'voice'
     | 'audio'
+    | 'reel'
     | 'system';
 
   @Column({ type: 'text', nullable: true })
