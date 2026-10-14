@@ -7,7 +7,6 @@ import {
   emitGlobalMessageEdited,
   emitGlobalMessageDeleted,
   emitGlobalReactionUpdated,
-  emitGlobalMessagePinned,
   getGlobalOnlineCount,
 } from '../socket';
 
@@ -103,22 +102,9 @@ export const getGlobalMessages = async (
       return m;
     });
 
-    // Also get the current pinned message if any
-    const pinnedMessage = await messageRepo.findOne({
-      where: { isPinned: true },
-      relations: { sender: true },
-      order: { pinnedAt: 'DESC' },
-    });
-
-    if (pinnedMessage?.sender) {
-      delete (pinnedMessage.sender as any).password;
-      delete (pinnedMessage.sender as any).googleId;
-    }
-
     res.json({
       status: 'success',
       messages,
-      pinnedMessage: pinnedMessage || null,
       onlineCount: getGlobalOnlineCount(),
     });
   } catch (err: any) {
@@ -332,56 +318,6 @@ export const reactGlobalMessage = async (
   }
 };
 
-export const pinGlobalMessage = async (
-  req: AuthenticatedRequest,
-  res: Response
-): Promise<void> => {
-  try {
-    const userId = req.user?.id;
-    if (!userId) {
-      res.status(401).json({ status: 'error', message: 'Unauthorized' });
-      return;
-    }
-
-    const id = req.params.id as string;
-    const messageRepo = AppDataSource.getRepository(GlobalMessage);
-    const msg = await messageRepo.findOne({ where: { id }, relations: { sender: true } });
-
-    if (!msg) {
-      res.status(404).json({ status: 'error', message: 'Message not found' });
-      return;
-    }
-
-    if (msg.isPinned) {
-      msg.isPinned = false;
-      msg.pinnedAt = undefined;
-      msg.pinnedBy = undefined;
-    } else {
-      // Unpin any other pinned message first to keep single highlighted pin
-      await messageRepo.update({ isPinned: true }, { isPinned: false });
-      msg.isPinned = true;
-      msg.pinnedAt = new Date();
-      msg.pinnedBy = userId;
-    }
-
-    await messageRepo.save(msg);
-
-    if (msg.sender) {
-      delete (msg.sender as any).password;
-      delete (msg.sender as any).googleId;
-    }
-
-    emitGlobalMessagePinned(msg);
-
-    res.json({
-      status: 'success',
-      message: msg,
-    });
-  } catch (err: any) {
-    console.error('pinGlobalMessage error:', err);
-    res.status(500).json({ status: 'error', message: 'Failed to pin/unpin message' });
-  }
-};
 
 export const deleteGlobalMessage = async (
   req: AuthenticatedRequest,
@@ -421,7 +357,6 @@ export const deleteGlobalMessage = async (
     await messageRepo.save(msg);
 
     emitGlobalMessageDeleted(msg.id);
-    emitGlobalMessagePinned(msg);
 
     res.json({
       status: 'success',
