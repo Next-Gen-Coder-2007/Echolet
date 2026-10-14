@@ -12,6 +12,7 @@ import groupRoutes from './routes/group.routes';
 import globalChatRoutes from './routes/globalChat.routes';
 import reelRoutes from './routes/reel.routes';
 import searchRoutes from './routes/search.routes';
+import storyRoutes from './routes/story.routes';
 
 dotenv.config();
 
@@ -84,5 +85,6 @@ app.use('/api/posts', postRoutes);
 app.use('/api/global-chat', globalChatRoutes);
 app.use('/api/reels', reelRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/stories', storyRoutes);
 
 export default app;
