@@ -545,3 +545,18 @@ export const emitGlobalChatCleared = () => {
   io.emit('global_chat_cleared', {});
 };
 
+export const emitNewStory = (story: any) => {
+  if (!io) return;
+  io.emit('new_story', story);
+};
+
+export const emitStoryDeleted = (data: { storyId: string; userId: string }) => {
+  if (!io) return;
+  io.emit('story_deleted', data);
+};
+
+export const emitStoryViewed = (data: { storyId: string; viewer: any; viewsCount: number }) => {
+  if (!io) return;
+  io.emit('story_viewed', data);
+};
+

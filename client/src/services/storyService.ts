@@ -1,0 +1,81 @@
+import api from './api';
+
+export interface StoryViewer {
+  userId: string;
+  username: string;
+  fullName: string;
+  avatarUrl?: string;
+  viewedAt: string;
+}
+
+export interface StoryItem {
+  id: string;
+  userId: string;
+  user: {
+    id: string;
+    fullName: string;
+    username: string;
+    avatarUrl?: string;
+  };
+  mediaUrl?: string | null;
+  mediaType: 'image' | 'video' | 'text';
+  duration?: number | null;
+  content?: string | null;
+  backgroundColor?: string | null;
+  fontStyle?: string | null;
+  viewsCount: number;
+  viewers?: StoryViewer[];
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  isViewed?: boolean;
+}
+
+export interface UserStoryGroup {
+  userId: string;
+  user: {
+    id: string;
+    fullName: string;
+    username: string;
+    avatarUrl?: string;
+  };
+  hasUnviewed: boolean;
+  lastStoryTimestamp: string;
+  stories: StoryItem[];
+}
+
+export interface CreateStoryData {
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'text';
+  duration?: number;
+  content?: string;
+  backgroundColor?: string;
+  fontStyle?: string;
+}
+
+const storyService = {
+  getStories: async (): Promise<{
+    stories: StoryItem[];
+    userStoryGroups: UserStoryGroup[];
+  }> => {
+    const response = await api.get('/stories');
+    return response.data;
+  },
+
+  createStory: async (data: CreateStoryData): Promise<{ story: StoryItem; message: string }> => {
+    const response = await api.post('/stories', data);
+    return response.data;
+  },
+
+  viewStory: async (storyId: string): Promise<{ viewsCount: number; viewers: StoryViewer[] }> => {
+    const response = await api.post(`/stories/${storyId}/view`);
+    return response.data;
+  },
+
+  deleteStory: async (storyId: string): Promise<{ message: string }> => {
+    const response = await api.delete(`/stories/${storyId}`);
+    return response.data;
+  },
+};
+
+export default storyService;
