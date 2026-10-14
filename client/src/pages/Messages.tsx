@@ -57,6 +57,7 @@ import ChatPollWidget from '../components/ChatPollWidget';
 import ChatMediaAttachment from '../components/ChatMediaAttachment';
 import ChatAttachmentMenu from '../components/ChatAttachmentMenu';
 import CreateChatPollModal from '../components/CreateChatPollModal';
+import ReelMessageCard from '../components/ReelMessageCard';
 
 // WhatsApp-like dual tick SVG indicator
 const MessageTicks: React.FC<{
@@ -3908,6 +3909,33 @@ export default function Messages() {
                                     </div>
                                   }
                                 />
+                              ) : !m.isDeletedForEveryone && (m.messageType === 'reel' || /\/reels\/[a-zA-Z0-9_-]+/i.test(m.content || '')) ? (
+                                <div>
+                                  <ReelMessageCard
+                                    content={m.content}
+                                    mediaUrl={m.mediaUrl}
+                                    isMe={isMe}
+                                  />
+                                  <div className="flex items-center gap-1.5 ml-auto justify-end select-none pb-0.5 leading-none mt-1">
+                                    {m.starredBy?.includes(currentUser?.id || '') && (
+                                      <HiStar
+                                        className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
+                                        title="Starred message"
+                                      />
+                                    )}
+                                    {m.isPinned && (
+                                      <span title="Pinned message" className="text-purple-400">
+                                        <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-slate-400">
+                                      {new Date(m.createdAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </span>
+                                  </div>
+                                </div>
                               ) : (
                                 <div>
                                   {!m.isDeletedForEveryone && m.mediaUrl && (
@@ -4662,6 +4690,39 @@ export default function Messages() {
                                     </div>
                                   }
                                 />
+                              ) : !m.isDeletedForEveryone && (m.messageType === 'reel' || /\/reels\/[a-zA-Z0-9_-]+/i.test(m.content || '')) ? (
+                                <div>
+                                  <ReelMessageCard
+                                    content={m.content}
+                                    mediaUrl={m.mediaUrl}
+                                    isMe={isMe}
+                                  />
+                                  <div className="flex items-center gap-1.5 ml-auto justify-end select-none pb-0.5 leading-none mt-1">
+                                    {m.starredBy?.includes(currentUser?.id || '') && (
+                                      <HiStar
+                                        className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
+                                        title="Starred message"
+                                      />
+                                    )}
+                                    {m.isPinned && (
+                                      <span title="Pinned message" className="text-purple-400">
+                                        <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                      </span>
+                                    )}
+                                    {m.isEdited && !m.isDeletedForEveryone && (
+                                      <span className="text-[10px] italic text-slate-400">edited</span>
+                                    )}
+                                    <span className="text-[10px] text-slate-400">
+                                      {new Date(m.createdAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </span>
+                                    {isMe && !m.isDeletedForEveryone && (
+                                      <MessageTicks status={m.status} isRead={m.isRead} />
+                                    )}
+                                  </div>
+                                </div>
                               ) : (
                                 <div>
                                   {!m.isDeletedForEveryone && m.mediaUrl && (
