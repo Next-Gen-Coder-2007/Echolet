@@ -150,6 +150,10 @@ export default function Home() {
             </button>
           </div>
 
+          <div className="block lg:hidden">
+            <Stories currentUser={currentUser} showToast={showToast} variant="feed" />
+          </div>
+
           <CreatePostCard
             currentUser={currentUser}
             onPostCreated={handlePostCreated}
