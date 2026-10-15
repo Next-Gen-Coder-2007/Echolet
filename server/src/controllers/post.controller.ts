@@ -107,7 +107,7 @@ const enrichPostsWithUserData = async (
         userId: currentUserId,
         postId: In(postIds),
       },
-      select: { postId: true },
+      select: { postId: true, collectionName: true },
     }),
     pollVoteRepo.find({
       where: {
@@ -120,6 +120,9 @@ const enrichPostsWithUserData = async (
 
   const likedSet = new Set(likes.map((l) => l.postId));
   const bookmarkedSet = new Set(bookmarks.map((b) => b.postId));
+  const bookmarkCollectionMap = new Map(
+    bookmarks.map((b) => [b.postId, b.collectionName || 'Default'])
+  );
   const voteMap = new Map(votes.map((v) => [v.postId, v.optionIndex]));
 
   return posts.map((post) => ({
@@ -127,6 +130,7 @@ const enrichPostsWithUserData = async (
     isPollExpired: Boolean(post.pollExpiresAt && new Date(post.pollExpiresAt) <= now),
     isLiked: likedSet.has(post.id),
     isBookmarked: bookmarkedSet.has(post.id),
+    bookmarkCollection: bookmarkCollectionMap.get(post.id) || null,
     userVotedOption: voteMap.has(post.id) ? voteMap.get(post.id) : null,
   }));
 };
@@ -606,20 +610,36 @@ export const toggleBookmarkPost = async (
       where: { postId: id, userId: currentUserId },
     });
 
+    const requestedCollection =
+      typeof req.body.collectionName === 'string' && req.body.collectionName.trim()
+        ? req.body.collectionName.trim()
+        : undefined;
+
     let isBookmarked = false;
+    let savedCollection = 'Default';
 
     if (existingBookmark) {
-      await bookmarkRepo.remove(existingBookmark);
-      post.bookmarksCount = Math.max(0, (post.bookmarksCount || 0) - 1);
-      isBookmarked = false;
+      if (requestedCollection && requestedCollection !== existingBookmark.collectionName) {
+        // Switch / Move collection on an existing bookmark
+        existingBookmark.collectionName = requestedCollection;
+        await bookmarkRepo.save(existingBookmark);
+        isBookmarked = true;
+        savedCollection = existingBookmark.collectionName;
+      } else {
+        // Normal toggle off
+        await bookmarkRepo.remove(existingBookmark);
+        post.bookmarksCount = Math.max(0, (post.bookmarksCount || 0) - 1);
+        isBookmarked = false;
+      }
     } else {
       const newBookmark = new PostBookmark();
       newBookmark.postId = id;
       newBookmark.userId = currentUserId;
-      newBookmark.collectionName = 'Default';
+      newBookmark.collectionName = requestedCollection || 'Default';
       await bookmarkRepo.save(newBookmark);
       post.bookmarksCount = (post.bookmarksCount || 0) + 1;
       isBookmarked = true;
+      savedCollection = newBookmark.collectionName;
     }
 
     await postRepo.save(post);
@@ -628,6 +648,7 @@ export const toggleBookmarkPost = async (
       status: 'success',
       isBookmarked,
       bookmarksCount: post.bookmarksCount,
+      collectionName: isBookmarked ? savedCollection : null,
     });
   } catch (error) {
     console.error('Toggle bookmark error:', error);
@@ -635,6 +656,48 @@ export const toggleBookmarkPost = async (
       status: 'error',
       message: 'Failed to update bookmark status',
     });
+  }
+};
+
+/**
+ * Update collection of an existing bookmark
+ */
+export const updatePostBookmarkCollection = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = getParamString(req.params.id);
+    const currentUserId = req.user?.id;
+    const { collectionName } = req.body;
+
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const targetCollection = (collectionName || 'Default').trim();
+    const bookmarkRepo = AppDataSource.getRepository(PostBookmark);
+
+    const bookmark = await bookmarkRepo.findOne({
+      where: { postId: id, userId: currentUserId },
+    });
+
+    if (!bookmark) {
+      res.status(404).json({ status: 'error', message: 'Bookmark not found' });
+      return;
+    }
+
+    bookmark.collectionName = targetCollection;
+    await bookmarkRepo.save(bookmark);
+
+    res.json({
+      status: 'success',
+      collectionName: bookmark.collectionName,
+    });
+  } catch (error) {
+    console.error('Update post bookmark collection error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to update collection' });
   }
 };
 
@@ -1026,14 +1089,22 @@ export const getSavedPosts = async (
     }
 
     const postRepo = AppDataSource.getRepository(Post);
-    const posts = await postRepo
+    const requestedCollection = req.query.collection as string | undefined;
+
+    let query = postRepo
       .createQueryBuilder('post')
       .innerJoin(PostBookmark, 'pb', 'pb.postId = post.id AND pb.userId = :currentUserId', {
         currentUserId,
       })
-      .leftJoinAndSelect('post.user', 'user')
-      .orderBy('pb.createdAt', 'DESC')
-      .getMany();
+      .leftJoinAndSelect('post.user', 'user');
+
+    if (requestedCollection && requestedCollection.toLowerCase() !== 'all') {
+      query = query.andWhere('pb.collectionName = :collectionName', {
+        collectionName: requestedCollection,
+      });
+    }
+
+    const posts = await query.orderBy('pb.createdAt', 'DESC').getMany();
 
     const enrichedPosts = await enrichPostsWithUserData(posts, currentUserId);
 

@@ -8,6 +8,7 @@ import {
   deletePost,
   toggleLikePost,
   toggleBookmarkPost,
+  updatePostBookmarkCollection,
   votePoll,
   getComments,
   addComment,
@@ -36,6 +37,7 @@ router.delete('/:id', authMiddleware, deletePost);
 // Interactions (require login)
 router.post('/:id/like', authMiddleware, toggleLikePost);
 router.post('/:id/bookmark', authMiddleware, toggleBookmarkPost);
+router.put('/:id/bookmark/collection', authMiddleware, updatePostBookmarkCollection);
 router.post('/:id/poll/vote', authMiddleware, votePoll);
 
 // Comments (require login)

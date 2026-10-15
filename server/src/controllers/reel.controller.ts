@@ -47,12 +47,23 @@ const enrichReels = async (reels: Reel[], currentUserId?: string) => {
 
     likedReelIds = new Set(likes.map((l) => l.reelId));
     bookmarkedReelIds = new Set(bookmarks.map((b) => b.reelId));
+    const bookmarkCollectionMap = new Map(
+      bookmarks.map((b) => [b.reelId, b.collectionName || 'Default'])
+    );
+
+    return reels.map((reel) => ({
+      ...reel,
+      isLiked: likedReelIds.has(reel.id),
+      isBookmarked: bookmarkedReelIds.has(reel.id),
+      bookmarkCollection: bookmarkCollectionMap.get(reel.id) || null,
+    }));
   }
 
   return reels.map((reel) => ({
     ...reel,
-    isLiked: likedReelIds.has(reel.id),
-    isBookmarked: bookmarkedReelIds.has(reel.id),
+    isLiked: false,
+    isBookmarked: false,
+    bookmarkCollection: null,
   }));
 };
 
@@ -337,18 +348,35 @@ export const toggleBookmarkReel = async (
       where: { reelId: id, userId: currentUserId },
     });
 
+    const requestedCollection =
+      typeof req.body.collectionName === 'string' && req.body.collectionName.trim()
+        ? req.body.collectionName.trim()
+        : undefined;
+
     let isBookmarked = false;
+    let savedCollection = 'Default';
+
     if (existingBookmark) {
-      await reelBookmarkRepo.remove(existingBookmark);
-      reel.bookmarksCount = Math.max(0, (reel.bookmarksCount || 0) - 1);
-      isBookmarked = false;
+      if (requestedCollection && requestedCollection !== existingBookmark.collectionName) {
+        // Move to new collection
+        existingBookmark.collectionName = requestedCollection;
+        await reelBookmarkRepo.save(existingBookmark);
+        isBookmarked = true;
+        savedCollection = existingBookmark.collectionName;
+      } else {
+        await reelBookmarkRepo.remove(existingBookmark);
+        reel.bookmarksCount = Math.max(0, (reel.bookmarksCount || 0) - 1);
+        isBookmarked = false;
+      }
     } else {
       const newBookmark = new ReelBookmark();
       newBookmark.reelId = id;
       newBookmark.userId = currentUserId;
+      newBookmark.collectionName = requestedCollection || 'Default';
       await reelBookmarkRepo.save(newBookmark);
       reel.bookmarksCount = (reel.bookmarksCount || 0) + 1;
       isBookmarked = true;
+      savedCollection = newBookmark.collectionName;
     }
 
     await reelRepo.save(reel);
@@ -357,6 +385,7 @@ export const toggleBookmarkReel = async (
       status: 'success',
       isBookmarked,
       bookmarksCount: reel.bookmarksCount,
+      collectionName: isBookmarked ? savedCollection : null,
     });
   } catch (error) {
     console.error('Toggle bookmark reel error:', error);
@@ -364,6 +393,48 @@ export const toggleBookmarkReel = async (
       status: 'error',
       message: 'Failed to toggle bookmark on reel',
     });
+  }
+};
+
+/**
+ * Update collection of an existing reel bookmark
+ */
+export const updateReelBookmarkCollection = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = getParamString(req.params.id);
+    const currentUserId = req.user?.id;
+    const { collectionName } = req.body;
+
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const targetCollection = (collectionName || 'Default').trim();
+    const bookmarkRepo = AppDataSource.getRepository(ReelBookmark);
+
+    const bookmark = await bookmarkRepo.findOne({
+      where: { reelId: id, userId: currentUserId },
+    });
+
+    if (!bookmark) {
+      res.status(404).json({ status: 'error', message: 'Reel bookmark not found' });
+      return;
+    }
+
+    bookmark.collectionName = targetCollection;
+    await bookmarkRepo.save(bookmark);
+
+    res.json({
+      status: 'success',
+      collectionName: bookmark.collectionName,
+    });
+  } catch (error) {
+    console.error('Update reel bookmark collection error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to update collection' });
   }
 };
 
@@ -383,10 +454,17 @@ export const getSavedReels = async (
 
     const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
     const limit = Math.max(1, Math.min(50, parseInt(req.query.limit as string) || 15));
+    const requestedCollection = req.query.collection as string | undefined;
 
     const bookmarkRepo = AppDataSource.getRepository(ReelBookmark);
+
+    const whereClause: any = { userId: currentUserId };
+    if (requestedCollection && requestedCollection.toLowerCase() !== 'all') {
+      whereClause.collectionName = requestedCollection;
+    }
+
     const [bookmarks, total] = await bookmarkRepo.findAndCount({
-      where: { userId: currentUserId },
+      where: whereClause,
       relations: {
         reel: {
           user: true,

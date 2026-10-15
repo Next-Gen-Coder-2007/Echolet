@@ -7,6 +7,7 @@ import {
   getUserReels,
   toggleLikeReel,
   toggleBookmarkReel,
+  updateReelBookmarkCollection,
   getSavedReels,
   getLikedReels,
   deleteReel,
@@ -42,6 +43,7 @@ router.post('/:id/comments', authMiddleware, addReelComment);
 router.post('/', authMiddleware, createReel);
 router.post('/:id/like', authMiddleware, toggleLikeReel);
 router.post('/:id/bookmark', authMiddleware, toggleBookmarkReel);
+router.put('/:id/bookmark/collection', authMiddleware, updateReelBookmarkCollection);
 router.post('/:id/share', optionalAuthMiddleware, shareReel);
 router.delete('/:id', authMiddleware, deleteReel);
 
