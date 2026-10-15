@@ -13,6 +13,7 @@ import {
   clearConversation,
   getChatSettings,
   updateChatSettings,
+  getConversationMedia,
 } from '../controllers/message.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
 
@@ -29,6 +30,7 @@ router.post('/item/:messageId/pin', togglePinMessage);
 router.post('/item/:messageId/vote', voteMessagePoll);
 router.put('/item/:messageId', editMessage);
 router.delete('/item/:messageId', deleteMessage);
+router.get('/:userId/media', getConversationMedia);
 router.post('/:userId/clear', clearConversation);
 router.post('/:userId/read', markMessagesAsRead);
 router.get('/:userId', getMessages);

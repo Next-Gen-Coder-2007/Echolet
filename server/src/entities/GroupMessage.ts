@@ -33,6 +33,7 @@ export class GroupMessage {
     | 'voice'
     | 'audio'
     | 'reel'
+    | 'post'
     | 'system';
 
   @Column({ type: 'text', nullable: true })

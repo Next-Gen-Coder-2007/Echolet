@@ -32,6 +32,7 @@ export class Message {
     | 'voice'
     | 'audio'
     | 'reel'
+    | 'post'
     | 'story_reply'
     | 'system';
 

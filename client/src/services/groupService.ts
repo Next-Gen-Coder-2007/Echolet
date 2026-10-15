@@ -44,6 +44,7 @@ export interface GroupMessageItem {
     | 'voice'
     | 'audio'
     | 'reel'
+    | 'post'
     | 'story_reply'
     | 'system';
   mediaUrl?: string;
@@ -155,6 +156,7 @@ export const groupService = {
         | 'voice'
         | 'audio'
         | 'reel'
+        | 'post'
         | 'system';
       mediaUrl?: string;
       fileName?: string;
@@ -274,6 +276,51 @@ export const groupService = {
   async markGroupAsRead(groupId: string): Promise<void> {
     await api.post(`/groups/${encodeURIComponent(groupId)}/read`);
   },
+
+  async getGroupMedia(
+    groupId: string,
+    options?: { type?: string; search?: string; page?: number; limit?: number }
+  ): Promise<{
+    status: string;
+    media: GroupMessageItem[];
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+    counts: {
+      all: number;
+      photos: number;
+      videos: number;
+      documents: number;
+      audio: number;
+      links: number;
+    };
+  }> {
+    const params: Record<string, any> = {};
+    if (options?.type) params.type = options.type;
+    if (options?.search) params.search = options.search;
+    if (options?.page) params.page = options.page;
+    if (options?.limit) params.limit = options.limit;
+
+    const response = await api.get<{
+      status: string;
+      media: GroupMessageItem[];
+      page: number;
+      limit: number;
+      total: number;
+      hasMore: boolean;
+      counts: {
+        all: number;
+        photos: number;
+        videos: number;
+        documents: number;
+        audio: number;
+        links: number;
+      };
+    }>(`/groups/${encodeURIComponent(groupId)}/media`, { params });
+    return response.data;
+  },
 };
 
 export default groupService;
+

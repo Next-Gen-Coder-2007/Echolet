@@ -48,6 +48,7 @@ export interface MessageItem {
     | 'voice'
     | 'audio'
     | 'reel'
+    | 'post'
     | 'story_reply'
     | 'system';
   mediaUrl?: string;
@@ -129,6 +130,7 @@ export const messageService = {
         | 'voice'
         | 'audio'
         | 'reel'
+        | 'post'
         | 'story_reply'
         | 'system';
       mediaUrl?: string;
@@ -244,6 +246,51 @@ export const messageService = {
     });
     return response.data;
   },
+
+  async getConversationMedia(
+    userId: string,
+    options?: { type?: string; search?: string; page?: number; limit?: number }
+  ): Promise<{
+    status: string;
+    media: MessageItem[];
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+    counts: {
+      all: number;
+      photos: number;
+      videos: number;
+      documents: number;
+      audio: number;
+      links: number;
+    };
+  }> {
+    const params: Record<string, any> = {};
+    if (options?.type) params.type = options.type;
+    if (options?.search) params.search = options.search;
+    if (options?.page) params.page = options.page;
+    if (options?.limit) params.limit = options.limit;
+
+    const response = await api.get<{
+      status: string;
+      media: MessageItem[];
+      page: number;
+      limit: number;
+      total: number;
+      hasMore: boolean;
+      counts: {
+        all: number;
+        photos: number;
+        videos: number;
+        documents: number;
+        audio: number;
+        links: number;
+      };
+    }>(`/messages/${encodeURIComponent(userId)}/media`, { params });
+    return response.data;
+  },
 };
 
 export default messageService;
+

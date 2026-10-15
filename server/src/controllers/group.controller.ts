@@ -508,6 +508,10 @@ export const sendGroupMessage = async (
       content = req.body.fileName || 'Document';
     } else if (!content && messageType === 'poll') {
       content = req.body.poll?.question || 'Poll';
+    } else if (!content && messageType === 'post') {
+      content = 'Shared an echo';
+    } else if (!content && messageType === 'reel') {
+      content = 'Shared a reel';
     }
 
     if (!content && !req.body.mediaUrl && !req.body.poll) {
@@ -1354,5 +1358,119 @@ export const markGroupAsRead = async (
   } catch (error) {
     console.error('Mark group read error:', error);
     res.status(500).json({ status: 'error', message: 'Failed to mark group as read' });
+  }
+};
+
+export const getGroupMedia = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const groupId = getParam(req.params.groupId);
+    const memberRepository = AppDataSource.getRepository(GroupMember);
+    const messageRepository = AppDataSource.getRepository(GroupMessage);
+
+    const membership = await memberRepository.findOne({
+      where: { groupId, userId: currentUserId },
+    });
+
+    if (!membership) {
+      res.status(403).json({ status: 'error', message: 'You are not a member of this group' });
+      return;
+    }
+
+    const type = (req.query.type as string) || 'all';
+    const search = ((req.query.search as string) || '').trim().toLowerCase();
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 40));
+    const offset = (page - 1) * limit;
+
+    const rawAll = await messageRepository
+      .createQueryBuilder('m')
+      .leftJoinAndSelect('m.sender', 's')
+      .where('m.groupId = :groupId', { groupId })
+      .andWhere('m.isDeletedForEveryone = :isDel', { isDel: false })
+      .orderBy('m.createdAt', 'DESC')
+      .getMany();
+
+    const visible = rawAll.filter(
+      (m) => !(m.deletedFor && m.deletedFor.includes(currentUserId))
+    );
+
+    const isPhoto = (m: GroupMessage) =>
+      m.messageType === 'image' || (!!m.mediaUrl && !['video', 'document', 'audio', 'voice'].includes(m.messageType));
+    const isVideo = (m: GroupMessage) => m.messageType === 'video';
+    const isDoc = (m: GroupMessage) => m.messageType === 'document' || (!!m.fileName && !isPhoto(m) && !isVideo(m));
+    const isAudio = (m: GroupMessage) => m.messageType === 'audio' || m.messageType === 'voice' || !!m.audioUrl;
+    const isLink = (m: GroupMessage) =>
+      Boolean(m.content && /https?:\/\/[^\s]+/i.test(m.content));
+
+    const counts = {
+      all: visible.filter((m) => isPhoto(m) || isVideo(m) || isDoc(m) || isAudio(m) || isLink(m)).length,
+      photos: visible.filter(isPhoto).length,
+      videos: visible.filter(isVideo).length,
+      documents: visible.filter(isDoc).length,
+      audio: visible.filter(isAudio).length,
+      links: visible.filter(isLink).length,
+    };
+
+    let filtered = visible.filter((m) => {
+      switch (type) {
+        case 'photo':
+        case 'photos':
+        case 'image':
+          return isPhoto(m);
+        case 'video':
+        case 'videos':
+          return isVideo(m);
+        case 'document':
+        case 'documents':
+        case 'docs':
+          return isDoc(m);
+        case 'audio':
+        case 'voice':
+          return isAudio(m);
+        case 'link':
+        case 'links':
+          return isLink(m);
+        case 'all':
+        default:
+          return isPhoto(m) || isVideo(m) || isDoc(m) || isAudio(m) || isLink(m);
+      }
+    });
+
+    if (search) {
+      filtered = filtered.filter((m) => {
+        const nameMatch = m.fileName?.toLowerCase().includes(search);
+        const contentMatch = m.content?.toLowerCase().includes(search);
+        const senderMatch =
+          m.sender?.fullName?.toLowerCase().includes(search) ||
+          m.sender?.username?.toLowerCase().includes(search);
+        return nameMatch || contentMatch || senderMatch;
+      });
+    }
+
+    const total = filtered.length;
+    const items = filtered.slice(offset, offset + limit);
+    const hasMore = offset + items.length < total;
+
+    res.json({
+      status: 'success',
+      media: items,
+      page,
+      limit,
+      total,
+      hasMore,
+      counts,
+    });
+  } catch (error) {
+    console.error('Get group media error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to retrieve group media' });
   }
 };

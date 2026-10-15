@@ -17,6 +17,7 @@ import {
   togglePinGroupMessage,
   voteGroupMessagePoll,
   clearGroupChat,
+  getGroupMedia,
 } from '../controllers/group.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
 
@@ -28,6 +29,7 @@ router.post('/', createGroup);
 router.get('/', getGroups);
 router.get('/:groupId', getGroupDetails);
 router.put('/:groupId', updateGroup);
+router.get('/:groupId/media', getGroupMedia);
 router.get('/:groupId/messages', getGroupMessages);
 router.post('/:groupId/messages', sendGroupMessage);
 router.post('/:groupId/messages/:messageId/star', toggleStarGroupMessage);
