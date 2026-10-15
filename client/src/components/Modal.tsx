@@ -157,9 +157,9 @@ export default function Modal({
         className={`relative z-10 w-full ${resolvedSizeClass} animate-modal-content transition-all ${className}`}
         style={style}
       >
-        {(title || description || (showCloseButton && closeButtonPosition === 'inside')) && !className.includes('bg-') ? (
+        {!className.includes('bg-') ? (
           <div className={`bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col ${contentClassName}`}>
-            {(title || (showCloseButton && closeButtonPosition === 'inside')) && (
+            {(title || description || icon) && (
               <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50">
                 <div className="flex items-center gap-3 min-w-0">
                   {icon && (
@@ -197,7 +197,7 @@ export default function Modal({
 
             <div
               data-lenis-prevent
-              className="p-4 sm:p-5 overflow-y-auto max-h-[82vh] touch-pan-y overscroll-contain"
+              className={`${title || description || icon ? 'p-4 sm:p-5' : ''} overflow-y-auto max-h-[82vh] touch-pan-y overscroll-contain`}
             >
               {children}
             </div>
