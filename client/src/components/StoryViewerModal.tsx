@@ -13,7 +13,7 @@ import {
 } from 'react-icons/hi2';
 import Modal from './Modal';
 import type { User } from '../services/authService';
-import storyService, { type UserStoryGroup } from '../services/storyService';
+import storyService, { type UserStoryGroup, markOwnStoryAsViewed } from '../services/storyService';
 import messageService from '../services/messageService';
 
 interface StoryViewerModalProps {
@@ -63,41 +63,62 @@ export default function StoryViewerModal({
   const [currentUserIndex, setCurrentUserIndex] = useState(initialUserIndex);
   const [currentStoryIndex, setCurrentStoryIndex] = useState(initialStoryIndex);
   const [isPaused, setIsPaused] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [showViewersDrawer, setShowViewersDrawer] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isSendingReply, setIsSendingReply] = useState(false);
   const [floatingReaction, setFloatingReaction] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
 
+  const progressRef = useRef<number>(0);
   const holdTimerRef = useRef<number | null>(null);
+  const pointerDownTimeRef = useRef<number>(0);
+  const pointerDownPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const isHoldingRef = useRef<boolean>(false);
+  const prevIsOpenRef = useRef<boolean>(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Sync exact target indices when opening
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       const targetUserIndex = Math.max(0, Math.min(initialUserIndex, userStoryGroups.length - 1));
       setCurrentUserIndex(targetUserIndex);
       const targetGroup = userStoryGroups[targetUserIndex];
       const maxStoryIdx = targetGroup ? Math.max(0, targetGroup.stories.length - 1) : 0;
       setCurrentStoryIndex(Math.max(0, Math.min(initialStoryIndex, maxStoryIdx)));
       setIsPaused(false);
+      setIsHolding(false);
+      isHoldingRef.current = false;
       setShowViewersDrawer(false);
       setReplyText('');
+      progressRef.current = 0;
+      setProgress(0);
     }
-  }, [isOpen, initialUserIndex, initialStoryIndex, userStoryGroups]);
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, initialUserIndex, initialStoryIndex]);
 
-  const safeUserIndex = Math.max(0, Math.min(currentUserIndex, userStoryGroups.length - 1));
+  const safeUserIndex = Math.max(0, Math.min(currentUserIndex, Math.max(0, userStoryGroups.length - 1)));
   const currentGroup = userStoryGroups[safeUserIndex];
   const stories = currentGroup?.stories || [];
   const safeStoryIndex = Math.max(0, Math.min(currentStoryIndex, Math.max(0, stories.length - 1)));
   const currentStory = stories[safeStoryIndex];
   const isOwnStory = Boolean(currentUser && currentStory && currentStory.userId === currentUser.id);
 
+  // Reset progress synchronously on story or user change
+  useEffect(() => {
+    progressRef.current = 0;
+    setProgress(0);
+  }, [safeStoryIndex, safeUserIndex]);
+
   // Mark story as viewed
   useEffect(() => {
     if (!isOpen || !currentStory || !currentUser) return;
-    if (currentStory.userId === currentUser.id) return;
+    if (currentStory.userId === currentUser.id) {
+      markOwnStoryAsViewed(currentStory.id, currentUser.id);
+      onStoryViewed?.(currentStory.id);
+      return;
+    }
 
     if (!currentStory.isViewed) {
       storyService
@@ -111,28 +132,31 @@ export default function StoryViewerModal({
     }
   }, [isOpen, currentStory?.id, currentUser?.id, onStoryViewed]);
 
+  const shouldPause = isPaused || isHolding || showViewersDrawer || isSendingReply;
+
   // Synchronize HTML5 video play/pause with story pause state
   useEffect(() => {
     if (videoRef.current) {
-      if (isPaused || showViewersDrawer || isSendingReply) {
+      if (shouldPause) {
         videoRef.current.pause();
       } else {
         videoRef.current.play().catch(() => {});
       }
     }
-  }, [isPaused, showViewersDrawer, isSendingReply, safeStoryIndex, safeUserIndex]);
+  }, [shouldPause, safeStoryIndex, safeUserIndex]);
 
   // Advance to next story
   const handleNext = useCallback(() => {
     if (!currentGroup) return;
 
+    progressRef.current = 0;
+    setProgress(0);
+
     if (safeStoryIndex < stories.length - 1) {
       setCurrentStoryIndex((prev) => prev + 1);
-      setIsPaused(false);
     } else if (safeUserIndex < userStoryGroups.length - 1) {
       setCurrentUserIndex((prev) => prev + 1);
       setCurrentStoryIndex(0);
-      setIsPaused(false);
     } else {
       onClose();
     }
@@ -140,46 +164,131 @@ export default function StoryViewerModal({
 
   // Go to previous story
   const handlePrev = useCallback(() => {
+    progressRef.current = 0;
+    setProgress(0);
+
     if (safeStoryIndex > 0) {
       setCurrentStoryIndex((prev) => prev - 1);
-      setIsPaused(false);
     } else if (safeUserIndex > 0) {
       const prevGroup = userStoryGroups[safeUserIndex - 1];
       setCurrentUserIndex((prev) => prev - 1);
       setCurrentStoryIndex(Math.max(0, (prevGroup?.stories.length || 1) - 1));
-      setIsPaused(false);
     }
   }, [safeStoryIndex, safeUserIndex, userStoryGroups]);
 
-  // Press-and-hold to pause (Long press > 180ms)
-  const handlePressStart = () => {
-    holdTimerRef.current = window.setTimeout(() => {
-      isHoldingRef.current = true;
-      setIsPaused(true);
-    }, 180);
+  const handleNextRef = useRef(handleNext);
+  useEffect(() => {
+    handleNextRef.current = handleNext;
+  }, [handleNext]);
+
+  const handlePrevRef = useRef(handlePrev);
+  useEffect(() => {
+    handlePrevRef.current = handlePrev;
+  }, [handlePrev]);
+
+  // Auto-progress for image and text stories (5 seconds duration)
+  useEffect(() => {
+    if (!isOpen || !currentStory || currentStory.mediaType === 'video') return;
+    if (shouldPause) return;
+
+    const intervalMs = 25;
+    const step = (intervalMs / STORY_DURATION) * 100;
+
+    const timer = setInterval(() => {
+      progressRef.current += step;
+      if (progressRef.current >= 100) {
+        clearInterval(timer);
+        progressRef.current = 0;
+        setProgress(0);
+        handleNextRef.current();
+      } else {
+        setProgress(Math.min(100, progressRef.current));
+      }
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [isOpen, shouldPause, currentStory?.id, currentStory?.mediaType]);
+
+  // Track video progress in sync with playback
+  const handleVideoTimeUpdate = () => {
+    if (videoRef.current && videoRef.current.duration) {
+      const current = videoRef.current.currentTime;
+      const duration = videoRef.current.duration;
+      if (duration > 0 && !isNaN(duration)) {
+        const pct = Math.min(100, (current / duration) * 100);
+        progressRef.current = pct;
+        setProgress(pct);
+      }
+    }
   };
 
-  const handlePressEnd = () => {
+  // Pointer down: record time and pos, schedule hold timer (250ms)
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    pointerDownTimeRef.current = Date.now();
+    pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
+    isHoldingRef.current = false;
+
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = window.setTimeout(() => {
+      isHoldingRef.current = true;
+      setIsHolding(true);
+    }, 250);
+  };
+
+  // Pointer up: distinguish quick tap (< 250ms) from long press hold (>= 250ms)
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+
+    const dx = Math.abs(e.clientX - pointerDownPosRef.current.x);
+    const dy = Math.abs(e.clientY - pointerDownPosRef.current.y);
+
+    // If moved significantly, it was a drag or swipe, ignore
+    if (dx > 20 || dy > 20) {
+      if (isHoldingRef.current) {
+        isHoldingRef.current = false;
+        setIsHolding(false);
+      }
+      return;
+    }
+
+    if (isHoldingRef.current) {
+      // Long press hold finished: release hold, leave isPaused unchanged
+      isHoldingRef.current = false;
+      setIsHolding(false);
+      return;
+    }
+
+    // Quick tap (< 250ms)
+    const currentTarget = e.currentTarget as HTMLElement;
+    const rect = currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = clickX / rect.width;
+
+    if (ratio < 0.22) {
+      // Left 22%: Previous Story
+      handlePrevRef.current();
+    } else if (ratio > 0.78) {
+      // Right 22%: Next Story
+      handleNextRef.current();
+    } else {
+      // Center 56%: Toggle Pause / Play permanently until clicked again
+      setIsPaused((prev) => !prev);
+    }
+  };
+
+  const handlePointerCancel = () => {
     if (holdTimerRef.current) {
       clearTimeout(holdTimerRef.current);
       holdTimerRef.current = null;
     }
     if (isHoldingRef.current) {
       isHoldingRef.current = false;
-      setIsPaused(false);
+      setIsHolding(false);
     }
-  };
-
-  const handleTapPrev = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isHoldingRef.current) return;
-    handlePrev();
-  };
-
-  const handleTapNext = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isHoldingRef.current) return;
-    handleNext();
   };
 
   // Keyboard navigation
@@ -312,8 +421,6 @@ export default function StoryViewerModal({
       ? 'font-sans font-medium'
       : 'font-sans font-bold';
 
-  const shouldPauseBar = isPaused || showViewersDrawer || isSendingReply;
-
   return (
     <Modal
       isOpen={isOpen}
@@ -355,7 +462,7 @@ export default function StoryViewerModal({
 
         {/* Main 9:16 Story Viewport Card: Strictly locked fixed width for rock-solid consistency across all stories */}
         <div
-          className="relative h-[88vh] max-h-[820px] sm:rounded-3xl overflow-hidden bg-white border border-slate-200/90 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] flex flex-col justify-between shrink-0"
+          className="relative h-[88vh] max-h-[820px] sm:rounded-3xl overflow-hidden bg-black border border-slate-800 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] flex flex-col justify-between shrink-0"
           style={STORY_VIEWER_WIDTH_STYLE}
         >
           {/* Floating animated reaction celebration */}
@@ -367,15 +474,12 @@ export default function StoryViewerModal({
             </div>
           )}
 
-          {/* Top Progress Bars: GPU-accelerated CSS keyframe animation */}
+          {/* Top Progress Bars */}
           <div className="relative z-30 pt-3 px-3.5 pb-1 flex items-center gap-1.5 bg-white/95 backdrop-blur-md border-b border-slate-100">
             {stories.map((st, idx) => {
               const isPast = idx < safeStoryIndex;
               const isCurrent = idx === safeStoryIndex;
-              const storyDurationMs =
-                st.mediaType === 'video'
-                  ? Math.min(60000, st.duration ? st.duration * 1000 : 15000)
-                  : STORY_DURATION;
+              const barWidth = isPast ? 100 : isCurrent ? progress : 0;
 
               return (
                 <div
@@ -383,23 +487,10 @@ export default function StoryViewerModal({
                   className="h-1 flex-1 bg-slate-200 rounded-full overflow-hidden"
                 >
                   <div
-                    key={`${st.id}-${safeStoryIndex === idx}-${storyDurationMs}`}
                     className="h-full bg-purple-600 rounded-full"
-                    style={
-                      isPast
-                        ? { width: '100%' }
-                        : isCurrent
-                        ? {
-                            width: '0%',
-                            animation: `storyProgressBar ${storyDurationMs}ms linear forwards`,
-                            animationPlayState: shouldPauseBar ? 'paused' : 'running',
-                          }
-                        : { width: '0%' }
-                    }
-                    onAnimationEnd={() => {
-                      if (isCurrent && !shouldPauseBar) {
-                        handleNext();
-                      }
+                    style={{
+                      width: `${barWidth}%`,
+                      transition: isCurrent && !shouldPause ? 'width 25ms linear' : 'none',
                     }}
                   />
                 </div>
@@ -456,7 +547,7 @@ export default function StoryViewerModal({
                 </button>
               )}
 
-              {shouldPauseBar && (
+              {shouldPause && (
                 <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
                   Paused
                 </span>
@@ -467,9 +558,10 @@ export default function StoryViewerModal({
                 onClick={() => setIsPaused((p) => !p)}
                 className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
                 title={isPaused ? 'Resume' : 'Pause'}
+                aria-label={isPaused ? 'Resume story' : 'Pause story'}
               >
                 {isPaused ? (
-                  <HiOutlinePlay className="w-3.5 h-3.5" />
+                  <HiOutlinePlay className="w-3.5 h-3.5 text-purple-600" />
                 ) : (
                   <HiOutlinePause className="w-3.5 h-3.5" />
                 )}
@@ -497,64 +589,69 @@ export default function StoryViewerModal({
             </div>
           </div>
 
-          {/* Story Canvas / Content Area */}
+          {/* Story Canvas / Content Area: Pure black sleek backdrop for centering */}
           <div
-            className="relative flex-1 flex items-center justify-center overflow-hidden touch-none bg-slate-50"
-            onMouseDown={handlePressStart}
-            onMouseUp={handlePressEnd}
-            onTouchStart={handlePressStart}
-            onTouchEnd={handlePressEnd}
+            className="relative flex-1 flex items-center justify-center overflow-hidden touch-none bg-black cursor-pointer select-none"
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onPointerLeave={handlePointerCancel}
           >
-            {/* Left / Right tap zones */}
-            <div
-              onClick={handleTapPrev}
-              className="absolute left-0 top-0 bottom-0 w-1/3 z-20 cursor-pointer"
-              title="Previous story"
-            />
-            <div
-              onClick={handleTapNext}
-              className="absolute right-0 top-0 bottom-0 w-2/3 z-20 cursor-pointer"
-              title="Next story"
-            />
+            {/* Centered Paused Indicator Overlay */}
+            {isPaused && (
+              <div className="absolute inset-0 z-25 flex items-center justify-center pointer-events-none bg-black/35 backdrop-blur-[1px] transition-opacity">
+                <div className="w-16 h-16 rounded-full bg-black/70 text-white flex items-center justify-center shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-75 duration-150 border border-white/20">
+                  <HiOutlinePlay className="w-8 h-8 ml-1" />
+                </div>
+              </div>
+            )}
 
             {/* Media / Content: Video, Image, or Text */}
             {currentStory.mediaType === 'video' && currentStory.mediaUrl ? (
-              <div className="relative w-full h-full flex items-center justify-center bg-slate-950 overflow-hidden">
+              <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden pointer-events-none">
                 <video
+                  key={`video-${currentStory.id}`}
                   ref={videoRef}
                   src={currentStory.mediaUrl}
                   autoPlay
                   playsInline
                   muted={isMuted}
-                  className="w-full h-full object-contain pointer-events-none select-none max-w-full max-h-full"
+                  className={`w-full h-full select-none max-w-full max-h-full transition-all duration-200 ${
+                    currentStory.fontStyle === 'cover' ? 'object-cover' : 'object-contain'
+                  }`}
+                  onTimeUpdate={handleVideoTimeUpdate}
                   onEnded={() => {
-                    if (!shouldPauseBar) handleNext();
+                    if (!shouldPause) handleNextRef.current();
                   }}
                 />
 
                 {currentStory.content && (
-                  <div className="absolute bottom-4 inset-x-4 z-25 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-3 text-center text-sm font-semibold text-slate-800 shadow-md pointer-events-auto">
+                  <div className="absolute bottom-4 inset-x-4 z-25 bg-black/75 backdrop-blur-md border border-white/15 rounded-2xl p-3 text-center text-sm font-semibold text-white shadow-xl">
                     {currentStory.content}
                   </div>
                 )}
               </div>
             ) : currentStory.mediaType === 'image' && currentStory.mediaUrl ? (
-              <div className="relative w-full h-full flex items-center justify-center bg-slate-100 overflow-hidden">
+              <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden pointer-events-none">
                 <img
+                  key={`img-${currentStory.id}`}
                   src={currentStory.mediaUrl}
                   alt="Story"
-                  className="w-full h-full object-contain pointer-events-none select-none max-w-full max-h-full"
+                  className={`w-full h-full select-none max-w-full max-h-full transition-all duration-200 ${
+                    currentStory.fontStyle === 'cover' ? 'object-cover' : 'object-contain'
+                  }`}
                 />
 
                 {currentStory.content && (
-                  <div className="absolute bottom-4 inset-x-4 z-25 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-3 text-center text-sm font-semibold text-slate-800 shadow-md pointer-events-auto">
+                  <div className="absolute bottom-4 inset-x-4 z-25 bg-black/75 backdrop-blur-md border border-white/15 rounded-2xl p-3 text-center text-sm font-semibold text-white shadow-xl">
                     {currentStory.content}
                   </div>
                 )}
               </div>
             ) : (
               <div
-                className="w-full h-full flex items-center justify-center p-8 text-center overflow-hidden"
+                key={`text-${currentStory.id}`}
+                className="w-full h-full flex items-center justify-center p-8 text-center overflow-hidden pointer-events-none"
                 style={{
                   background:
                     currentStory.backgroundColor ||
