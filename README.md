@@ -35,7 +35,7 @@
 | 11 | **Search** | *Now:* users, posts, reels, hashtags · *Later:* full-text search, semantic search |
 | 12 | **Messaging** | *1-to-1:* text, images, video, GIFs, stickers, voice messages, replies, reactions, edit/delete, typing indicator, online status, read receipts · *Group (WhatsApp-style):* create, add/remove members, name/image, admins, roles, media sharing, reactions, mentions, message search, settings, leave · *Global:* public real-time chatroom, online count, reactions, replies, mentions, rate limiting, spam detection, content filtering, reporting, block/mute, moderation — built with WebSockets + Redis Pub/Sub + PostgreSQL |
 | 13 | **Notifications** | Likes, comments, replies, follows, mentions, reposts, shares, messages, group invitations, story reactions — delivered in real time via WebSockets |
-| 14 | **Bookmarks** | Save posts, reels, images, videos into custom collections (e.g. Memes, Movies, Programming, Funny, Other) |
+| 14 | **Bookmarks** | Save posts and reels into custom user-created folders with color tags, folder filtering, and instant organization |
 | 15 | **Reactions** | Love, Funny, Fire, Wow, Sad, Dead, Applause — applicable to posts, comments, messages, and reels |
 | 16 | **Polls** | Can be created in posts, stories, and group chats |
 | 17 | **Fun Features** | **Surprise Me** — randomly discover a post, user, reel, or topic for a natural rabbit-hole browsing experience |
@@ -43,7 +43,7 @@
 
 ## Implementation Status
 
-> **Overall Progress: ~50% (Core MVP & Profile Engine Active)**
+> **Overall Progress: ~75% (Core Platform, Stories, Reels, Custom Folders & Messaging Active)**
 
 | Sl No | Feature | Status | What's Implemented | What's Pending |
 |:---:|---|:---:|---|---|
@@ -52,16 +52,16 @@
 | 3 | **Settings & Preferences** | 🟢 ~85% | Dedicated `/settings` hub with nested router outlets (`EditProfile`, `AccountSettings`, `NotificationSettings`, `PrivacySettings`), sticky minimalist menu | Password change form, account deletion request flow |
 | 4 | **Home Feed** | 🟡 ~60% | Post stream with real-time WebSocket updates, multi-image, video, polls, interactions | "Following" vs "For You" toggle tabs, reposts, clickable hashtag/mention parsing |
 | 5 | **Posts** | 🟡 ~65% | Text, multi-image, video, poll creation, like, comment, bookmark, delete, share link | Edit post, pin post, report post, GIF picker, quote posts / reposts |
-| 6 | **Comments** | 🟡 ~60% | Add comment, delete comment, like comment, live comment counts | Nested/threaded replies (`parentId`), edit comments, user mentions |
-| 7 | **Stories** | 🔴 ~10% | Frontend UI component shell (`Stories.tsx`) | Backend entity & routes, file upload, full story viewer modal, 24-hour expiration |
-| 8 | **Reels / Short Videos** | ⚪ 0% | — | Vertical reel feed, video player, reels tab/page, backend model |
+| 6 | **Comments** | 🟢 ~85% | Add/delete/like comments, live counts, recursive infinite nested threaded replies (`parentId`) with collapsible threads | Edit comments, user mentions |
+| 7 | **Stories** | 🟢 ~85% | Backend entity, routes & uploads, full story viewer modal with timed progress bars, pause/resume, looping, center fit vs vertical crop toggle during creation | Music/audio picker, stickers, polls in stories |
+| 8 | **Reels / Short Videos** | 🟢 ~85% | Backend model & upload routes, full-screen vertical feed, video player, likes, comments, bookmarking with custom folders, contain/cover display modes, saved reels grid | Duets / remixes, advanced video editor filters |
 | 9 | **Explore** | ⚪ 0% | — | Visual grid, trending content discovery page |
 | 10 | **Trending** | ⚪ 0% | — | Trending ranking engine (engagement + velocity + recency) |
 | 11 | **Hashtags** | 🔴 ~10% | Hashtags can be typed into posts | Hashtag parsing/indexing, hashtag pages, follow hashtags, search hashtags |
 | 12 | **Search** | 🟡 ~35% | Real-time user search by username/display name | Search posts, reels, hashtags, and media |
-| 13 | **Messaging** | 🟢 ~90% | Real-time 1-to-1 direct messaging, group chat management, and public real-time Global Chatroom (online count, live typing, emoji reactions, voice notes, pinned announcements, reply threads, user mentions, anti-spam rate limiting) via WebSockets | Media sharing (images/videos) |
+| 13 | **Messaging** | 🟢 ~95% | Real-time 1-to-1 direct messaging, group chat management, public Global Chatroom, image & video media sharing with upload preview modal & captions, optimized smooth chat switching, voice notes, emoji reactions | Voice/video calls |
 | 14 | **Notifications** | 🔴 ~15% | Frontend UI layout (`Notifications.tsx`) with mock data | Backend entity, DB persistence, real-time socket triggers on interactions |
-| 15 | **Bookmarks** | 🟡 ~55% | Save/unsave posts, saved posts feed | Custom collections/folders (Memes, Movies, Programming, etc.) |
+| 15 | **Bookmarks** | 🟢 ~95% | Save/unsave posts and reels, custom user-created folders with color tags, folder filtering tabs, inline folder creation in picker modal, move items between folders, clean modern UI without emoji clutter | Shared/collaborative folders |
 | 16 | **Reactions** | 🔴 ~20% | Binary like/heart on posts & comments | Rich emoji reactions (Love, Funny, Fire, Wow, Sad, Dead, Applause) |
 | 17 | **Polls** | 🟡 ~60% | Poll posts with voting, percentages, single-vote prevention | Polls inside stories and group chats |
 | 18 | **Fun Features** | ⚪ 0% | — | "Surprise Me" random discovery button & route |
