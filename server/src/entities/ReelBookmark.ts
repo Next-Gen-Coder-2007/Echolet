@@ -22,6 +22,9 @@ export class ReelBookmark {
   @Column({ type: 'uuid' })
   userId: string;
 
+  @Column({ type: 'varchar', length: 60, default: 'Default' })
+  collectionName: string;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
