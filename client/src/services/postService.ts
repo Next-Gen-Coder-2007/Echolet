@@ -44,6 +44,7 @@ export interface Post {
   isPinned: boolean;
   isLiked?: boolean;
   isBookmarked?: boolean;
+  bookmarkCollection?: string | null;
   userVotedOption?: number | null;
   createdAt: string;
   updatedAt: string;
@@ -103,9 +104,26 @@ export const postService = {
     return res.data;
   },
 
-  async toggleBookmark(id: string): Promise<{ isBookmarked: boolean; bookmarksCount: number }> {
-    const res = await api.post<{ status: string; isBookmarked: boolean; bookmarksCount: number }>(
-      `/posts/${encodeURIComponent(id)}/bookmark`
+  async toggleBookmark(
+    id: string,
+    collectionName?: string
+  ): Promise<{ isBookmarked: boolean; bookmarksCount: number; collectionName?: string }> {
+    const res = await api.post<{
+      status: string;
+      isBookmarked: boolean;
+      bookmarksCount: number;
+      collectionName?: string;
+    }>(`/posts/${encodeURIComponent(id)}/bookmark`, { collectionName });
+    return res.data;
+  },
+
+  async updateBookmarkCollection(
+    id: string,
+    collectionName: string
+  ): Promise<{ status: string; collectionName: string }> {
+    const res = await api.put<{ status: string; collectionName: string }>(
+      `/posts/${encodeURIComponent(id)}/bookmark/collection`,
+      { collectionName }
     );
     return res.data;
   },
@@ -147,8 +165,12 @@ export const postService = {
     return res.data;
   },
 
-  async getSavedPosts(): Promise<Post[]> {
-    const res = await api.get<{ status: string; posts: Post[] }>('/posts/saved');
+  async getSavedPosts(collection?: string): Promise<Post[]> {
+    const query =
+      collection && collection.toLowerCase() !== 'all'
+        ? `?collection=${encodeURIComponent(collection)}`
+        : '';
+    const res = await api.get<{ status: string; posts: Post[] }>(`/posts/saved${query}`);
     return res.data.posts || [];
   },
 

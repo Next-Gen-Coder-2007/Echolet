@@ -34,6 +34,7 @@ export interface Reel {
   viewsCount: number;
   isLiked?: boolean;
   isBookmarked?: boolean;
+  bookmarkCollection?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -96,9 +97,18 @@ export const reelService = {
   },
 
   async toggleBookmarkReel(
-    reelId: string
-  ): Promise<{ isBookmarked: boolean; bookmarksCount: number }> {
-    const res = await api.post(`/reels/${reelId}/bookmark`);
+    reelId: string,
+    collectionName?: string
+  ): Promise<{ isBookmarked: boolean; bookmarksCount: number; collectionName?: string }> {
+    const res = await api.post(`/reels/${reelId}/bookmark`, { collectionName });
+    return res.data;
+  },
+
+  async updateReelBookmarkCollection(
+    reelId: string,
+    collectionName: string
+  ): Promise<{ status: string; collectionName: string }> {
+    const res = await api.put(`/reels/${reelId}/bookmark/collection`, { collectionName });
     return res.data;
   },
 
@@ -109,11 +119,17 @@ export const reelService = {
 
   async getSavedReels(
     offset = 0,
-    limit = 15
+    limit = 15,
+    collection?: string
   ): Promise<{ reels: Reel[]; hasMore: boolean; total: number }> {
-    const res = await api.get('/reels/saved', {
-      params: { offset, limit },
-    });
+    const params: { offset: number; limit: number; collection?: string } = {
+      offset,
+      limit,
+    };
+    if (collection && collection.toLowerCase() !== 'all') {
+      params.collection = collection;
+    }
+    const res = await api.get('/reels/saved', { params });
     return {
       reels: res.data.reels || [],
       hasMore: Boolean(res.data.hasMore),
