@@ -41,6 +41,7 @@ export interface Post {
   commentsCount: number;
   repostsCount: number;
   bookmarksCount: number;
+  sharesCount?: number;
   isPinned: boolean;
   isLiked?: boolean;
   isBookmarked?: boolean;
@@ -177,6 +178,11 @@ export const postService = {
   async getLikedPosts(): Promise<Post[]> {
     const res = await api.get<{ status: string; posts: Post[] }>('/posts/liked');
     return res.data.posts || [];
+  },
+
+  async sharePost(id: string): Promise<{ status: string; sharesCount: number }> {
+    const res = await api.post<{ status: string; sharesCount: number }>(`/posts/${id}/share`);
+    return res.data;
   },
 };
 

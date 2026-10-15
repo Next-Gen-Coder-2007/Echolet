@@ -1159,3 +1159,38 @@ export const getLikedPosts = async (
     });
   }
 };
+
+/**
+ * Increment and record share on a post
+ */
+export const sharePost = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = getParamString(req.params.id);
+    const postRepo = AppDataSource.getRepository(Post);
+    const post = await postRepo.findOne({ where: { id } });
+
+    if (!post) {
+      res.status(404).json({ status: 'error', message: 'Post not found' });
+      return;
+    }
+
+    post.sharesCount = (post.sharesCount || 0) + 1;
+    await postRepo.save(post);
+
+    res.json({
+      status: 'success',
+      sharesCount: post.sharesCount,
+      message: 'Post shared successfully',
+    });
+  } catch (error) {
+    console.error('Share post error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to record post share',
+    });
+  }
+};
+

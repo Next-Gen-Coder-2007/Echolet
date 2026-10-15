@@ -61,6 +61,9 @@ export class Post {
   @Column({ type: 'int', default: 0 })
   bookmarksCount: number;
 
+  @Column({ type: 'int', default: 0 })
+  sharesCount: number;
+
   @Column({ type: 'boolean', default: false })
   isPinned: boolean;
 
