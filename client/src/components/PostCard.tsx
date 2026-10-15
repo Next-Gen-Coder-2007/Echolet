@@ -27,6 +27,7 @@ import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
 import MediaViewerModal from './MediaViewerModal';
 import SaveToCollectionModal from './SaveToCollectionModal';
+import SharePostModal from './SharePostModal';
 import getSocket from '../services/socket';
 
 interface PostCardProps {
@@ -283,11 +284,23 @@ export default function PostCard({
   const [likesCount, setLikesCount] = useState(post.likesCount || 0);
   const [isBookmarked, setIsBookmarked] = useState(Boolean(post.isBookmarked));
   const [bookmarksCount, setBookmarksCount] = useState(post.bookmarksCount || 0);
+  const [sharesCount, setSharesCount] = useState<number>(post.sharesCount || 0);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [currentCollection, setCurrentCollection] = useState<string | null>(
     post.bookmarkCollection || null
   );
   const [isCollectionPickerOpen, setIsCollectionPickerOpen] = useState(false);
   const [availableCollections, setAvailableCollections] = useState<BookmarkCollection[]>([]);
+
+  useEffect(() => {
+    if (typeof post.sharesCount === 'number') {
+      setSharesCount(post.sharesCount);
+    }
+  }, [post.sharesCount]);
+
+  const handleShareSuccess = (_postId: string, newSharesCount: number) => {
+    setSharesCount(newSharesCount);
+  };
 
   const loadCollections = async () => {
     try {
@@ -1288,11 +1301,17 @@ export default function PostCard({
           {/* Share */}
           <button
             type="button"
-            onClick={handleCopyLink}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-all cursor-pointer"
-            title="Share link"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsShareModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-all cursor-pointer text-slate-600"
+            title="Share echo"
           >
             <HiOutlineShare className="w-5 h-5" />
+            {sharesCount > 0 && (
+              <span className="text-xs font-semibold">{sharesCount}</span>
+            )}
           </button>
         </div>
 
@@ -1368,6 +1387,17 @@ export default function PostCard({
           itemTitle={post.content?.slice(0, 30)}
           onSelectCollection={handleSelectCollection}
           onCreateCollectionInline={handleCreateCollectionInline}
+        />
+      )}
+
+      {/* Share Post Modal */}
+      {isShareModalOpen && (
+        <SharePostModal
+          post={post}
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          currentUser={currentUser}
+          onShareSuccess={handleShareSuccess}
         />
       )}
     </>
