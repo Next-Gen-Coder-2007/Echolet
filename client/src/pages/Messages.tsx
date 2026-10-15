@@ -59,6 +59,12 @@ import ChatAttachmentMenu from '../components/ChatAttachmentMenu';
 import CreateChatPollModal from '../components/CreateChatPollModal';
 import ReelMessageCard from '../components/ReelMessageCard';
 import StoryMessageCard from '../components/StoryMessageCard';
+import StoryViewerModal from '../components/StoryViewerModal';
+import CreateStoryModal from '../components/CreateStoryModal';
+import MediaUploadPreviewModal from '../components/MediaUploadPreviewModal';
+import storyService, {
+  type UserStoryGroup,
+} from '../services/storyService';
 
 // WhatsApp-like dual tick SVG indicator
 const MessageTicks: React.FC<{
@@ -881,9 +887,9 @@ export default function Messages() {
     paramUsername || searchParams.get('user') || searchParams.get('username') || searchParams.get('userId');
   const targetGroupParam = searchParams.get('group') || searchParams.get('groupId');
 
-  // Filter tabs: 'all' | 'direct' | 'groups' | 'global' | 'favourites' | 'archived'
+  // Filter tabs: 'all' | 'direct' | 'groups' | 'favourites' | 'archived'
   const [chatTab, setChatTab] = useState<
-    'all' | 'direct' | 'groups' | 'global' | 'favourites' | 'archived'
+    'all' | 'direct' | 'groups' | 'favourites' | 'archived' | 'global'
   >(paramUsername === 'global' || searchParams.get('room') === 'global' ? 'global' : 'all');
 
   // Global Chat state
@@ -910,6 +916,60 @@ export default function Messages() {
 
   // Clear chat modal state
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+
+  // Stories in Messages state
+  const [userStoryGroups, setUserStoryGroups] = useState<UserStoryGroup[]>([]);
+  const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
+  const [storyViewerUserIndex, setStoryViewerUserIndex] = useState(0);
+  const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
+
+  const fetchStories = useCallback(async () => {
+    try {
+      const res = await storyService.getStories();
+      setUserStoryGroups(res.userStoryGroups || []);
+    } catch {
+      // silently fail
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStories();
+  }, [fetchStories]);
+
+
+
+  useEffect(() => {
+    const socket = getSocket();
+    const handleStoryUpdate = () => fetchStories();
+
+    socket.on('new_story', handleStoryUpdate);
+    socket.on('story_deleted', handleStoryUpdate);
+    socket.on('story_viewed', handleStoryUpdate);
+
+    return () => {
+      socket.off('new_story', handleStoryUpdate);
+      socket.off('story_deleted', handleStoryUpdate);
+      socket.off('story_viewed', handleStoryUpdate);
+    };
+  }, [fetchStories]);
+
+  const myGroup = useMemo(() => {
+    return userStoryGroups.find((g) => g.userId === currentUser?.id);
+  }, [userStoryGroups, currentUser?.id]);
+
+  const hasOwnStory = Boolean(myGroup && myGroup.stories.length > 0);
+
+  const handleOpenOurStory = () => {
+    if (hasOwnStory) {
+      const myGroupIndex = userStoryGroups.findIndex((g) => g.userId === currentUser?.id);
+      if (myGroupIndex >= 0) {
+        setStoryViewerUserIndex(myGroupIndex);
+        setIsStoryViewerOpen(true);
+      }
+    } else {
+      setIsCreateStoryOpen(true);
+    }
+  };
 
   const location = useLocation();
 
@@ -967,6 +1027,15 @@ export default function Messages() {
   const [forwardingTargetIds, setForwardingTargetIds] = useState<string[]>([]);
   const [forwardSuccess, setForwardSuccess] = useState(false);
   const [isPollModalOpen, setIsPollModalOpen] = useState(false);
+
+  // Pending Media Upload State (Photo / Video preview before sending with optional caption)
+  interface PendingMediaUpload {
+    file: File;
+    type: 'image' | 'video';
+    previewUrl: string;
+  }
+  const [pendingMedia, setPendingMedia] = useState<PendingMediaUpload | null>(null);
+  const [isSendingPendingMedia, setIsSendingPendingMedia] = useState(false);
 
   // Deleting State (supports single and multiple)
   const [deletingMessages, setDeletingMessages] = useState<(MessageItem | GroupMessageItem)[]>([]);
@@ -1215,6 +1284,11 @@ export default function Messages() {
   const currentUserRef = useRef<User | null | undefined>(currentUser);
   currentUserRef.current = currentUser;
 
+  // In-memory cache for ultra-fast conversation switching (0ms latency)
+  const messagesCacheRef = useRef<Record<string, MessageItem[]>>({});
+  const groupMessagesCacheRef = useRef<Record<string, GroupMessageItem[]>>({});
+  const isSwitchingChatRef = useRef<boolean>(false);
+
   // Fetch Direct Conversations
   const fetchConversations = useCallback(async () => {
     try {
@@ -1252,7 +1326,11 @@ export default function Messages() {
     async (userId: string) => {
       try {
         const data = await messageService.getMessages(userId);
-        setMessages(data);
+        messagesCacheRef.current[userId] = data;
+        // Only update state if this user is still the active chat
+        if (activeUserRef.current?.id === userId) {
+          setMessages(data);
+        }
         refreshUnreadCount?.();
       } catch {}
     },
@@ -1262,7 +1340,11 @@ export default function Messages() {
   const fetchGroupMessagesList = useCallback(async (groupId: string) => {
     try {
       const data = await groupService.getGroupMessages(groupId);
-      setGroupMessages(data);
+      groupMessagesCacheRef.current[groupId] = data;
+      // Only update state if this group is still the active chat
+      if (activeGroupRef.current?.id === groupId) {
+        setGroupMessages(data);
+      }
     } catch {}
   }, []);
 
@@ -1355,10 +1437,12 @@ export default function Messages() {
   const handleConfirmClearChat = async () => {
     try {
       if (activeGroup) {
+        delete groupMessagesCacheRef.current[activeGroup.id];
         await groupService.clearGroupChat(activeGroup.id);
         setGroupMessages([]);
         showFeedbackToast('Group chat cleared', 'success');
       } else if (activeUser) {
+        delete messagesCacheRef.current[activeUser.id];
         await messageService.clearConversation(activeUser.id);
         setMessages([]);
         showFeedbackToast('Chat cleared', 'success');
@@ -1461,30 +1545,78 @@ export default function Messages() {
       return;
     }
     try {
-      showFeedbackToast('Uploading media...', 'info');
       const dataUrl = await readFileAsDataUrl(file);
+      setPendingMedia({
+        file,
+        type,
+        previewUrl: dataUrl,
+      });
+    } catch {
+      showFeedbackToast('Failed to load media preview', 'error');
+    }
+  };
+
+  const handleConfirmSendMedia = async (caption: string) => {
+    if (!pendingMedia || isSendingPendingMedia) return;
+    setIsSendingPendingMedia(true);
+    try {
+      const { file, type, previewUrl } = pendingMedia;
       if (activeGroup) {
-        const sent = await groupService.sendGroupMessage(activeGroup.id, '', {
+        const sent = await groupService.sendGroupMessage(activeGroup.id, caption, {
           messageType: type,
-          mediaUrl: dataUrl,
+          mediaUrl: previewUrl,
           fileName: file.name,
           fileSize: file.size,
         });
+        groupMessagesCacheRef.current[activeGroup.id] = [
+          ...(groupMessagesCacheRef.current[activeGroup.id] || []),
+          sent,
+        ];
         setGroupMessages((prev) => [...prev, sent]);
         fetchGroups();
       } else if (activeUser) {
-        const sent = await messageService.sendMessage(activeUser.id, '', {
+        const sent = await messageService.sendMessage(activeUser.id, caption, {
           messageType: type,
-          mediaUrl: dataUrl,
+          mediaUrl: previewUrl,
           fileName: file.name,
           fileSize: file.size,
         });
+        messagesCacheRef.current[activeUser.id] = [
+          ...(messagesCacheRef.current[activeUser.id] || []),
+          sent,
+        ];
         setMessages((prev) => [...prev, sent]);
         fetchConversations();
       }
-      showFeedbackToast('Media sent', 'success');
+      showFeedbackToast(type === 'image' ? 'Photo sent' : 'Video sent', 'success');
+      setPendingMedia(null);
     } catch {
       showFeedbackToast('Failed to send media', 'error');
+    } finally {
+      setIsSendingPendingMedia(false);
+    }
+  };
+
+  const handleChatPaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleSelectMedia(file, 'image');
+          return;
+        }
+      } else if (item.type.startsWith('video/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleSelectMedia(file, 'video');
+          return;
+        }
+      }
     }
   };
 
@@ -1503,6 +1635,10 @@ export default function Messages() {
           fileName: file.name,
           fileSize: file.size,
         });
+        groupMessagesCacheRef.current[activeGroup.id] = [
+          ...(groupMessagesCacheRef.current[activeGroup.id] || []),
+          sent,
+        ];
         setGroupMessages((prev) => [...prev, sent]);
         fetchGroups();
       } else if (activeUser) {
@@ -1512,6 +1648,10 @@ export default function Messages() {
           fileName: file.name,
           fileSize: file.size,
         });
+        messagesCacheRef.current[activeUser.id] = [
+          ...(messagesCacheRef.current[activeUser.id] || []),
+          sent,
+        ];
         setMessages((prev) => [...prev, sent]);
         fetchConversations();
       }
@@ -1528,6 +1668,10 @@ export default function Messages() {
           messageType: 'poll',
           poll: { question, options, duration: timer || undefined },
         });
+        groupMessagesCacheRef.current[activeGroup.id] = [
+          ...(groupMessagesCacheRef.current[activeGroup.id] || []),
+          sent,
+        ];
         setGroupMessages((prev) => [...prev, sent]);
         fetchGroups();
       } else if (activeUser) {
@@ -1535,6 +1679,10 @@ export default function Messages() {
           messageType: 'poll',
           poll: { question, options, duration: timer || undefined },
         });
+        messagesCacheRef.current[activeUser.id] = [
+          ...(messagesCacheRef.current[activeUser.id] || []),
+          sent,
+        ];
         setMessages((prev) => [...prev, sent]);
         fetchConversations();
       }
@@ -1548,11 +1696,21 @@ export default function Messages() {
     try {
       if (activeGroup) {
         const res = await groupService.votePoll(activeGroup.id, messageId, optionId);
+        if (groupMessagesCacheRef.current[activeGroup.id]) {
+          groupMessagesCacheRef.current[activeGroup.id] = groupMessagesCacheRef.current[
+            activeGroup.id
+          ].map((m) => (m.id === messageId ? { ...m, poll: res.poll } : m));
+        }
         setGroupMessages((prev) =>
           prev.map((m) => (m.id === messageId ? { ...m, poll: res.poll } : m))
         );
-      } else {
+      } else if (activeUser) {
         const res = await messageService.votePoll(messageId, optionId);
+        if (messagesCacheRef.current[activeUser.id]) {
+          messagesCacheRef.current[activeUser.id] = messagesCacheRef.current[
+            activeUser.id
+          ].map((m) => (m.id === messageId ? { ...m, poll: res.poll } : m));
+        }
         setMessages((prev) =>
           prev.map((m) => (m.id === messageId ? { ...m, poll: res.poll } : m))
         );
@@ -1571,6 +1729,10 @@ export default function Messages() {
           audioUrl,
           audioDuration: duration,
         });
+        groupMessagesCacheRef.current[activeGroup.id] = [
+          ...(groupMessagesCacheRef.current[activeGroup.id] || []),
+          sent,
+        ];
         setGroupMessages((prev) => [...prev, sent]);
         fetchGroups();
       } else if (activeUser) {
@@ -1579,6 +1741,10 @@ export default function Messages() {
           audioUrl,
           audioDuration: duration,
         });
+        messagesCacheRef.current[activeUser.id] = [
+          ...(messagesCacheRef.current[activeUser.id] || []),
+          sent,
+        ];
         setMessages((prev) => [...prev, sent]);
         fetchConversations();
       }
@@ -1599,8 +1765,16 @@ export default function Messages() {
   useEffect(() => {
     if (targetGroupParam) {
       // 1. Group Chat selected
+      if (activeGroupRef.current?.id === targetGroupParam) {
+        return; // Already selected by selectGroup, skip duplicate work
+      }
+
+      isSwitchingChatRef.current = true;
       setActiveUser(null);
       setMessages([]);
+
+      const cached = groupMessagesCacheRef.current[targetGroupParam];
+      setGroupMessages(cached ? [...cached] : []);
 
       const existingGroup = groupsRef.current.find((g) => g.id === targetGroupParam);
       if (existingGroup) {
@@ -1644,13 +1818,23 @@ export default function Messages() {
       setActiveGroup(null);
       setActiveUser(null);
       setGroupMessages([]);
+      setChatTab('all');
     } else if (targetUserParam) {
       // 2. Direct Chat selected
+      const clean = targetUserParam.toLowerCase();
+      if (
+        activeUserRef.current &&
+        (activeUserRef.current.username.toLowerCase() === clean ||
+          activeUserRef.current.id.toLowerCase() === clean)
+      ) {
+        return; // Already selected by selectUser, skip redundant work
+      }
+
+      isSwitchingChatRef.current = true;
       setIsGlobalActive(false);
       setActiveGroup(null);
       setGroupMessages([]);
 
-      const clean = targetUserParam.toLowerCase();
       const existingConv = conversationsRef.current.find(
         (c) =>
           c.user.username.toLowerCase() === clean ||
@@ -1659,6 +1843,8 @@ export default function Messages() {
 
       if (existingConv) {
         setActiveUser(existingConv.user);
+        const cached = messagesCacheRef.current[existingConv.user.id];
+        setMessages(cached ? [...cached] : []);
         fetchMessages(existingConv.user.id);
         if (currentUser?.id) {
           getSocket().emit('mark_as_read', {
@@ -1681,6 +1867,8 @@ export default function Messages() {
           .then((u) => {
             if (u) {
               setActiveUser(u);
+              const cached = messagesCacheRef.current[u.id];
+              setMessages(cached ? [...cached] : []);
               fetchMessages(u.id);
               if (currentUser?.id) {
                 getSocket().emit('mark_as_read', {
@@ -1713,6 +1901,7 @@ export default function Messages() {
     fetchGroupMessagesList,
     currentUser?.id,
     refreshUnreadCount,
+    searchParams,
   ]);
 
   // Socket event subscriptions
@@ -1723,6 +1912,14 @@ export default function Messages() {
     const handleNewMessage = (msg: MessageItem) => {
       const curUser = activeUserRef.current;
       const curId = currentUserRef.current?.id;
+      const partnerId = msg.senderId === curId ? msg.receiverId : msg.senderId;
+
+      if (partnerId) {
+        const cached = messagesCacheRef.current[partnerId] || [];
+        if (!cached.some((m) => m.id === msg.id)) {
+          messagesCacheRef.current[partnerId] = [...cached, msg];
+        }
+      }
 
       if (
         curUser &&
@@ -1776,6 +1973,12 @@ export default function Messages() {
       const curUser = activeUserRef.current;
       const curId = currentUserRef.current?.id;
 
+      if (messagesCacheRef.current[partnerId]) {
+        messagesCacheRef.current[partnerId] = messagesCacheRef.current[partnerId].map((m) =>
+          m.senderId === curId ? { ...m, isRead: true, status: 'read' } : m
+        );
+      }
+
       if (curUser && readerId === curUser.id) {
         setMessages((prev) =>
           prev.map((m) =>
@@ -1805,6 +2008,15 @@ export default function Messages() {
       const curUser = activeUserRef.current;
       const curId = currentUserRef.current?.id;
 
+      if (messagesCacheRef.current[receiverId]) {
+        messagesCacheRef.current[receiverId] = messagesCacheRef.current[receiverId].map((m) => {
+          if (m.senderId === curId && messageIds.includes(m.id) && m.status === 'sent') {
+            return { ...m, status: 'delivered' };
+          }
+          return m;
+        });
+      }
+
       if (curUser && receiverId === curUser.id) {
         setMessages((prev) =>
           prev.map((m) => {
@@ -1818,6 +2030,13 @@ export default function Messages() {
     };
 
     const handleMessageEdited = (edited: MessageItem) => {
+      const curId = currentUserRef.current?.id;
+      const partnerId = edited.senderId === curId ? edited.receiverId : edited.senderId;
+      if (partnerId && messagesCacheRef.current[partnerId]) {
+        messagesCacheRef.current[partnerId] = messagesCacheRef.current[partnerId].map((m) =>
+          m.id === edited.id ? { ...m, ...edited } : m
+        );
+      }
       setMessages((prev) =>
         prev.map((m) => (m.id === edited.id ? { ...m, ...edited } : m))
       );
@@ -1830,6 +2049,21 @@ export default function Messages() {
       messageId: string;
       content: string;
     }) => {
+      Object.keys(messagesCacheRef.current).forEach((key) => {
+        messagesCacheRef.current[key] = messagesCacheRef.current[key].map((m) =>
+          m.id === messageId
+            ? {
+                ...m,
+                isDeletedForEveryone: true,
+                content,
+                isPinned: false,
+                pinnedAt: undefined,
+                pinnedBy: undefined,
+                starredBy: [],
+              }
+            : m
+        );
+      });
       setMessages((prev) =>
         prev.map((m) =>
           m.id === messageId
@@ -1889,6 +2123,11 @@ export default function Messages() {
       const curGroup = activeGroupRef.current;
       const curId = currentUserRef.current?.id;
 
+      const cached = groupMessagesCacheRef.current[msg.groupId] || [];
+      if (!cached.some((m) => m.id === msg.id)) {
+        groupMessagesCacheRef.current[msg.groupId] = [...cached, msg];
+      }
+
       if (curGroup && curGroup.id === msg.groupId) {
         setGroupMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
@@ -1921,6 +2160,11 @@ export default function Messages() {
     };
 
     const handleGroupMessageEdited = (edited: GroupMessageItem) => {
+      if (groupMessagesCacheRef.current[edited.groupId]) {
+        groupMessagesCacheRef.current[edited.groupId] = groupMessagesCacheRef.current[
+          edited.groupId
+        ].map((m) => (m.id === edited.id ? { ...m, ...edited } : m));
+      }
       const curGroup = activeGroupRef.current;
       if (curGroup && curGroup.id === edited.groupId) {
         setGroupMessages((prev) =>
@@ -1938,6 +2182,23 @@ export default function Messages() {
       messageId: string;
       isDeletedForEveryone: boolean;
     }) => {
+      if (groupMessagesCacheRef.current[groupId]) {
+        groupMessagesCacheRef.current[groupId] = groupMessagesCacheRef.current[groupId].map((m) =>
+          m.id === messageId
+            ? isDeletedForEveryone
+              ? {
+                  ...m,
+                  isDeletedForEveryone: true,
+                  content: 'This message was deleted',
+                  isPinned: false,
+                  pinnedAt: undefined,
+                  pinnedBy: undefined,
+                  starredBy: [],
+                }
+              : m
+            : m
+        );
+      }
       const curGroup = activeGroupRef.current;
       if (curGroup && curGroup.id === groupId) {
         setGroupMessages((prev) =>
@@ -2077,6 +2338,7 @@ export default function Messages() {
     };
 
     const handleChatCleared = ({ partnerId }: { userId: string; partnerId: string }) => {
+      delete messagesCacheRef.current[partnerId];
       if (activeUserRef.current?.id === partnerId) {
         setMessages([]);
       }
@@ -2084,6 +2346,7 @@ export default function Messages() {
     };
 
     const handleGroupChatCleared = ({ groupId }: { groupId: string }) => {
+      delete groupMessagesCacheRef.current[groupId];
       if (activeGroupRef.current?.id === groupId) {
         setGroupMessages([]);
       }
@@ -2151,15 +2414,22 @@ export default function Messages() {
     navigate,
   ]);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages (instant jump when switching chats, smooth when chatting)
   useEffect(() => {
     if (deduplicatedMessages.length > 0 || deduplicatedGroupMessages.length > 0) {
-      endRef.current?.scrollIntoView({ behavior: 'smooth' });
+      if (isSwitchingChatRef.current) {
+        endRef.current?.scrollIntoView({ behavior: 'auto' });
+        isSwitchingChatRef.current = false;
+      } else {
+        endRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   }, [deduplicatedMessages, deduplicatedGroupMessages]);
 
-  // Select Direct Contact
+  // Select Direct Contact (instant 0ms response)
   const selectUser = (u: UserProfileResponse) => {
+    if (activeUserRef.current?.id === u.id) return;
+    isSwitchingChatRef.current = true;
     setShowEmojiPicker(false);
     setIsGlobalActive(false);
     setIsHeaderMenuOpen(false);
@@ -2174,14 +2444,35 @@ export default function Messages() {
     setIsSelectionMode(false);
     setSelectedMessageIds(new Set());
 
+    // Instantly show cached messages (no blank screen, no waiting for HTTP roundtrip)
+    const cached = messagesCacheRef.current[u.id];
+    setMessages(cached ? [...cached] : []);
+
     setConversations((prev) =>
       prev.map((c) => (c.user.id === u.id ? { ...c, unreadCount: 0 } : c))
     );
+
+    // Fetch latest in background to update cache & stream
+    fetchMessages(u.id);
+
+    if (currentUser?.id) {
+      getSocket().emit('mark_as_read', {
+        readerId: currentUser.id,
+        partnerId: u.id,
+      });
+    }
+    messageService
+      .markMessagesAsRead(u.id)
+      .then(() => refreshUnreadCount?.())
+      .catch(() => {});
+
     navigate(`/messages/${encodeURIComponent(u.username)}`);
   };
 
-  // Select Group Chat
+  // Select Group Chat (instant 0ms response)
   const selectGroup = (g: GroupItem) => {
+    if (activeGroupRef.current?.id === g.id) return;
+    isSwitchingChatRef.current = true;
     setShowEmojiPicker(false);
     setIsGlobalActive(false);
     setIsHeaderMenuOpen(false);
@@ -2196,9 +2487,18 @@ export default function Messages() {
     setIsSelectionMode(false);
     setSelectedMessageIds(new Set());
 
+    // Instantly show cached group messages
+    const cached = groupMessagesCacheRef.current[g.id];
+    setGroupMessages(cached ? [...cached] : []);
+
     setGroups((prev) =>
       prev.map((item) => (item.id === g.id ? { ...item, unreadCount: 0 } : item))
     );
+
+    getSocket().emit('join_group', g.id);
+    fetchGroupMessagesList(g.id);
+    groupService.markGroupAsRead(g.id).catch(() => {});
+
     navigate(`/messages?group=${encodeURIComponent(g.id)}`);
   };
 
@@ -2215,6 +2515,7 @@ export default function Messages() {
     setEditingGroupMsg(null);
     setIsSelectionMode(false);
     setSelectedMessageIds(new Set());
+    setChatTab('all');
     navigate('/messages/global');
   };
 
@@ -2361,6 +2662,11 @@ export default function Messages() {
             editingGroupMsg.id,
             content
           );
+          if (groupMessagesCacheRef.current[activeGroup.id]) {
+            groupMessagesCacheRef.current[activeGroup.id] = groupMessagesCacheRef.current[
+              activeGroup.id
+            ].map((m) => (m.id === updated.id ? { ...m, ...updated } : m));
+          }
           setGroupMessages((prev) =>
             prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m))
           );
@@ -2385,6 +2691,10 @@ export default function Messages() {
           const sent = await groupService.sendGroupMessage(activeGroup.id, content, {
             replyTo: replyInfo,
           });
+          groupMessagesCacheRef.current[activeGroup.id] = [
+            ...(groupMessagesCacheRef.current[activeGroup.id] || []),
+            sent,
+          ];
           setGroupMessages((prev) => {
             if (prev.some((m) => m.id === sent.id)) return prev;
             return [...prev, sent];
@@ -2396,6 +2706,11 @@ export default function Messages() {
         // Direct Send / Edit / Reply
         if (editingMessage) {
           const updated = await messageService.editMessage(editingMessage.id, content);
+          if (messagesCacheRef.current[activeUser.id]) {
+            messagesCacheRef.current[activeUser.id] = messagesCacheRef.current[
+              activeUser.id
+            ].map((m) => (m.id === updated.id ? { ...m, ...updated } : m));
+          }
           setMessages((prev) =>
             prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m))
           );
@@ -2419,6 +2734,10 @@ export default function Messages() {
             replyTo: replyInfo,
           });
 
+          messagesCacheRef.current[activeUser.id] = [
+            ...(messagesCacheRef.current[activeUser.id] || []),
+            sent,
+          ];
           setMessages((prev) => {
             if (prev.some((m) => m.id === sent.id)) return prev;
             return [...prev, sent];
@@ -2766,51 +3085,151 @@ export default function Messages() {
         }`}
       >
         <div className="p-4 sm:p-5 border-b border-slate-100 shrink-0">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Messages</h1>
+          {/* Header Top Row */}
+          <div className="flex items-center justify-between mb-3.5">
+            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight font-sans">
+              Messages
+            </h1>
+
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={selectGlobalChat}
-                className={`inline-flex items-center justify-center p-1.5 rounded-xl transition-all cursor-pointer ${
+                className={`inline-flex items-center justify-center p-2 rounded-xl transition-all cursor-pointer ${
                   isGlobalActive
                     ? 'bg-purple-600 text-white shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                    : 'text-slate-600 hover:text-purple-600 hover:bg-purple-50'
                 }`}
-                title="Global Chat"
+                title="Public Global Chat"
+                aria-label="Global Chat"
               > 
-                <HiOutlineGlobeAlt className="w-4 h-4" />
+                <HiOutlineGlobeAlt className="w-4.5 h-4.5 stroke-[1.8]" />
               </button>
-            </div>
-            <div className="flex items-center gap-2">
+
+              <button
+                type="button"
+                onClick={() => navigate('/search')}
+                className="inline-flex items-center justify-center p-2 rounded-xl text-slate-600 hover:text-purple-600 hover:bg-purple-50 transition-all cursor-pointer"
+                title="Discover new contacts"
+                aria-label="Search and discover contacts"
+              >
+                <HiOutlineMagnifyingGlass className="w-4.5 h-4.5 stroke-[2]" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => setIsCreateGroupOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition-transform active:scale-95 cursor-pointer"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs hover:shadow transition-all active:scale-95 cursor-pointer"
                 title="Create a new Group Chat"
               >
-                <HiOutlinePlus className="w-3.5 h-3.5" />
+                <HiOutlinePlus className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>New Group</span>
-              </button>
-              <button
-                onClick={() => navigate('/search')}
-                className="text-xs sm:text-sm font-semibold text-purple-600 hover:text-purple-700 cursor-pointer px-1 py-1"
-              >
-                Search
               </button>
             </div>
           </div>
 
           {/* Search bar */}
-          <div className="relative flex items-center mb-3">
-            <HiOutlineMagnifyingGlass className="absolute left-3 w-4 h-4 text-slate-400" />
+          <div className="relative flex items-center mb-3 group">
+            <HiOutlineMagnifyingGlass className="absolute left-3 w-4 h-4 text-slate-400 group-focus-within:text-purple-600 transition-colors pointer-events-none" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter chats or groups..."
-              className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 transition-all"
+              className="w-full pl-9 pr-8 py-2 bg-slate-50/80 hover:bg-slate-100/70 border border-slate-200/80 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-400 focus:bg-white focus:ring-2 focus:ring-purple-500/10 transition-all shadow-2xs"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                aria-label="Clear search"
+              >
+                <HiOutlineXMark className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Stories in Messages Tray */}
+          <div className="mb-3.5 flex items-center gap-3 overflow-x-auto pb-2 pt-0.5 px-0.5 scrollbar-none select-none">
+            {/* Our Profile Story Item */}
+            <div
+              onClick={handleOpenOurStory}
+              className="flex flex-col items-center gap-1 shrink-0 cursor-pointer group"
+            >
+              <div
+                className={`relative w-12 h-12 rounded-full p-0.5 transition-transform group-hover:scale-105 active:scale-95 ${
+                  hasOwnStory
+                    ? 'bg-gradient-to-tr from-purple-600 to-pink-500 shadow-xs'
+                    : 'border-2 border-dashed border-slate-300 hover:border-purple-400 bg-slate-50'
+                }`}
+              >
+                <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5">
+                  {currentUser?.avatarUrl ? (
+                    <img
+                      src={currentUser.avatarUrl}
+                      alt="You"
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center">
+                      {currentUser?.fullName?.[0] || currentUser?.username?.[0] || 'U'}
+                    </div>
+                  )}
+                </div>
+
+                {!hasOwnStory && (
+                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-purple-600 text-white flex items-center justify-center ring-2 ring-white shadow-2xs">
+                    <HiOutlinePlus className="w-2.5 h-2.5 stroke-[3]" />
+                  </div>
+                )}
+              </div>
+              <span className="text-[10px] font-semibold text-slate-700 truncate max-w-[54px]">
+                {hasOwnStory ? 'Your Story' : 'Add Story'}
+              </span>
+            </div>
+
+            {/* Other contacts' stories */}
+            {userStoryGroups
+              .filter((g) => g.userId !== currentUser?.id)
+              .map((group) => {
+                const targetIdx = userStoryGroups.findIndex((g) => g.userId === group.userId);
+                return (
+                  <div
+                    key={group.userId}
+                    onClick={() => {
+                      setStoryViewerUserIndex(targetIdx);
+                      setIsStoryViewerOpen(true);
+                    }}
+                    className="flex flex-col items-center gap-1 shrink-0 cursor-pointer group"
+                  >
+                    <div
+                      className={`w-12 h-12 rounded-full p-0.5 transition-transform group-hover:scale-105 active:scale-95 ${
+                        group.hasUnviewed
+                          ? 'bg-gradient-to-tr from-purple-600 to-pink-500 shadow-xs'
+                          : 'bg-slate-200'
+                      }`}
+                    >
+                      <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5">
+                        {group.user.avatarUrl ? (
+                          <img
+                            src={group.user.avatarUrl}
+                            alt={group.user.fullName}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center">
+                            {group.user.fullName?.[0] || 'U'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-700 truncate max-w-[54px]">
+                      {group.user.fullName.split(' ')[0]}
+                    </span>
+                  </div>
+                );
+              })}
           </div>
 
           {/* Category Tabs: All / Direct / Groups + Favs / Archived */}
@@ -3025,24 +3444,26 @@ export default function Messages() {
                       </div>
                     </div>
 
-                    <ChatActionDropdown
-                      isOpen={openChatMenuId === g.id}
-                      onClose={() => setOpenChatMenuId(null)}
-                      isPinned={isPinned}
-                      isArchived={isArchived}
-                      isMuted={isMuted}
-                      isUnread={hasUnread}
-                      isFavourite={isFavourite}
-                      onTogglePin={() => togglePinChat(g.id)}
-                      onToggleArchive={() => toggleArchiveChat(g.id)}
-                      onToggleMute={() => toggleMuteChat(g.id)}
-                      onToggleUnread={() => toggleUnreadChat(g.id)}
-                      onToggleFavourite={() => toggleFavouriteChat(g.id)}
-                      onClearChat={() => {
-                        setActiveGroup(g);
-                        setIsClearModalOpen(true);
-                      }}
-                    />
+                    {openChatMenuId === g.id && (
+                      <ChatActionDropdown
+                        isOpen={true}
+                        onClose={() => setOpenChatMenuId(null)}
+                        isPinned={isPinned}
+                        isArchived={isArchived}
+                        isMuted={isMuted}
+                        isUnread={hasUnread}
+                        isFavourite={isFavourite}
+                        onTogglePin={() => togglePinChat(g.id)}
+                        onToggleArchive={() => toggleArchiveChat(g.id)}
+                        onToggleMute={() => toggleMuteChat(g.id)}
+                        onToggleUnread={() => toggleUnreadChat(g.id)}
+                        onToggleFavourite={() => toggleFavouriteChat(g.id)}
+                        onClearChat={() => {
+                          setActiveGroup(g);
+                          setIsClearModalOpen(true);
+                        }}
+                      />
+                    )}
                   </div>
                 );
               })
@@ -3135,26 +3556,28 @@ export default function Messages() {
                       </div>
                     </div>
 
-                    <ChatActionDropdown
-                      isOpen={openChatMenuId === c.user.id}
-                      onClose={() => setOpenChatMenuId(null)}
-                      isPinned={isPinned}
-                      isArchived={isArchived}
-                      isMuted={isMuted}
-                      isUnread={hasUnread}
-                      isFavourite={isFavourite}
-                      isBlocked={isBlocked}
-                      onTogglePin={() => togglePinChat(c.user.id)}
-                      onToggleArchive={() => toggleArchiveChat(c.user.id)}
-                      onToggleMute={() => toggleMuteChat(c.user.id)}
-                      onToggleUnread={() => toggleUnreadChat(c.user.id)}
-                      onToggleFavourite={() => toggleFavouriteChat(c.user.id)}
-                      onToggleBlock={() => toggleBlockUser(c.user.id)}
-                      onClearChat={() => {
-                        setActiveUser(c.user);
-                        setIsClearModalOpen(true);
-                      }}
-                    />
+                    {openChatMenuId === c.user.id && (
+                      <ChatActionDropdown
+                        isOpen={true}
+                        onClose={() => setOpenChatMenuId(null)}
+                        isPinned={isPinned}
+                        isArchived={isArchived}
+                        isMuted={isMuted}
+                        isUnread={hasUnread}
+                        isFavourite={isFavourite}
+                        isBlocked={isBlocked}
+                        onTogglePin={() => togglePinChat(c.user.id)}
+                        onToggleArchive={() => toggleArchiveChat(c.user.id)}
+                        onToggleMute={() => toggleMuteChat(c.user.id)}
+                        onToggleUnread={() => toggleUnreadChat(c.user.id)}
+                        onToggleFavourite={() => toggleFavouriteChat(c.user.id)}
+                        onToggleBlock={() => toggleBlockUser(c.user.id)}
+                        onClearChat={() => {
+                          setActiveUser(c.user);
+                          setIsClearModalOpen(true);
+                        }}
+                      />
+                    )}
                   </div>
                 );
               })
@@ -3217,9 +3640,9 @@ export default function Messages() {
                         )}
                       </p>
 
-                      <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded-md shrink-0 flex items-center gap-1">
+                      <span className="text-[10px] font-semibold text-purple-600 bg-purple-50 border border-purple-200/60 px-2 py-0.5 rounded-md shrink-0 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        {globalStats.onlineCount} online
+                        Public
                       </span>
                     </div>
                   </div>
@@ -3318,24 +3741,26 @@ export default function Messages() {
                         </div>
                       </div>
 
-                      <ChatActionDropdown
-                        isOpen={openChatMenuId === g.id}
-                        onClose={() => setOpenChatMenuId(null)}
-                        isPinned={isPinned}
-                        isArchived={isArchived}
-                        isMuted={isMuted}
-                        isUnread={hasUnread}
-                        isFavourite={isFavourite}
-                        onTogglePin={() => togglePinChat(g.id)}
-                        onToggleArchive={() => toggleArchiveChat(g.id)}
-                        onToggleMute={() => toggleMuteChat(g.id)}
-                        onToggleUnread={() => toggleUnreadChat(g.id)}
-                        onToggleFavourite={() => toggleFavouriteChat(g.id)}
-                        onClearChat={() => {
-                          setActiveGroup(g);
-                          setIsClearModalOpen(true);
-                        }}
-                      />
+                      {openChatMenuId === g.id && (
+                        <ChatActionDropdown
+                          isOpen={true}
+                          onClose={() => setOpenChatMenuId(null)}
+                          isPinned={isPinned}
+                          isArchived={isArchived}
+                          isMuted={isMuted}
+                          isUnread={hasUnread}
+                          isFavourite={isFavourite}
+                          onTogglePin={() => togglePinChat(g.id)}
+                          onToggleArchive={() => toggleArchiveChat(g.id)}
+                          onToggleMute={() => toggleMuteChat(g.id)}
+                          onToggleUnread={() => toggleUnreadChat(g.id)}
+                          onToggleFavourite={() => toggleFavouriteChat(g.id)}
+                          onClearChat={() => {
+                            setActiveGroup(g);
+                            setIsClearModalOpen(true);
+                          }}
+                        />
+                      )}
                     </div>
                   );
                 }
@@ -3422,26 +3847,28 @@ export default function Messages() {
                       </div>
                     </div>
 
-                    <ChatActionDropdown
-                      isOpen={openChatMenuId === c.user.id}
-                      onClose={() => setOpenChatMenuId(null)}
-                      isPinned={isPinned}
-                      isArchived={isArchived}
-                      isMuted={isMuted}
-                      isUnread={hasUnread}
-                      isFavourite={isFavourite}
-                      isBlocked={isBlocked}
-                      onTogglePin={() => togglePinChat(c.user.id)}
-                      onToggleArchive={() => toggleArchiveChat(c.user.id)}
-                      onToggleMute={() => toggleMuteChat(c.user.id)}
-                      onToggleUnread={() => toggleUnreadChat(c.user.id)}
-                      onToggleFavourite={() => toggleFavouriteChat(c.user.id)}
-                      onToggleBlock={() => toggleBlockUser(c.user.id)}
-                      onClearChat={() => {
-                        setActiveUser(c.user);
-                        setIsClearModalOpen(true);
-                      }}
-                    />
+                    {openChatMenuId === c.user.id && (
+                      <ChatActionDropdown
+                        isOpen={true}
+                        onClose={() => setOpenChatMenuId(null)}
+                        isPinned={isPinned}
+                        isArchived={isArchived}
+                        isMuted={isMuted}
+                        isUnread={hasUnread}
+                        isFavourite={isFavourite}
+                        isBlocked={isBlocked}
+                        onTogglePin={() => togglePinChat(c.user.id)}
+                        onToggleArchive={() => toggleArchiveChat(c.user.id)}
+                        onToggleMute={() => toggleMuteChat(c.user.id)}
+                        onToggleUnread={() => toggleUnreadChat(c.user.id)}
+                        onToggleFavourite={() => toggleFavouriteChat(c.user.id)}
+                        onToggleBlock={() => toggleBlockUser(c.user.id)}
+                        onClearChat={() => {
+                          setActiveUser(c.user);
+                          setIsClearModalOpen(true);
+                        }}
+                      />
+                    )}
                   </div>
                 );
               })
@@ -3659,7 +4086,7 @@ export default function Messages() {
                             toggleSelectMessage(m.id);
                           }
                         }}
-                        className={`group flex items-center gap-2 transition-all duration-200 rounded-2xl p-1 ${
+                        className={`group flex items-center gap-2 transition-colors duration-150 rounded-2xl p-1 ${
                           isSelectionMode && !m.isDeletedForEveryone
                             ? 'cursor-pointer hover:bg-slate-100/60'
                             : ''
@@ -3689,7 +4116,7 @@ export default function Messages() {
                         )}
 
                         <div
-                          className={`flex-1 flex items-end gap-2 transition-all duration-300 ${
+                          className={`flex-1 flex items-end gap-2 ${
                             isMe ? 'justify-end' : 'justify-start'
                           }`}
                         >
@@ -4258,6 +4685,7 @@ export default function Messages() {
                       type="text"
                       value={text}
                       onChange={(e) => handleInputChange(e.target.value)}
+                      onPaste={handleChatPaste}
                       placeholder={`Message #${activeGroup.name}...`}
                       className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
                     />
@@ -4481,7 +4909,7 @@ export default function Messages() {
                             toggleSelectMessage(m.id);
                           }
                         }}
-                        className={`group flex items-center gap-2 transition-all duration-200 rounded-2xl p-1 ${
+                        className={`group flex items-center gap-2 transition-colors duration-150 rounded-2xl p-1 ${
                           isSelectionMode && !m.isDeletedForEveryone
                             ? 'cursor-pointer hover:bg-slate-100/60'
                             : ''
@@ -4511,7 +4939,7 @@ export default function Messages() {
                         )}
 
                         <div
-                          className={`flex-1 flex items-end gap-2 transition-all duration-300 ${
+                          className={`flex-1 flex items-end gap-2 ${
                             isMe ? 'justify-end' : 'justify-start'
                           }`}
                         >
@@ -5081,6 +5509,7 @@ export default function Messages() {
                       type="text"
                       value={text}
                       onChange={(e) => handleInputChange(e.target.value)}
+                      onPaste={handleChatPaste}
                       placeholder="Type a message..."
                       className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
                     />
@@ -5464,6 +5893,62 @@ export default function Messages() {
         onClose={() => setIsPollModalOpen(false)}
         onSubmit={handleCreatePoll}
       />
+
+      {/* Story Viewer Modal */}
+      {isStoryViewerOpen && (
+        <StoryViewerModal
+          isOpen={isStoryViewerOpen}
+          onClose={() => setIsStoryViewerOpen(false)}
+          userStoryGroups={userStoryGroups}
+          initialUserIndex={storyViewerUserIndex}
+          initialStoryIndex={0}
+          currentUser={currentUser}
+          onStoryDeleted={() => fetchStories()}
+          onStoryViewed={() => {
+            fetchStories();
+          }}
+          showToast={(msg, type) => {
+            if (type === 'error') showError(msg);
+            else if (type === 'info') showInfo(msg);
+            else showSuccess(msg);
+          }}
+        />
+      )}
+
+      {/* Create Story Modal */}
+      <CreateStoryModal
+        isOpen={isCreateStoryOpen}
+        onClose={() => setIsCreateStoryOpen(false)}
+        currentUser={currentUser}
+        onStoryCreated={() => {
+          fetchStories();
+        }}
+        showToast={(msg, type) => {
+          if (type === 'error') showError(msg);
+          else if (type === 'info') showInfo(msg);
+          else showSuccess(msg);
+        }}
+      />
+
+      {/* Photo / Video Preview & Caption Modal before sending */}
+      {pendingMedia && (
+        <MediaUploadPreviewModal
+          isOpen={Boolean(pendingMedia)}
+          onClose={() => setPendingMedia(null)}
+          file={pendingMedia.file}
+          mediaType={pendingMedia.type}
+          previewUrl={pendingMedia.previewUrl}
+          recipientName={
+            activeGroup
+              ? activeGroup.name
+              : activeUser?.fullName || activeUser?.username || 'User'
+          }
+          recipientAvatar={activeGroup ? activeGroup.avatarUrl : activeUser?.avatarUrl}
+          isGroup={Boolean(activeGroup)}
+          onSend={handleConfirmSendMedia}
+          isSending={isSendingPendingMedia}
+        />
+      )}
     </div>
   );
 }
