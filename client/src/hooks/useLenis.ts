@@ -16,11 +16,19 @@ export function useLenis(options?: UseLenisOptions) {
       duration: options?.duration ?? 1.2,
       easing: options?.easing ?? ((t) => Math.min(1, 1.001 - Math.pow(2, -10 * t))),
       smoothWheel: options?.smoothWheel ?? true,
+      allowNestedScroll: true,
       prevent: (node: HTMLElement) => {
-        return Boolean(
-          node.hasAttribute?.('data-lenis-prevent') ||
-          node.closest?.('[data-lenis-prevent]')
-        );
+        try {
+          if (!node) return false;
+          return Boolean(
+            node.hasAttribute?.('data-lenis-prevent') ||
+            node.closest?.('[data-lenis-prevent]') ||
+            node.closest?.('.overflow-y-auto') ||
+            node.closest?.('.overflow-auto')
+          );
+        } catch {
+          return false;
+        }
       },
     });
 
