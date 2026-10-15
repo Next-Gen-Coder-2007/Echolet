@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import {
-  HiOutlineXMark,
-  HiOutlinePlus,
-  HiOutlineCheck,
   HiOutlineBookmark,
+  HiOutlineFolder,
+  HiOutlineFolderPlus,
+  HiOutlineCheck,
+  HiOutlinePlus,
+  HiOutlineExclamationCircle,
 } from 'react-icons/hi2';
 import Modal from './Modal';
 import type { BookmarkCollection } from '../services/collectionService';
 
-interface SaveToCollectionModalProps {
+export interface SaveToCollectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   collections: BookmarkCollection[];
@@ -28,19 +30,19 @@ export default function SaveToCollectionModal({
   itemTitle,
 }: SaveToCollectionModalProps) {
   const [selected, setSelected] = useState<string>(currentCollection || 'Default');
-  const [loading, setLoading] = useState(false);
+  const [loadingTarget, setLoadingTarget] = useState<string | null>(null);
   const [isCreatingInline, setIsCreatingInline] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [createError, setCreateError] = useState('');
 
   const handlePick = async (colName: string) => {
     setSelected(colName);
-    setLoading(true);
+    setLoadingTarget(colName);
     try {
       await onSelectCollection(colName);
       onClose();
-    } finally {
-      setLoading(false);
+    } catch {
+      setLoadingTarget(null);
     }
   };
 
@@ -54,7 +56,7 @@ export default function SaveToCollectionModal({
     }
 
     setCreateError('');
-    setLoading(true);
+    setLoadingTarget('__new__');
     try {
       if (onCreateCollectionInline) {
         await onCreateCollectionInline(cleanName);
@@ -67,98 +69,128 @@ export default function SaveToCollectionModal({
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         'Failed to create folder';
       setCreateError(msg);
-    } finally {
-      setLoading(false);
+      setLoadingTarget(null);
     }
   };
 
   if (!isOpen) return null;
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} size="sm" showCloseButton={false}>
-      <div className="p-5 select-none">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-800 flex items-center justify-center">
-              <HiOutlineBookmark className="w-4 h-4 stroke-[2]" />
-            </div>
-            <div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
-                Save to Folder
-              </h2>
-              {itemTitle && (
-                <p className="text-[11px] text-slate-400 line-clamp-1 max-w-[200px]">
-                  {itemTitle}
-                </p>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <HiOutlineXMark className="w-3.5 h-3.5" />
-          </button>
-        </div>
+  const isLoading = Boolean(loadingTarget);
 
-        {/* Collections List */}
-        <div className="mt-3.5 space-y-1.5 max-h-64 overflow-y-auto pr-1">
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="sm"
+      backdropVariant="blur"
+      icon={<HiOutlineBookmark className="w-5 h-5 text-indigo-600 stroke-[2.2]" />}
+      iconClassName="bg-indigo-50 text-indigo-600 border border-indigo-100/80 shadow-xs"
+      title={
+        <div className="flex items-center gap-2">
+          <span className="text-base font-bold text-slate-900">Save to Folder</span>
+          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+            Saved
+          </span>
+        </div>
+      }
+      description={
+        itemTitle ? (
+          <span className="truncate block max-w-[240px] sm:max-w-[280px]">
+            Organize: "{itemTitle}"
+          </span>
+        ) : (
+          'Choose a folder to organize your saved item'
+        )
+      }
+      showCloseButton={!isLoading}
+      closeButtonPosition="inside"
+    >
+      <div className="select-none space-y-3.5">
+        {createError && (
+          <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center gap-2">
+            <HiOutlineExclamationCircle className="w-4 h-4 text-rose-500 shrink-0" />
+            <span>{createError}</span>
+          </div>
+        )}
+
+        {/* Collections Scrollable List */}
+        <div className="space-y-2 max-h-64 sm:max-h-72 overflow-y-auto pr-1">
           {/* General / Default Option */}
           <button
             type="button"
-            disabled={loading}
+            disabled={isLoading}
             onClick={() => handlePick('Default')}
-            className={`w-full p-2.5 rounded-2xl flex items-center justify-between transition-all cursor-pointer border text-left ${
+            className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all cursor-pointer border text-left group ${
               selected === 'Default' || !selected
-                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200/80'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                : 'bg-slate-50/70 hover:bg-slate-100 text-slate-800 border-slate-200/80 hover:border-slate-300'
             }`}
           >
-            <div>
-              <p className="text-xs font-bold leading-tight">All Saved / General</p>
-              <p
-                className={`text-[10px] leading-tight ${
-                  selected === 'Default' || !selected ? 'text-slate-300' : 'text-slate-400'
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                  selected === 'Default' || !selected
+                    ? 'bg-white/15 text-white'
+                    : 'bg-white border border-slate-200 text-slate-700 shadow-2xs'
                 }`}
               >
-                Default folder
-              </p>
+                <HiOutlineBookmark className="w-4 h-4 stroke-[2]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-bold leading-tight truncate">
+                  All Saved
+                </p>
+                <p
+                  className={`text-[11px] leading-tight mt-0.5 ${
+                    selected === 'Default' || !selected ? 'text-slate-300' : 'text-slate-400'
+                  }`}
+                >
+                  Default general folder
+                </p>
+              </div>
             </div>
-            {(selected === 'Default' || !selected) && (
-              <HiOutlineCheck className="w-4 h-4 text-white stroke-[2.5]" />
-            )}
+
+            <div className="shrink-0 ml-2">
+              {loadingTarget === 'Default' ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : selected === 'Default' || !selected ? (
+                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                  <HiOutlineCheck className="w-3.5 h-3.5 text-white stroke-[3]" />
+                </div>
+              ) : null}
+            </div>
           </button>
 
           {/* User Custom Collections */}
           {collections.map((col) => {
             const isCurrent = selected === col.name;
+            const isItemLoading = loadingTarget === col.name;
+
             return (
               <button
                 key={col.id}
                 type="button"
-                disabled={loading}
+                disabled={isLoading}
                 onClick={() => handlePick(col.name)}
-                className={`w-full p-2.5 rounded-2xl flex items-center justify-between transition-all cursor-pointer border text-left ${
+                className={`w-full p-3 rounded-2xl flex items-center justify-between transition-all cursor-pointer border text-left group ${
                   isCurrent
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200/80'
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                    : 'bg-slate-50/70 hover:bg-slate-100 text-slate-800 border-slate-200/80 hover:border-slate-300'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  {col.color && (
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: col.color }}
-                    />
-                  )}
-                  <div>
-                    <p className="text-xs font-bold leading-tight truncate max-w-[190px]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-2xs shrink-0"
+                    style={{ backgroundColor: col.color || '#6366f1' }}
+                  >
+                    <HiOutlineFolder className="w-4 h-4 stroke-[2]" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm font-bold leading-tight truncate">
                       {col.name}
                     </p>
                     <p
-                      className={`text-[10px] leading-tight ${
+                      className={`text-[11px] leading-tight mt-0.5 ${
                         isCurrent ? 'text-slate-300' : 'text-slate-400'
                       }`}
                     >
@@ -166,36 +198,31 @@ export default function SaveToCollectionModal({
                     </p>
                   </div>
                 </div>
-                {isCurrent && <HiOutlineCheck className="w-4 h-4 text-white stroke-[2.5]" />}
+
+                <div className="shrink-0 ml-2">
+                  {isItemLoading ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : isCurrent ? (
+                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                      <HiOutlineCheck className="w-3.5 h-3.5 text-white stroke-[3]" />
+                    </div>
+                  ) : null}
+                </div>
               </button>
             );
           })}
         </div>
 
-        {/* Inline Create Folder Form */}
+        {/* Inline Create Folder Section */}
         {isCreatingInline ? (
-          <form onSubmit={handleCreateSubmit} className="mt-3.5 pt-3 border-t border-slate-100 space-y-2">
-            {createError && (
-              <p className="text-[11px] font-semibold text-rose-600">{createError}</p>
-            )}
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                placeholder="New folder name..."
-                maxLength={60}
-                autoFocus
-                required
-                className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-800 focus:bg-white transition-all font-medium"
-              />
-              <button
-                type="submit"
-                disabled={loading || !newFolderName.trim()}
-                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-black text-white shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-              >
-                {loading ? 'Adding...' : 'Create'}
-              </button>
+          <form
+            onSubmit={handleCreateSubmit}
+            className="pt-3 border-t border-slate-100 space-y-2.5"
+          >
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700">
+                New Folder Name
+              </label>
               <button
                 type="button"
                 onClick={() => {
@@ -203,30 +230,46 @@ export default function SaveToCollectionModal({
                   setNewFolderName('');
                   setCreateError('');
                 }}
-                className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 Cancel
               </button>
             </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Folder name..."
+                maxLength={60}
+                autoFocus
+                required
+                className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 focus:bg-white transition-all"
+              />
+              <button
+                type="submit"
+                disabled={isLoading || !newFolderName.trim()}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-black text-white shadow-2xs transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5"
+              >
+                {loadingTarget === '__new__' ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <HiOutlinePlus className="w-3.5 h-3.5 stroke-[2.5]" />
+                )}
+                <span>Save</span>
+              </button>
+            </div>
           </form>
         ) : (
-          /* Footer Actions */
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
             <button
               type="button"
+              disabled={isLoading}
               onClick={() => setIsCreatingInline(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-bold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/80 transition-colors cursor-pointer border border-dashed border-indigo-200 hover:border-indigo-300 w-full justify-center"
             >
-              <HiOutlinePlus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>New Folder</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              Done
+              <HiOutlineFolderPlus className="w-4 h-4 stroke-[2.2]" />
+              <span>Create New Folder</span>
             </button>
           </div>
         )}

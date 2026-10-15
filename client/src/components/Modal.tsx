@@ -31,6 +31,8 @@ export interface ModalProps {
   title?: React.ReactNode;
   description?: React.ReactNode;
   icon?: React.ReactNode;
+  iconClassName?: string;
+  card?: boolean;
   size?: ModalSize;
   backdropVariant?: BackdropVariant;
   backdropClassName?: string;
@@ -77,6 +79,8 @@ export default function Modal({
   title,
   description,
   icon,
+  iconClassName,
+  card,
   size = 'md',
   backdropVariant = 'glass',
   backdropClassName,
@@ -125,6 +129,10 @@ export default function Modal({
     : BACKDROP_STYLES[backdropVariant];
 
   const resolvedSizeClass = SIZE_STYLES[size];
+  const isCard =
+    card ??
+    ((title || description || (showCloseButton && closeButtonPosition === 'inside')) &&
+      !className.includes('bg-'));
 
   const content = (
     <div
@@ -157,21 +165,27 @@ export default function Modal({
         className={`relative z-10 w-full ${resolvedSizeClass} animate-modal-content transition-all ${className}`}
         style={style}
       >
-        {!className.includes('bg-') ? (
+        {isCard ? (
           <div className={`bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col ${contentClassName}`}>
-            {(title || description || icon) && (
+            {(title || (showCloseButton && closeButtonPosition === 'inside')) && (
               <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50">
                 <div className="flex items-center gap-3 min-w-0">
                   {icon && (
-                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0 ${iconClassName || 'bg-purple-100 text-purple-700'}`}>
                       {icon}
                     </div>
                   )}
                   <div className="min-w-0">
                     {title && (
-                      <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
-                        {title}
-                      </h3>
+                      typeof title === 'string' ? (
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
+                          {title}
+                        </h3>
+                      ) : (
+                        <div className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                          {title}
+                        </div>
+                      )
                     )}
                     {description && (
                       <p className="text-xs text-slate-500 truncate mt-0.5">
@@ -197,7 +211,7 @@ export default function Modal({
 
             <div
               data-lenis-prevent
-              className={`${title || description || icon ? 'p-4 sm:p-5' : ''} overflow-y-auto max-h-[82vh] touch-pan-y overscroll-contain`}
+              className="p-4 sm:p-5 overflow-y-auto max-h-[82vh] touch-pan-y overscroll-contain"
             >
               {children}
             </div>
