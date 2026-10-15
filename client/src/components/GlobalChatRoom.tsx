@@ -26,6 +26,7 @@ import ChatMediaAttachment from './ChatMediaAttachment';
 import ChatAttachmentMenu from './ChatAttachmentMenu';
 import CreateChatPollModal from './CreateChatPollModal';
 import ReelMessageCard from './ReelMessageCard';
+import PostMessageCard from './PostMessageCard';
 import StoryMessageCard from './StoryMessageCard';
 
 // Distinct sender colors identical to group messages
@@ -1035,6 +1036,22 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
                     ) : (msg.messageType === 'reel' || /\/reels\/[a-zA-Z0-9_-]+/i.test(msg.content || '')) ? (
                       <div>
                         <ReelMessageCard
+                          content={msg.content}
+                          mediaUrl={msg.mediaUrl}
+                          isMe={isMe}
+                        />
+                        <div className="flex items-center gap-1.5 ml-auto justify-end select-none pb-0.5 leading-none mt-1">
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(msg.createdAt).toLocaleTimeString([], {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (msg.messageType === 'post' || /\/post(?:s)?\/[a-zA-Z0-9_-]+/i.test(msg.content || '')) ? (
+                      <div>
+                        <PostMessageCard
                           content={msg.content}
                           mediaUrl={msg.mediaUrl}
                           isMe={isMe}

@@ -43,6 +43,7 @@ export interface GlobalMessageItem {
     | 'voice'
     | 'audio'
     | 'reel'
+    | 'post'
     | 'story_reply'
     | 'system';
   mediaUrl?: string;
@@ -94,6 +95,8 @@ export const globalChatService = {
         | 'poll'
         | 'voice'
         | 'audio'
+        | 'reel'
+        | 'post'
         | 'system';
       mediaUrl?: string;
       fileName?: string;

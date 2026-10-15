@@ -30,6 +30,7 @@ export class GlobalMessage {
     | 'voice'
     | 'audio'
     | 'reel'
+    | 'post'
     | 'system';
 
   @Column({ type: 'text', nullable: true })

@@ -15,9 +15,7 @@ import {
   HiOutlineCheckCircle,
   HiOutlineClipboardDocument,
   HiOutlineArrowDownTray,
-  HiOutlineSquares2X2,
   HiOutlineUserGroup,
-  HiOutlineInformationCircle,
   HiOutlinePlus,
   HiOutlineMicrophone,
   HiOutlinePlay,
@@ -52,12 +50,14 @@ import getSocket, { joinUserRoom } from '../services/socket';
 import { useMessage } from '../context/MessageContext';
 import CreateGroupModal from '../components/CreateGroupModal';
 import GroupInfoModal from '../components/GroupInfoModal';
+import ConversationDetailsView from '../components/ConversationDetailsView';
 import GlobalChatRoom from '../components/GlobalChatRoom';
 import ChatPollWidget from '../components/ChatPollWidget';
 import ChatMediaAttachment from '../components/ChatMediaAttachment';
 import ChatAttachmentMenu from '../components/ChatAttachmentMenu';
 import CreateChatPollModal from '../components/CreateChatPollModal';
 import ReelMessageCard from '../components/ReelMessageCard';
+import PostMessageCard from '../components/PostMessageCard';
 import StoryMessageCard from '../components/StoryMessageCard';
 import StoryViewerModal from '../components/StoryViewerModal';
 import CreateStoryModal from '../components/CreateStoryModal';
@@ -535,6 +535,8 @@ const ChatActionDropdown: React.FC<{
         onClick={(e) => e.stopPropagation()}
         className="absolute right-2 top-8 z-50 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-150"
       >
+
+
       <button
         type="button"
         onClick={() => {
@@ -991,6 +993,7 @@ export default function Messages() {
   // Group conversations state
   const [groups, setGroups] = useState<GroupItem[]>([]);
   const [activeGroup, setActiveGroup] = useState<GroupItem | null>(null);
+  const [isViewingChatDetails, setIsViewingChatDetails] = useState(false);
   const [groupMessages, setGroupMessages] = useState<GroupMessageItem[]>([]);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
@@ -2436,6 +2439,7 @@ export default function Messages() {
     setOpenChatMenuId(null);
     setActiveGroup(null);
     setActiveUser(u);
+    setIsViewingChatDetails(false);
     setText('');
     setReplyingTo(null);
     setEditingMessage(null);
@@ -2479,6 +2483,7 @@ export default function Messages() {
     setOpenChatMenuId(null);
     setActiveUser(null);
     setActiveGroup(g);
+    setIsViewingChatDetails(false);
     setText('');
     setReplyingTo(null);
     setEditingMessage(null);
@@ -3880,7 +3885,8 @@ export default function Messages() {
 
       {/* Right Pane: Active Chat Window (Global OR Direct OR Group) */}
       <div
-        className={`flex-1 min-w-0 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-full ${
+        data-lenis-prevent
+        className={`flex-1 min-w-0 min-h-0 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-full ${
           !hasActiveChat ? 'hidden md:flex' : 'flex'
         }`}
       >
@@ -3890,6 +3896,37 @@ export default function Messages() {
             currentUser={currentUser}
             onBack={() => {
               setIsGlobalActive(false);
+              navigate('/messages');
+            }}
+          />
+        ) : (activeGroup || activeUser) && isViewingChatDetails ? (
+          <ConversationDetailsView
+            user={activeUser}
+            group={activeGroup}
+            messages={activeGroup ? deduplicatedGroupMessages : deduplicatedMessages}
+            currentUser={currentUser}
+            isOnline={isPartnerOnline}
+            lastSeen={partnerLastSeen}
+            onBack={() => setIsViewingChatDetails(false)}
+            isPinned={isChatPinned(activeGroup?.id || activeUser?.id || '')}
+            isArchived={isChatArchived(activeGroup?.id || activeUser?.id || '')}
+            isMuted={isChatMuted(activeGroup?.id || activeUser?.id || '')}
+            isFavourite={isChatFavourite(activeGroup?.id || activeUser?.id || '')}
+            isBlocked={activeUser ? isContactBlocked : false}
+            onTogglePin={() => togglePinChat(activeGroup?.id || activeUser?.id || '')}
+            onToggleArchive={() => toggleArchiveChat(activeGroup?.id || activeUser?.id || '')}
+            onToggleMute={() => toggleMuteChat(activeGroup?.id || activeUser?.id || '')}
+            onToggleFavourite={() => toggleFavouriteChat(activeGroup?.id || activeUser?.id || '')}
+            onToggleBlock={activeUser ? () => toggleBlockUser(activeUser.id) : undefined}
+            onClearChat={handleConfirmClearChat}
+            onGroupUpdated={(updated) => {
+              setActiveGroup((prev) => (prev ? { ...prev, ...updated } : null));
+              fetchGroups();
+            }}
+            onLeaveGroup={() => {
+              setIsViewingChatDetails(false);
+              setActiveGroup(null);
+              fetchGroups();
               navigate('/messages');
             }}
           />
@@ -3924,7 +3961,7 @@ export default function Messages() {
                   </button>
 
                   <div
-                    onClick={() => setIsGroupInfoOpen(true)}
+                    onClick={() => setIsViewingChatDetails(true)}
                     className="flex items-center gap-3 cursor-pointer min-w-0 hover:opacity-90 transition-opacity"
                   >
                     <GroupAvatar group={activeGroup} size="md" />
@@ -3962,25 +3999,6 @@ export default function Messages() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsSelectionMode(true)}
-                    className="text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition-colors shrink-0 flex items-center gap-1.5"
-                    title="Select messages"
-                  >
-                    <HiOutlineSquares2X2 className="w-4 h-4 text-purple-600" />
-                    <span className="hidden sm:inline">Select</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsGroupInfoOpen(true)}
-                    className="text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-900 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition-colors shrink-0 flex items-center gap-1.5"
-                  >
-                    <HiOutlineInformationCircle className="w-4 h-4 text-indigo-600" />
-                    <span className="hidden sm:inline">Group Info</span>
-                  </button>
-
                   {/* Group header options menu */}
                   <div className="relative">
                     <button
@@ -4391,6 +4409,33 @@ export default function Messages() {
                                     </span>
                                   </div>
                                 </div>
+                              ) : !m.isDeletedForEveryone && (m.messageType === 'post' || /\/post(?:s)?\/[a-zA-Z0-9_-]+/i.test(m.content || '')) ? (
+                                <div>
+                                  <PostMessageCard
+                                    content={m.content}
+                                    mediaUrl={m.mediaUrl}
+                                    isMe={isMe}
+                                  />
+                                  <div className="flex items-center gap-1.5 ml-auto justify-end select-none pb-0.5 leading-none mt-1">
+                                    {m.starredBy?.includes(currentUser?.id || '') && (
+                                      <HiStar
+                                        className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
+                                        title="Starred message"
+                                      />
+                                    )}
+                                    {m.isPinned && (
+                                      <span title="Pinned message" className="text-purple-400">
+                                        <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-slate-400">
+                                      {new Date(m.createdAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </span>
+                                  </div>
+                                </div>
                               ) : (
                                 <div>
                                   {!m.isDeletedForEveryone && m.mediaUrl && (
@@ -4740,8 +4785,8 @@ export default function Messages() {
                     <HiOutlineArrowLeft className="w-5 h-5" />
                   </button>
                   <div
-                    onClick={() => navigate(`/profile/${activeUser.username}`)}
-                    className="flex items-center gap-3 cursor-pointer min-w-0"
+                    onClick={() => setIsViewingChatDetails(true)}
+                    className="flex items-center gap-3 cursor-pointer min-w-0 hover:opacity-90 transition-opacity"
                   >
                     <UserAvatar
                       user={activeUser}
@@ -4798,15 +4843,6 @@ export default function Messages() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsSelectionMode(true)}
-                    className="text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition-colors shrink-0 flex items-center gap-1.5"
-                    title="Select messages"
-                  >
-                    <HiOutlineSquares2X2 className="w-4 h-4 text-purple-600" />
-                    <span className="hidden sm:inline">Select</span>
-                  </button>
 
                   <button
                     onClick={() => navigate(`/profile/${activeUser.username}`)}
@@ -5182,6 +5218,39 @@ export default function Messages() {
                               ) : !m.isDeletedForEveryone && (m.messageType === 'reel' || /\/reels\/[a-zA-Z0-9_-]+/i.test(m.content || '')) ? (
                                 <div>
                                   <ReelMessageCard
+                                    content={m.content}
+                                    mediaUrl={m.mediaUrl}
+                                    isMe={isMe}
+                                  />
+                                  <div className="flex items-center gap-1.5 ml-auto justify-end select-none pb-0.5 leading-none mt-1">
+                                    {m.starredBy?.includes(currentUser?.id || '') && (
+                                      <HiStar
+                                        className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
+                                        title="Starred message"
+                                      />
+                                    )}
+                                    {m.isPinned && (
+                                      <span title="Pinned message" className="text-purple-400">
+                                        <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                      </span>
+                                    )}
+                                    {m.isEdited && !m.isDeletedForEveryone && (
+                                      <span className="text-[10px] italic text-slate-400">edited</span>
+                                    )}
+                                    <span className="text-[10px] text-slate-400">
+                                      {new Date(m.createdAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </span>
+                                    {isMe && !m.isDeletedForEveryone && (
+                                      <MessageTicks status={m.status} isRead={m.isRead} />
+                                    )}
+                                  </div>
+                                </div>
+                              ) : !m.isDeletedForEveryone && (m.messageType === 'post' || /\/post(?:s)?\/[a-zA-Z0-9_-]+/i.test(m.content || '')) ? (
+                                <div>
+                                  <PostMessageCard
                                     content={m.content}
                                     mediaUrl={m.mediaUrl}
                                     isMe={isMe}

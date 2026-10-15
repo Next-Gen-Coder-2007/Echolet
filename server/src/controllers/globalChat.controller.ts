@@ -145,6 +145,10 @@ export const sendGlobalMessage = async (
       trimmed = fileName || 'Document';
     } else if (!trimmed && messageType === 'poll') {
       trimmed = poll?.question || 'Poll';
+    } else if (!trimmed && messageType === 'post') {
+      trimmed = 'Shared an echo';
+    } else if (!trimmed && messageType === 'reel') {
+      trimmed = 'Shared a reel';
     }
 
     if (!trimmed && !audioUrl && !mediaUrl && !poll) {
