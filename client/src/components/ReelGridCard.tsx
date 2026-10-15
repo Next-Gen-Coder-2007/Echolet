@@ -198,14 +198,19 @@ export default function ReelGridCard({
         </div>
       )}
 
-      {/* Duration Badge Top Left */}
-      {reel.duration && (
-        <div className="absolute top-2.5 left-2.5 z-10">
+      {/* Badges Top Left (Duration & Folder) */}
+      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-1.5">
+        {reel.duration ? (
           <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-black/60 backdrop-blur-md text-white/90 border border-white/10 shadow-2xs">
             {Math.round(reel.duration)}s
           </span>
-        </div>
-      )}
+        ) : null}
+        {reel.bookmarkCollection && reel.bookmarkCollection !== 'Default' && (
+          <span className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-black/60 backdrop-blur-md text-white/90 border border-white/10 shadow-2xs truncate max-w-[85px]">
+            {reel.bookmarkCollection}
+          </span>
+        )}
+      </div>
 
       {/* Bottom Info Overlay */}
       <div className="absolute bottom-3 inset-x-3 z-10 flex flex-col gap-1.5 text-white pointer-events-none">

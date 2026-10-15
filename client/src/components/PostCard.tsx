@@ -19,11 +19,14 @@ import {
   HiOutlineChartBar,
   HiOutlineClock,
   HiCheck,
+  HiOutlineFolder,
 } from 'react-icons/hi2';
 import postService, { type Post, type PostComment, type PollOptionItem } from '../services/postService';
+import collectionService, { type BookmarkCollection } from '../services/collectionService';
 import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
 import MediaViewerModal from './MediaViewerModal';
+import SaveToCollectionModal from './SaveToCollectionModal';
 import getSocket from '../services/socket';
 
 interface PostCardProps {
@@ -280,6 +283,41 @@ export default function PostCard({
   const [likesCount, setLikesCount] = useState(post.likesCount || 0);
   const [isBookmarked, setIsBookmarked] = useState(Boolean(post.isBookmarked));
   const [bookmarksCount, setBookmarksCount] = useState(post.bookmarksCount || 0);
+  const [currentCollection, setCurrentCollection] = useState<string | null>(
+    post.bookmarkCollection || null
+  );
+  const [isCollectionPickerOpen, setIsCollectionPickerOpen] = useState(false);
+  const [availableCollections, setAvailableCollections] = useState<BookmarkCollection[]>([]);
+
+  const loadCollections = async () => {
+    try {
+      const res = await collectionService.getCollections();
+      setAvailableCollections(res.collections || []);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSelectCollection = async (targetCollectionName: string) => {
+    try {
+      await postService.updateBookmarkCollection(post.id, targetCollectionName);
+      setCurrentCollection(targetCollectionName);
+      setIsBookmarked(true);
+      notify(`Saved to "${targetCollectionName}"`, 'info');
+    } catch {
+      notify('Failed to update folder', 'error');
+    }
+  };
+
+  const handleCreateCollectionInline = async (name: string) => {
+    try {
+      const created = await collectionService.createCollection({ name, icon: '', color: '#6366f1' });
+      setAvailableCollections((prev) => [...prev, created]);
+      await handleSelectCollection(created.name);
+    } catch {
+      notify('Failed to create folder', 'error');
+    }
+  };
 
   const location = useLocation();
 
@@ -288,9 +326,12 @@ export default function PostCard({
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Close menu on route change
-  useEffect(() => {
-    setShowMenu(false);
-  }, [location.pathname, location.search]);
+  const currentPath = location.pathname + location.search;
+  const [prevPath, setPrevPath] = useState(currentPath);
+  if (prevPath !== currentPath) {
+    setPrevPath(currentPath);
+    if (showMenu) setShowMenu(false);
+  }
 
   // Close menu on Escape key
   useEffect(() => {
@@ -320,14 +361,12 @@ export default function PostCard({
   );
   const [isVoting, setIsVoting] = useState(false);
 
-  useEffect(() => {
-    if (post.pollOptions) {
-      setPollOptions(post.pollOptions);
-    }
-    if (post.userVotedOption !== undefined) {
-      setUserVotedOption(post.userVotedOption);
-    }
-  }, [post.pollOptions, post.userVotedOption]);
+  const [prevPostPollId, setPrevPostPollId] = useState(post.id);
+  if (prevPostPollId !== post.id) {
+    setPrevPostPollId(post.id);
+    if (post.pollOptions) setPollOptions(post.pollOptions);
+    if (post.userVotedOption !== undefined) setUserVotedOption(post.userVotedOption);
+  }
 
   // Real-time socket listener for poll updates
   useEffect(() => {
@@ -357,14 +396,20 @@ export default function PostCard({
     if (!post.pollExpiresAt) return Boolean(post.isPollExpired);
     return new Date(post.pollExpiresAt).getTime() <= Date.now();
   });
-  const [pollTimeRemainingText, setPollTimeRemainingText] = useState<string>('');
+  const [pollTimeRemainingText, setPollTimeRemainingText] = useState<string>(() => {
+    if (!post.pollExpiresAt) return '';
+    const diff = new Date(post.pollExpiresAt).getTime() - Date.now();
+    if (diff <= 0) return 'Poll ended';
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (days > 0) return `${days}d left`;
+    if (hours > 0) return `${hours}h left`;
+    return `${Math.max(1, minutes)}m left`;
+  });
 
   useEffect(() => {
-    if (!post.pollExpiresAt) {
-      setIsPollExpired(false);
-      setPollTimeRemainingText('');
-      return;
-    }
+    if (!post.pollExpiresAt) return;
 
     const updateTimer = () => {
       const expiresAtMs = new Date(post.pollExpiresAt!).getTime();
@@ -397,12 +442,15 @@ export default function PostCard({
       }
     };
 
-    updateTimer();
     const expiresDiff = new Date(post.pollExpiresAt).getTime() - Date.now();
     const intervalTime = expiresDiff < 3600000 ? 1000 : 10000;
+    const timeout = setTimeout(updateTimer, 0);
     const interval = setInterval(updateTimer, intervalTime);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, [post.pollExpiresAt]);
 
   const handleVotePoll = async (optionIndex: number) => {
@@ -423,7 +471,7 @@ export default function PostCard({
     const previousOptions = [...pollOptions];
     const previousVote = userVotedOption;
 
-    let optimisticOptions = [...pollOptions];
+    let optimisticOptions: PollOptionItem[];
     let optimisticVote: number | null = optionIndex;
 
     if (userVotedOption === optionIndex) {
@@ -470,10 +518,13 @@ export default function PostCard({
       } else {
         notify('Your vote has been recorded!', 'success');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setPollOptions(previousOptions);
       setUserVotedOption(previousVote);
-      notify(err.response?.data?.message || 'Failed to record vote. Please try again.', 'error');
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Failed to record vote. Please try again.';
+      notify(msg, 'error');
     } finally {
       setIsVoting(false);
     }
@@ -539,6 +590,7 @@ export default function PostCard({
       const res = await postService.toggleBookmark(post.id);
       setIsBookmarked(res.isBookmarked);
       setBookmarksCount(res.bookmarksCount);
+      setCurrentCollection(res.isBookmarked ? res.collectionName || 'Default' : null);
       notify(
         res.isBookmarked ? 'Saved to bookmarks' : 'Removed from bookmarks',
         'info'
@@ -862,6 +914,21 @@ export default function PostCard({
                     Copy link
                   </button>
 
+                  {isBookmarked && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowMenu(false);
+                        loadCollections();
+                        setIsCollectionPickerOpen(true);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-xs sm:text-sm font-semibold text-purple-700 hover:bg-purple-50 flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <HiOutlineFolder className="w-4 h-4 text-purple-600" />
+                      Organize in Folder
+                    </button>
+                  )}
+
                   {isAuthor && (
                     <button
                       type="button"
@@ -1184,23 +1251,39 @@ export default function PostCard({
           </button>
 
           {/* Bookmark */}
-          <button
-            type="button"
-            onClick={handleToggleBookmark}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-              isBookmarked
-                ? 'text-slate-900 bg-slate-100'
-                : 'hover:bg-slate-100 hover:text-slate-900'
-            }`}
-            title="Save / Bookmark"
-          >
-            {isBookmarked ? (
-              <HiBookmark className="w-5 h-5 text-slate-900" />
-            ) : (
-              <HiOutlineBookmark className="w-5 h-5" />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleToggleBookmark}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                isBookmarked
+                  ? 'text-slate-900 bg-slate-100'
+                  : 'hover:bg-slate-100 hover:text-slate-900'
+              }`}
+              title="Save / Bookmark"
+            >
+              {isBookmarked ? (
+                <HiBookmark className="w-5 h-5 text-slate-900" />
+              ) : (
+                <HiOutlineBookmark className="w-5 h-5" />
+              )}
+              <span>{bookmarksCount}</span>
+            </button>
+
+            {isBookmarked && (
+              <button
+                type="button"
+                onClick={() => {
+                  loadCollections();
+                  setIsCollectionPickerOpen(true);
+                }}
+                className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer flex items-center gap-1"
+                title="Organize into folder"
+              >
+                <span className="truncate max-w-[80px]">{currentCollection || 'Folder'}</span>
+              </button>
             )}
-            <span>{bookmarksCount}</span>
-          </button>
+          </div>
 
           {/* Share */}
           <button
@@ -1274,6 +1357,19 @@ export default function PostCard({
           </div>
         )}
       </article>
+
+      {/* Collection Selection / Move Modal (Inline folder creation supported) */}
+      {isCollectionPickerOpen && (
+        <SaveToCollectionModal
+          isOpen={isCollectionPickerOpen}
+          onClose={() => setIsCollectionPickerOpen(false)}
+          collections={availableCollections}
+          currentCollection={currentCollection}
+          itemTitle={post.content?.slice(0, 30)}
+          onSelectCollection={handleSelectCollection}
+          onCreateCollectionInline={handleCreateCollectionInline}
+        />
+      )}
     </>
   );
 }
