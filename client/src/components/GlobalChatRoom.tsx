@@ -435,7 +435,6 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
   const { showSuccess, showError, showInfo } = useMessage();
 
   const [messages, setMessages] = useState<GlobalMessageItem[]>([]);
-  const [onlineCount, setOnlineCount] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Input states
@@ -512,7 +511,6 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
         const res = await globalChatService.getMessages(100);
         if (!isMounted) return;
         setMessages(res.messages || []);
-        setOnlineCount(res.onlineCount || 1);
         setTimeout(() => scrollToBottom('auto'), 100);
       } catch (err: any) {
         showError(err.response?.data?.message || 'Failed to load Global Chat');
@@ -546,10 +544,6 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
       );
     };
 
-    const handleOnlineCount = ({ count }: { count: number }) => {
-      setOnlineCount(count);
-    };
-
     const handleGlobalTyping = ({
       userId,
       userName,
@@ -574,14 +568,12 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
 
     socket.on('global_new_message', handleNewMessage);
     socket.on('global_message_edited', handleMessageEdited);
-    socket.on('global_online_count', handleOnlineCount);
     socket.on('global_typing', handleGlobalTyping);
     socket.on('global_stop_typing', handleGlobalStopTyping);
 
     return () => {
       socket.off('global_new_message', handleNewMessage);
       socket.off('global_message_edited', handleMessageEdited);
-      socket.off('global_online_count', handleOnlineCount);
       socket.off('global_typing', handleGlobalTyping);
       socket.off('global_stop_typing', handleGlobalStopTyping);
     };
@@ -838,9 +830,7 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
             </h2>
             <div className="text-xs flex items-center gap-1.5 mt-0.5 truncate text-slate-500">
               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-              <span>
-                {onlineCount} {onlineCount === 1 ? 'member' : 'members'} online
-              </span>
+              <span>Public chat room</span>
             </div>
           </div>
         </div>

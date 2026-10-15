@@ -889,8 +889,8 @@ export default function Messages() {
 
   // Filter tabs: 'all' | 'direct' | 'groups' | 'favourites' | 'archived'
   const [chatTab, setChatTab] = useState<
-    'all' | 'direct' | 'groups' | 'favourites' | 'archived' | 'global'
-  >(paramUsername === 'global' || searchParams.get('room') === 'global' ? 'global' : 'all');
+    'all' | 'direct' | 'groups' | 'favourites' | 'archived'
+  >('all');
 
   // Global Chat state
   const [isGlobalActive, setIsGlobalActive] = useState<boolean>(
@@ -3586,7 +3586,7 @@ export default function Messages() {
             // All / Favourites / Archived Chats
             <>
               {/* Global Chat Item in Sidebar */}
-              {chatTab === 'all' && (!search || 'global chat'.includes(search.toLowerCase()) || 'public'.includes(search.toLowerCase())) && (
+              {(chatTab === 'all' || isGlobalActive) && (!search || 'global chat'.includes(search.toLowerCase()) || 'public'.includes(search.toLowerCase())) && (
                 <div
                   onClick={selectGlobalChat}
                   className={`w-full p-3.5 text-left flex items-center gap-3 transition-colors cursor-pointer group relative border-b border-slate-100 ${
