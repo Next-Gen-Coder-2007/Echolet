@@ -78,4 +78,28 @@ const storyService = {
   },
 };
 
+export const markOwnStoryAsViewed = (storyId: string, userId: string) => {
+  try {
+    const key = `echolet_viewed_own_stories_${userId}`;
+    const stored: string[] = JSON.parse(localStorage.getItem(key) || '[]');
+    if (!stored.includes(storyId)) {
+      stored.push(storyId);
+      localStorage.setItem(key, JSON.stringify(stored));
+      window.dispatchEvent(new CustomEvent('own_story_viewed', { detail: { storyId, userId } }));
+    }
+  } catch (e) {
+    console.error('Error saving viewed own story:', e);
+  }
+};
+
+export const getHasUnviewedOwnStory = (stories: StoryItem[], userId: string): boolean => {
+  try {
+    const key = `echolet_viewed_own_stories_${userId}`;
+    const stored: string[] = JSON.parse(localStorage.getItem(key) || '[]');
+    return stories.some((s) => !stored.includes(s.id));
+  } catch {
+    return false;
+  }
+};
+
 export default storyService;
