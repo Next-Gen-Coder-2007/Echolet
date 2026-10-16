@@ -27,13 +27,13 @@
 | 3 | **Home Feed** | Following feed, For You feed, text/image/video/GIF posts, polls, reposts, hashtags, mentions, likes, comments, shares, bookmarks |    
 | 4 | **Posts** | *Types:* text, image, multi-image, video, GIF, poll, link · *Actions:* like, comment, repost, share, bookmark, edit, delete, pin, report |
 | 5 | **Comments** | Comments, nested replies, like/edit/delete comments, user mentions, comment notifications |
-| 6 | **Stories** | Image/video/text stories, music, GIFs, stickers, polls, questions, story views, reactions, replies, 24-hour expiration |
+| 6 | **Stories** | Image/video/text stories, clean caption authoring, center-fit vs vertical-crop toggle, full viewer with progress timers, reactions, replies, 24-hour expiration |
 | 7 | **Reels / Short Videos** | Upload, vertical feed, likes, comments, shares, reposts, bookmarks, views, captions, hashtags, music/audio, recommended reels |
 | 8 | **Explore** | Trending posts/reels, popular users, popular hashtags, visual content grid, personalized recommendations |
 | 9 | **Trending** | Trending hashtags/posts/reels/topics, ranked by engagement + engagement growth + recency + views + shares |
 | 10 | **Hashtags** | Create, follow, hashtag pages, trending hashtags, posts by hashtag, search hashtags |
 | 11 | **Search** | *Now:* users, posts, reels, hashtags · *Later:* full-text search, semantic search |
-| 12 | **Messaging** | *1-to-1:* text, images, video, GIFs, stickers, voice messages, replies, reactions, edit/delete, typing indicator, online status, read receipts · *Group (WhatsApp-style):* create, add/remove members, name/image, admins, roles, media sharing, reactions, mentions, message search, settings, leave · *Global:* public real-time chatroom, online count, reactions, replies, mentions, rate limiting, spam detection, content filtering, reporting, block/mute, moderation — built with WebSockets + Redis Pub/Sub + PostgreSQL |
+| 12 | **Messaging & Studio** | *1-to-1:* text, images, video, GIFs, stickers, voice messages, replies, reactions, text/caption message editing, soft-deletion bubble handling, typing indicator, online status, read receipts<br/>*Media Upload Studio:* Interactive preview before upload with Crop & Rotate (1:1, 4:5, 16:9, Free), Paint & Doodle (multi-color palette, brush sizes, eraser, undo), and editable attached captions with emoji picker<br/>*Voice Engine:* Studio-grade recorder with live Web Audio API frequency visualizer bars & pause/resume; fluid 60/120 FPS continuous liquid waveform playback with gliding sub-pixel scrubber needle<br/>*Group (WhatsApp-style):* create, add/remove members, name/image, admins, roles, media sharing, reactions, mentions, message search, settings, leave<br/>*Global:* public real-time chatroom, online count, reactions, replies, mentions, rate limiting, spam detection, content filtering, reporting, block/mute, moderation — built with WebSockets + Redis Pub/Sub + PostgreSQL |
 | 13 | **Notifications** | Likes, comments, replies, follows, mentions, reposts, shares, messages, group invitations, story reactions — delivered in real time via WebSockets |
 | 14 | **Bookmarks** | Save posts and reels into custom user-created folders with color tags, folder filtering, and instant organization |
 | 15 | **Reactions** | Love, Funny, Fire, Wow, Sad, Dead, Applause — applicable to posts, comments, messages, and reels |
@@ -43,7 +43,7 @@
 
 ## Implementation Status
 
-> **Overall Progress: ~75% (Core Platform, Stories, Reels, Custom Folders & Messaging Active)**
+> **Overall Progress: ~80% (Core Platform, Stories, Reels, Custom Folders, Media Studio & High-Fidelity Messaging Active)**
 
 | Sl No | Feature | Status | What's Implemented | What's Pending |
 |:---:|---|:---:|---|---|
@@ -53,13 +53,13 @@
 | 4 | **Home Feed** | 🟡 ~60% | Post stream with real-time WebSocket updates, multi-image, video, polls, interactions | "Following" vs "For You" toggle tabs, reposts, clickable hashtag/mention parsing |
 | 5 | **Posts** | 🟡 ~65% | Text, multi-image, video, poll creation, like, comment, bookmark, delete, share link | Edit post, pin post, report post, GIF picker, quote posts / reposts |
 | 6 | **Comments** | 🟢 ~85% | Add/delete/like comments, live counts, recursive infinite nested threaded replies (`parentId`) with collapsible threads | Edit comments, user mentions |
-| 7 | **Stories** | 🟢 ~85% | Backend entity, routes & uploads, full story viewer modal with timed progress bars, pause/resume, looping, center fit vs vertical crop toggle during creation | Music/audio picker, stickers, polls in stories |
+| 7 | **Stories** | 🟢 ~90% | Backend entity, routes & uploads, full story viewer modal with timed progress bars, pause/resume, looping, center-fit vs vertical-crop toggle, clean creation flow (no default placeholder captions) | Music/audio picker, stickers, polls in stories |
 | 8 | **Reels / Short Videos** | 🟢 ~85% | Backend model & upload routes, full-screen vertical feed, video player, likes, comments, bookmarking with custom folders, contain/cover display modes, saved reels grid | Duets / remixes, advanced video editor filters |
 | 9 | **Explore** | ⚪ 0% | — | Visual grid, trending content discovery page |
 | 10 | **Trending** | ⚪ 0% | — | Trending ranking engine (engagement + velocity + recency) |
 | 11 | **Hashtags** | 🔴 ~10% | Hashtags can be typed into posts | Hashtag parsing/indexing, hashtag pages, follow hashtags, search hashtags |
 | 12 | **Search** | 🟡 ~35% | Real-time user search by username/display name | Search posts, reels, hashtags, and media |
-| 13 | **Messaging** | 🟢 ~95% | Real-time 1-to-1 direct messaging, group chat management, public Global Chatroom, image & video media sharing with upload preview modal & captions, optimized smooth chat switching, voice notes, emoji reactions | Voice/video calls |
+| 13 | **Messaging & Studio** | 🟢 ~98% | Real-time 1-to-1 direct messaging, group chat management, public Global Chatroom, **Media Upload Preview Studio** (Crop & Rotate with multiple aspect ratios, Paint & Doodle canvas with color palette selector & brush sizing, editable captions with emoji picker), **Voice Engine** (studio-grade Web Audio API real-time frequency visualizer bars, pause/resume, continuous 60/120 FPS liquid wave playback with gliding micro-scrubber needle), clean deleted message & voice note fallbacks, message editing restricted to text/captions, emoji reactions | Voice/video calls |
 | 14 | **Notifications** | 🔴 ~15% | Frontend UI layout (`Notifications.tsx`) with mock data | Backend entity, DB persistence, real-time socket triggers on interactions |
 | 15 | **Bookmarks** | 🟢 ~95% | Save/unsave posts and reels, custom user-created folders with color tags, folder filtering tabs, inline folder creation in picker modal, move items between folders, clean modern UI without emoji clutter | Shared/collaborative folders |
 | 16 | **Reactions** | 🔴 ~20% | Binary like/heart on posts & comments | Rich emoji reactions (Love, Funny, Fire, Wow, Sad, Dead, Applause) |
