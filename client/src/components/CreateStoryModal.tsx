@@ -631,18 +631,6 @@ export default function CreateStoryModal({
                     maxLength={150}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-purple-500 focus:bg-white transition-all shadow-2xs"
                   />
-                  <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
-                    {['✨ Loving this!', '🔥 Weekend vibes', '☕ Coffee time', '🎶 On repeat', '🌴 Good times', '❤️'].map((quickTag) => (
-                      <button
-                        key={quickTag}
-                        type="button"
-                        onClick={() => setCaption(quickTag)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-purple-50 hover:text-purple-700 text-slate-600 text-xs font-medium shrink-0 transition-colors cursor-pointer"
-                      >
-                        {quickTag}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             ) : tab === 'video' ? (
@@ -791,18 +779,6 @@ export default function CreateStoryModal({
                     maxLength={150}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-purple-500 focus:bg-white transition-all shadow-2xs"
                   />
-                  <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
-                    {['🎬 Watch this!', '✨ Highlights', '🔥 Mood right now', '🌴 Travel moment', '🎉 Story time'].map((quickTag) => (
-                      <button
-                        key={quickTag}
-                        type="button"
-                        onClick={() => setCaption(quickTag)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-purple-50 hover:text-purple-700 text-slate-600 text-xs font-medium shrink-0 transition-colors cursor-pointer"
-                      >
-                        {quickTag}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             ) : (
