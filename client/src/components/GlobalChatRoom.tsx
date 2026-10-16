@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   HiOutlineGlobeAlt,
@@ -104,7 +104,7 @@ const UserAvatar: React.FC<{
   );
 };
 
-// Reusable Voice Note Player matching Messages.tsx
+// Reusable Voice Note Audio Player bubble component with ultra-fluid requestAnimationFrame playback
 const VoiceNotePlayer: React.FC<{
   audioUrl?: string;
   duration?: number;
@@ -116,6 +116,19 @@ const VoiceNotePlayer: React.FC<{
   const [totalDuration, setTotalDuration] = useState(duration || 0);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const progressBarRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = useRef<boolean>(false);
+
+  // Ultra-fluid 60/120fps progress tracking via requestAnimationFrame
+  const updateFluidProgress = useCallback(() => {
+    if (audioRef.current && !isDraggingRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+      if (!audioRef.current.paused && !audioRef.current.ended) {
+        animFrameRef.current = requestAnimationFrame(updateFluidProgress);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!audioUrl) return;
@@ -125,31 +138,54 @@ const VoiceNotePlayer: React.FC<{
 
     const handleLoadedMetadata = () => {
       if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
-        setTotalDuration(Math.round(audio.duration));
+        setTotalDuration(audio.duration);
       }
     };
 
-    const handleTimeUpdate = () => {
-      setCurrentTime(Math.round(audio.currentTime));
+    const handlePlay = () => {
+      setIsPlaying(true);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = requestAnimationFrame(updateFluidProgress);
+    };
+
+    const handlePause = () => {
+      setIsPlaying(false);
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      if (audioRef.current) {
+        setCurrentTime(audioRef.current.currentTime);
+      }
     };
 
     const handleEnded = () => {
       setIsPlaying(false);
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
       setCurrentTime(0);
     };
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
 
     return () => {
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
       audio.pause();
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('ended', handleEnded);
       audioRef.current = null;
     };
-  }, [audioUrl]);
+  }, [audioUrl, updateFluidProgress]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -162,24 +198,48 @@ const VoiceNotePlayer: React.FC<{
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
-      setIsPlaying(false);
     } else {
       audioRef.current
         .play()
-        .then(() => setIsPlaying(true))
         .catch((err) => console.error('Audio play error:', err));
     }
   };
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.stopPropagation();
+  const seekToRatio = (ratio: number) => {
     if (!audioRef.current || !totalDuration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-    const newTime = ratio * totalDuration;
+    const clamped = Math.max(0, Math.min(1, ratio));
+    const newTime = clamped * totalDuration;
     audioRef.current.currentTime = newTime;
-    setCurrentTime(Math.round(newTime));
+    setCurrentTime(newTime);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    if (!progressBarRef.current || !totalDuration) return;
+    isDraggingRef.current = true;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    seekToRatio(ratio);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current || !progressBarRef.current || !totalDuration) return;
+    e.stopPropagation();
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    seekToRatio(ratio);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDraggingRef.current) {
+      e.stopPropagation();
+      isDraggingRef.current = false;
+      try {
+        (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+      } catch (_) {}
+    }
   };
 
   const toggleSpeed = (e: React.MouseEvent) => {
@@ -189,26 +249,33 @@ const VoiceNotePlayer: React.FC<{
   };
 
   const formatSeconds = (sec: number) => {
-    const mins = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
+    const sVal = Math.max(0, isFinite(sec) ? sec : 0);
+    const mins = Math.floor(sVal / 60);
+    const s = Math.floor(sVal % 60);
     return `${mins}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const progressPct = totalDuration > 0 ? (currentTime / totalDuration) * 100 : 0;
+  const progressPct =
+    totalDuration > 0
+      ? Math.max(0, Math.min(100, (currentTime / totalDuration) * 100))
+      : 0;
+
+  // 36 bars with organic acoustic waveform contours
   const waveformBars = [
-    24, 45, 68, 38, 55, 88, 42, 78, 96, 60, 82, 48, 92, 70, 46, 84,
-    58, 88, 42, 68, 98, 52, 76, 62, 86, 38, 72, 54, 82, 58, 36, 22
+    24, 38, 62, 44, 60, 88, 50, 78, 96, 68, 84, 54, 94, 72, 50, 90,
+    64, 98, 48, 70, 94, 56, 80, 66, 90, 44, 76, 58, 86, 62, 40, 26,
+    46, 72, 52, 32
   ];
 
   return (
-    <div className="flex items-center gap-3 py-1.5 px-0.5 min-w-[240px] sm:min-w-[270px]">
+    <div className="flex items-center gap-3 py-1.5 px-0.5 min-w-[245px] sm:min-w-[280px]">
       <button
         type="button"
         onClick={togglePlay}
-        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm transition-transform active:scale-90 cursor-pointer ${
+        className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-md transition-all active:scale-90 cursor-pointer ${
           isMe
-            ? 'bg-white text-slate-900 hover:bg-slate-100'
-            : 'bg-purple-600 text-white hover:bg-purple-700'
+            ? 'bg-white text-slate-900 hover:bg-slate-100 shadow-slate-900/10'
+            : 'bg-gradient-to-tr from-purple-600 to-indigo-600 text-white hover:from-purple-500 hover:to-indigo-500 shadow-purple-500/20'
         }`}
         title={isPlaying ? 'Pause' : 'Play voice message'}
       >
@@ -220,30 +287,63 @@ const VoiceNotePlayer: React.FC<{
       </button>
 
       <div className="flex-1 min-w-0 flex flex-col gap-1.5 justify-center">
+        {/* Continuous Fluid Sub-pixel Waveform */}
         <div
-          onClick={handleSeek}
-          className="h-6 flex items-center gap-[2.5px] cursor-pointer py-1 group/wave"
-          title="Click to seek"
+          ref={progressBarRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          className="relative h-7 flex items-center cursor-pointer select-none group/wave py-1"
+          title="Click or drag to seek"
         >
-          {waveformBars.map((h, i) => {
-            const barPct = (i / waveformBars.length) * 100;
-            const isPlayed = barPct <= progressPct;
-            return (
+          {/* Base Unplayed Layer */}
+          <div className="absolute inset-0 flex items-center gap-[2.5px] pointer-events-none">
+            {waveformBars.map((h, i) => (
               <div
                 key={i}
                 style={{ height: `${h}%` }}
-                className={`flex-1 rounded-full transition-all duration-100 ${
-                  isPlayed
-                    ? isMe
-                      ? 'bg-purple-300'
-                      : 'bg-purple-600'
-                    : isMe
-                    ? 'bg-slate-700/80 group-hover/wave:bg-slate-600'
-                    : 'bg-slate-200 group-hover/wave:bg-slate-300'
+                className={`flex-1 rounded-full transition-colors ${
+                  isMe
+                    ? 'bg-purple-300/35 group-hover/wave:bg-purple-300/45'
+                    : 'bg-slate-200 dark:bg-slate-700/80 group-hover/wave:bg-slate-300 dark:group-hover/wave:bg-slate-600'
                 }`}
               />
-            );
-          })}
+            ))}
+          </div>
+
+          {/* Ultra-fluid Liquid Active Layer (sub-pixel overflow mask) */}
+          <div
+            style={{ width: `${progressPct}%` }}
+            className="absolute inset-y-0 left-0 flex items-center overflow-hidden pointer-events-none z-10"
+          >
+            <div className="w-[200px] sm:w-[230px] h-full flex items-center gap-[2.5px] shrink-0">
+              {waveformBars.map((h, i) => (
+                <div
+                  key={i}
+                  style={{ height: `${h}%` }}
+                  className={`flex-1 rounded-full ${
+                    isMe
+                      ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.7)]'
+                      : 'bg-gradient-to-t from-purple-600 to-indigo-500 shadow-[0_0_8px_rgba(147,51,234,0.35)]'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Gliding Micro-Scrubber Indicator */}
+          <div
+            style={{ left: `${progressPct}%` }}
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 pointer-events-none z-20"
+          >
+            <div
+              className={`w-1.5 h-5 rounded-full shadow-md ${
+                isMe
+                  ? 'bg-white ring-2 ring-white/60'
+                  : 'bg-purple-600 ring-2 ring-purple-400/60'
+              } opacity-90 group-hover/wave:scale-125 transition-transform`}
+            />
+          </div>
         </div>
 
         <div
@@ -277,17 +377,25 @@ const VoiceNotePlayer: React.FC<{
   );
 };
 
-// Live Voice Recorder matching Messages.tsx
+
+// Reusable Live Voice Recording Bar component with Web Audio API real-time visualizer
 const LiveVoiceRecorder: React.FC<{
   onCancel: () => void;
   onSend: (audioUrl: string, duration: number) => void;
 }> = ({ onCancel, onSend }) => {
   const { showError } = useMessage();
   const [seconds, setSeconds] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [frequencyData, setFrequencyData] = useState<number[]>(() =>
+    new Array(24).fill(15)
+  );
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
@@ -300,6 +408,45 @@ const LiveVoiceRecorder: React.FC<{
           return;
         }
         streamRef.current = stream;
+
+        // Real-time Web Audio API frequency analysis
+        try {
+          const AudioContextClass =
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          if (AudioContextClass) {
+            const audioCtx = new AudioContextClass();
+            audioCtxRef.current = audioCtx;
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+            analyser.smoothingTimeConstant = 0.75;
+            analyserRef.current = analyser;
+
+            const source = audioCtx.createMediaStreamSource(stream);
+            source.connect(analyser);
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            const drawWave = () => {
+              if (analyserRef.current && !isCancelled) {
+                analyserRef.current.getByteFrequencyData(dataArray);
+                const bars: number[] = [];
+                const step = Math.max(1, Math.floor(bufferLength / 24));
+                for (let i = 0; i < 24; i++) {
+                  const val = dataArray[i * step] || 0;
+                  const pct = Math.max(15, Math.min(100, Math.round((val / 255) * 95) + 12));
+                  bars.push(pct);
+                }
+                setFrequencyData(bars);
+                animFrameRef.current = requestAnimationFrame(drawWave);
+              }
+            };
+            drawWave();
+          }
+        } catch (audioErr) {
+          console.warn('Web Audio visualizer fallback:', audioErr);
+        }
 
         let options: MediaRecorderOptions = {};
         if (typeof MediaRecorder !== 'undefined') {
@@ -338,14 +485,42 @@ const LiveVoiceRecorder: React.FC<{
 
     return () => {
       isCancelled = true;
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
   }, [onCancel, showError]);
 
+  const togglePauseResume = () => {
+    const mr = mediaRecorderRef.current;
+    if (!mr) return;
+    if (mr.state === 'recording') {
+      mr.pause();
+      setIsPaused(true);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (audioCtxRef.current && audioCtxRef.current.state === 'running') {
+        audioCtxRef.current.suspend();
+      }
+    } else if (mr.state === 'paused') {
+      mr.resume();
+      setIsPaused(false);
+      timerRef.current = setInterval(() => {
+        setSeconds((s) => s + 1);
+      }, 1000);
+      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+    }
+  };
+
   const handleStopAndSend = () => {
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
     const mediaRecorder = mediaRecorderRef.current;
     if (!mediaRecorder) {
@@ -359,6 +534,10 @@ const LiveVoiceRecorder: React.FC<{
       const mime = mediaRecorder.mimeType || 'audio/webm';
       const audioBlob = new Blob(audioChunksRef.current, { type: mime });
 
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
@@ -377,9 +556,14 @@ const LiveVoiceRecorder: React.FC<{
   };
 
   const handleDiscard = () => {
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
@@ -394,28 +578,64 @@ const LiveVoiceRecorder: React.FC<{
   };
 
   return (
-    <div className="flex-1 flex items-center justify-between gap-3 px-4 py-2 bg-rose-50/90 border border-rose-200 rounded-2xl">
-      <div className="flex items-center gap-3">
-        <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
-        <span className="text-sm font-bold text-rose-700 flex items-center gap-2">
-          Recording <span className="font-mono text-xs">{formatTime(seconds)}</span>
+    <div className="flex-1 flex items-center justify-between gap-3 px-4 py-2 bg-gradient-to-r from-rose-500/10 via-purple-500/10 to-indigo-500/10 dark:from-rose-950/30 dark:via-purple-950/20 dark:to-slate-900/40 border border-rose-500/25 rounded-2xl backdrop-blur-md shadow-sm animate-in fade-in duration-200">
+      {/* Recording status & Elapsed Timer */}
+      <div className="flex items-center gap-2.5 shrink-0">
+        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-[10px] font-bold tracking-wider uppercase select-none">
+          <span className={`w-2 h-2 rounded-full bg-rose-500 ${isPaused ? 'opacity-50' : 'animate-ping'}`} />
+          {isPaused ? 'PAUSED' : 'REC'}
+        </span>
+        <span className="font-mono text-sm font-bold text-slate-800 dark:text-slate-100 select-none">
+          {formatTime(seconds)}
         </span>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      {/* Live Audio Visualizer Frequency Bars */}
+      <div className="flex-1 max-w-[200px] sm:max-w-[260px] h-7 flex items-center justify-center gap-[3px] px-2 overflow-hidden">
+        {frequencyData.map((heightPct, idx) => (
+          <div
+            key={idx}
+            style={{ height: `${heightPct}%` }}
+            className={`flex-1 rounded-full transition-all duration-75 ${
+              isPaused
+                ? 'bg-slate-300 dark:bg-slate-600'
+                : 'bg-gradient-to-t from-rose-500 to-purple-500 shadow-[0_0_6px_rgba(244,63,94,0.4)]'
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Action controls */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Pause / Resume Button */}
+        <button
+          type="button"
+          onClick={togglePauseResume}
+          className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          title={isPaused ? 'Resume recording' : 'Pause recording'}
+        >
+          {isPaused ? (
+            <HiOutlinePlay className="w-4 h-4 fill-current ml-0.5" />
+          ) : (
+            <HiOutlinePause className="w-4 h-4 fill-current" />
+          )}
+        </button>
+
+        {/* Discard Button */}
         <button
           type="button"
           onClick={handleDiscard}
-          className="p-1.5 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
+          className="p-1.5 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
           title="Discard recording"
         >
           <HiOutlineTrash className="w-4 h-4" />
         </button>
 
+        {/* Send Button */}
         <button
           type="button"
           onClick={handleStopAndSend}
-          className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs flex items-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer"
+          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
           title="Send voice note"
         >
           <HiOutlinePaperAirplane className="w-3.5 h-3.5 rotate-90" />
@@ -426,7 +646,8 @@ const LiveVoiceRecorder: React.FC<{
   );
 };
 
-export interface GlobalChatRoomProps {
+
+interface GlobalChatRoomProps {
   currentUser?: User | null;
   onBack?: () => void;
 }
@@ -1003,7 +1224,7 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
                         onVote={(optionId) => handleVotePoll(msg.id, optionId)}
                         isMe={isMe}
                       />
-                    ) : msg.messageType === 'voice' || msg.audioUrl ? (
+                    ) : !msg.isDeleted && (msg.messageType === 'voice' || msg.audioUrl) ? (
                       <VoiceNotePlayer
                         audioUrl={msg.audioUrl || ''}
                         duration={msg.audioDuration}

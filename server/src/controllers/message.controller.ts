@@ -414,13 +414,6 @@ export const editMessage = async (
       ? req.params.messageId[0]
       : req.params.messageId;
     const messageId = (rawMessageId || '').trim();
-    const content = (req.body.content || '').trim();
-
-    if (!content) {
-      res.status(400).json({ status: 'error', message: 'Message content cannot be empty' });
-      return;
-    }
-
     const messageRepository = AppDataSource.getRepository(Message);
     const message = await messageRepository.findOne({ where: { id: messageId } });
 
@@ -432,6 +425,38 @@ export const editMessage = async (
     if (message.senderId !== currentUserId) {
       res.status(403).json({ status: 'error', message: 'You can only edit your own messages' });
       return;
+    }
+
+    // Disallow editing for posts, reels, story replies, polls, voice notes, documents, system messages
+    const isSpecialNonEditable =
+      message.messageType === 'post' ||
+      message.messageType === 'reel' ||
+      message.messageType === 'story_reply' ||
+      message.messageType === 'poll' ||
+      message.messageType === 'system' ||
+      message.messageType === 'voice' ||
+      message.messageType === 'audio' ||
+      message.messageType === 'document' ||
+      !!message.audioUrl ||
+      /\/post(?:s)?\/[a-zA-Z0-9_-]+/i.test(message.content) ||
+      /\/reels\/[a-zA-Z0-9_-]+/i.test(message.content);
+
+    if (isSpecialNonEditable) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Only messages and media captions can be edited',
+      });
+      return;
+    }
+
+    let content = (req.body.content || '').trim();
+    if (!content) {
+      if (message.mediaUrl || message.messageType === 'image' || message.messageType === 'video') {
+        content = message.messageType === 'video' ? 'Video' : 'Photo';
+      } else {
+        res.status(400).json({ status: 'error', message: 'Message content cannot be empty' });
+        return;
+      }
     }
 
     // Enforce 10-minute edit limit
@@ -545,11 +570,13 @@ export const deleteMessage = async (
 
       message.isDeletedForEveryone = true;
       message.content = 'This message was deleted';
+      message.messageType = 'text';
       message.isPinned = false;
       message.pinnedAt = undefined;
       message.pinnedBy = undefined;
       message.starredBy = [];
       message.audioUrl = undefined;
+      message.audioDuration = undefined;
       message.mediaUrl = undefined;
       message.poll = undefined;
       const saved = await messageRepository.save(message);

@@ -629,11 +629,6 @@ export const editGroupMessage = async (
     const messageId = getParam(req.params.messageId);
     const { content } = req.body;
 
-    if (!content || typeof content !== 'string' || !content.trim()) {
-      res.status(400).json({ status: 'error', message: 'New content is required' });
-      return;
-    }
-
     const messageRepository = AppDataSource.getRepository(GroupMessage);
     const message = await messageRepository.findOne({
       where: { id: messageId, groupId },
@@ -650,7 +645,38 @@ export const editGroupMessage = async (
       return;
     }
 
-    message.content = content.trim();
+    // Disallow editing for posts, reels, story replies, polls, voice notes, documents, system messages
+    const isSpecialNonEditable =
+      message.messageType === 'post' ||
+      message.messageType === 'reel' ||
+      message.messageType === 'poll' ||
+      message.messageType === 'system' ||
+      message.messageType === 'voice' ||
+      message.messageType === 'audio' ||
+      message.messageType === 'document' ||
+      !!message.audioUrl ||
+      /\/post(?:s)?\/[a-zA-Z0-9_-]+/i.test(message.content) ||
+      /\/reels\/[a-zA-Z0-9_-]+/i.test(message.content);
+
+    if (isSpecialNonEditable) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Only messages and media captions can be edited',
+      });
+      return;
+    }
+
+    let finalContent = typeof content === 'string' ? content.trim() : '';
+    if (!finalContent) {
+      if (message.mediaUrl || message.messageType === 'image' || message.messageType === 'video') {
+        finalContent = message.messageType === 'video' ? 'Video' : 'Photo';
+      } else {
+        res.status(400).json({ status: 'error', message: 'New content is required' });
+        return;
+      }
+    }
+
+    message.content = finalContent;
     message.isEdited = true;
     message.editedAt = new Date();
 
@@ -720,6 +746,7 @@ export const deleteGroupMessage = async (
 
       message.isDeletedForEveryone = true;
       message.content = 'This message was deleted';
+      message.messageType = 'text';
       message.isPinned = false;
       message.pinnedAt = undefined;
       message.pinnedBy = undefined;
