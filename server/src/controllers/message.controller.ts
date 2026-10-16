@@ -47,6 +47,14 @@ export const getConversations = async (
     for (const msg of visibleMessages) {
       const partnerId = msg.senderId === currentUserId ? msg.receiverId : msg.senderId;
       if (!lastMessagesMap[partnerId]) {
+        if (msg.isDeletedForEveryone) {
+          msg.content = 'This message was deleted';
+          msg.messageType = 'text';
+          msg.audioUrl = undefined;
+          msg.audioDuration = undefined;
+          msg.mediaUrl = undefined;
+          msg.poll = undefined;
+        }
         lastMessagesMap[partnerId] = msg;
         conversationPartnerIds.push(partnerId);
       }

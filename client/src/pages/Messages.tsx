@@ -26,6 +26,9 @@ import {
   HiOutlineSpeakerXMark,
   HiOutlineSpeakerWave,
   HiOutlineNoSymbol,
+  HiOutlinePhoto,
+  HiOutlineFilm,
+  HiOutlineDocumentText,
   HiOutlineEllipsisVertical,
   HiOutlineEnvelope,
   HiOutlineEnvelopeOpen,
@@ -1088,6 +1091,81 @@ const MultiSelectActionBar: React.FC<{
       </div>
     </div>
   );
+};
+
+const renderLastMessagePreview = (
+  msg: any,
+  fallbackText: string = ''
+) => {
+  if (!msg) {
+    return <span className="text-slate-400 italic">No messages yet</span>;
+  }
+
+  // 1. Explicitly check if message was deleted for everyone or content marked deleted
+  if (msg.isDeletedForEveryone || msg.content === 'This message was deleted') {
+    return (
+      <span className="italic text-slate-400 inline-flex items-center gap-1">
+        <HiOutlineNoSymbol className="w-3.5 h-3.5 text-slate-400 shrink-0 inline" />
+        <span>This message was deleted</span>
+      </span>
+    );
+  }
+
+  // 2. Voice note (only if not deleted)
+  if (msg.messageType === 'voice' || (msg.audioUrl && !msg.isDeletedForEveryone)) {
+    return (
+      <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
+        <HiOutlineMicrophone className="w-3.5 h-3.5 text-indigo-500 shrink-0 inline" />
+        <span>Voice note</span>
+      </span>
+    );
+  }
+
+  // 3. Image / Photo
+  if (
+    msg.messageType === 'image' ||
+    (msg.mediaUrl && /\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i.test(msg.mediaUrl)) ||
+    msg.mediaUrl?.startsWith('data:image/')
+  ) {
+    return (
+      <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
+        <HiOutlinePhoto className="w-3.5 h-3.5 text-indigo-500 shrink-0 inline" />
+        <span>Photo</span>
+      </span>
+    );
+  }
+
+  // 4. Video
+  if (
+    msg.messageType === 'video' ||
+    (msg.mediaUrl && /\.(mp4|webm|mov|mkv)(\?.*)?$/i.test(msg.mediaUrl)) ||
+    msg.mediaUrl?.startsWith('data:video/')
+  ) {
+    return (
+      <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
+        <HiOutlineFilm className="w-3.5 h-3.5 text-indigo-500 shrink-0 inline" />
+        <span>Video</span>
+      </span>
+    );
+  }
+
+  // 5. Document
+  if (msg.messageType === 'document') {
+    return (
+      <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
+        <HiOutlineDocumentText className="w-3.5 h-3.5 text-indigo-500 shrink-0 inline" />
+        <span>{msg.fileName || 'Document'}</span>
+      </span>
+    );
+  }
+
+  // 6. Poll
+  if (msg.poll) {
+    return <span>📊 Poll: {msg.poll.question}</span>;
+  }
+
+  // 7. Regular text or fallback
+  return <span>{msg.content || fallbackText}</span>;
 };
 
 export default function Messages() {
@@ -2297,7 +2375,7 @@ export default function Messages() {
             ? {
                 ...m,
                 isDeletedForEveryone: true,
-                content,
+                content: content || 'This message was deleted',
                 messageType: 'text',
                 audioUrl: undefined,
                 audioDuration: undefined,
@@ -2311,6 +2389,28 @@ export default function Messages() {
             : m
         )
       );
+
+      // Synchronize conversations list immediately
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.lastMessage?.id === messageId
+            ? {
+                ...c,
+                lastMessage: {
+                  ...c.lastMessage,
+                  isDeletedForEveryone: true,
+                  content: content || 'This message was deleted',
+                  messageType: 'text',
+                  audioUrl: undefined,
+                  audioDuration: undefined,
+                  mediaUrl: undefined,
+                  poll: undefined,
+                },
+              }
+            : c
+        )
+      );
+
       showInfo('A message was deleted for everyone', 'Message Deleted');
     };
 
@@ -2458,6 +2558,28 @@ export default function Messages() {
         if (isDeletedForEveryone) {
           showInfo('A message in this group was deleted', 'Message Deleted');
         }
+      }
+
+      if (isDeletedForEveryone) {
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === groupId && g.lastMessage?.id === messageId
+              ? {
+                  ...g,
+                  lastMessage: {
+                    ...g.lastMessage,
+                    isDeletedForEveryone: true,
+                    content: 'This message was deleted',
+                    messageType: 'text',
+                    audioUrl: undefined,
+                    audioDuration: undefined,
+                    mediaUrl: undefined,
+                    poll: undefined,
+                  },
+                }
+              : g
+          )
+        );
       }
     };
 
@@ -3082,6 +3204,25 @@ export default function Messages() {
                 : m
             )
           );
+          setGroups((prev) =>
+            prev.map((g) =>
+              deletedIds.has(g.lastMessage?.id || '')
+                ? {
+                    ...g,
+                    lastMessage: {
+                      ...g.lastMessage!,
+                      isDeletedForEveryone: true,
+                      content: 'This message was deleted',
+                      messageType: 'text',
+                      audioUrl: undefined,
+                      audioDuration: undefined,
+                      mediaUrl: undefined,
+                      poll: undefined,
+                    },
+                  }
+                : g
+            )
+          );
         } else {
           setGroupMessages((prev) => prev.filter((m) => !deletedIds.has(m.id)));
         }
@@ -3109,6 +3250,25 @@ export default function Messages() {
                     starredBy: [],
                   }
                 : m
+            )
+          );
+          setConversations((prev) =>
+            prev.map((c) =>
+              deletedIds.has(c.lastMessage?.id || '')
+                ? {
+                    ...c,
+                    lastMessage: {
+                      ...c.lastMessage!,
+                      isDeletedForEveryone: true,
+                      content: 'This message was deleted',
+                      messageType: 'text',
+                      audioUrl: undefined,
+                      audioDuration: undefined,
+                      mediaUrl: undefined,
+                      poll: undefined,
+                    },
+                  }
+                : c
             )
           );
         } else {
@@ -3718,11 +3878,7 @@ export default function Messages() {
                                   'User'}
                                 :{' '}
                               </span>
-                              <span>
-                                {g.lastMessage.messageType === 'voice'
-                                  ? '🎵 Voice note'
-                                  : g.lastMessage.content}
-                              </span>
+                              {renderLastMessagePreview(g.lastMessage)}
                             </>
                           ) : (
                             <span className="text-slate-400 italic">No messages yet</span>
@@ -3839,10 +3995,8 @@ export default function Messages() {
                             <span className="text-emerald-600 font-semibold animate-pulse">
                               typing...
                             </span>
-                          ) : c.lastMessage?.messageType === 'voice' ? (
-                            '🎵 Voice note'
                           ) : (
-                            c.lastMessage?.content || `@${c.user.username}`
+                            renderLastMessagePreview(c.lastMessage, `@${c.user.username}`)
                           )}
                         </p>
                         {hasUnread && (
@@ -3924,11 +4078,7 @@ export default function Messages() {
                                 'User'}
                               :{' '}
                             </span>
-                            <span>
-                              {globalStats.lastMessage.messageType === 'voice'
-                                ? '🎵 Voice note'
-                                : globalStats.lastMessage.content}
-                            </span>
+                            {renderLastMessagePreview(globalStats.lastMessage)}
                           </>
                         ) : (
                           <span className="text-slate-400 font-normal">
@@ -4015,11 +4165,7 @@ export default function Messages() {
                                     'User'}
                                   :{' '}
                                 </span>
-                                <span>
-                                  {g.lastMessage.messageType === 'voice'
-                                    ? '🎵 Voice note'
-                                    : g.lastMessage.content}
-                                </span>
+                                {renderLastMessagePreview(g.lastMessage)}
                               </>
                             ) : (
                               <span className="text-slate-400 italic">No messages yet</span>
@@ -4130,10 +4276,8 @@ export default function Messages() {
                             <span className="text-emerald-600 font-semibold animate-pulse">
                               typing...
                             </span>
-                          ) : c.lastMessage?.messageType === 'voice' ? (
-                            '🎵 Voice note'
                           ) : (
-                            c.lastMessage?.content || `@${c.user.username}`
+                            renderLastMessagePreview(c.lastMessage, `@${c.user.username}`)
                           )}
                         </p>
                         {hasUnread && (
@@ -4338,9 +4482,7 @@ export default function Messages() {
                       <span className="text-[10px] text-purple-500 font-normal">• Tap to jump</span>
                     </p>
                     <p className="text-xs text-slate-700 truncate max-w-md">
-                      {activePinnedMessage.messageType === 'voice'
-                        ? '🎵 Voice note'
-                        : activePinnedMessage.content}
+                      {renderLastMessagePreview(activePinnedMessage)}
                     </p>
                   </div>
                 </div>
@@ -5213,9 +5355,7 @@ export default function Messages() {
                       <span className="text-[10px] text-purple-500 font-normal">• Tap to jump</span>
                     </p>
                     <p className="text-xs text-slate-700 truncate max-w-md">
-                      {activePinnedMessage.messageType === 'voice'
-                        ? '🎵 Voice note'
-                        : activePinnedMessage.content}
+                      {renderLastMessagePreview(activePinnedMessage)}
                     </p>
                   </div>
                 </div>
