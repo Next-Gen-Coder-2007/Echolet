@@ -627,69 +627,75 @@ const VoiceRecorderBar: React.FC<{
   };
 
   return (
-    <div className="flex-1 flex items-center justify-between gap-3 px-4 py-2 bg-gradient-to-r from-rose-500/10 via-purple-500/10 to-indigo-500/10 dark:from-rose-950/30 dark:via-purple-950/20 dark:to-slate-900/40 border border-rose-500/25 rounded-2xl backdrop-blur-md shadow-sm animate-in fade-in duration-200">
-      {/* Recording status & Elapsed Timer */}
-      <div className="flex items-center gap-2.5 shrink-0">
-        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-[10px] font-bold tracking-wider uppercase select-none">
-          <span className={`w-2 h-2 rounded-full bg-rose-500 ${isPaused ? 'opacity-50' : 'animate-ping'}`} />
-          {isPaused ? 'PAUSED' : 'REC'}
-        </span>
-        <span className="font-mono text-sm font-bold text-slate-800 dark:text-slate-100 select-none">
-          {formatTime(seconds)}
-        </span>
-      </div>
+    <div className="p-3 sm:p-4 border-t border-slate-100 bg-white shrink-0 relative animate-in fade-in duration-150">
+      <div className="h-12 w-full px-3.5 sm:px-4 bg-slate-50/90 border border-slate-200/90 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
+        {/* Recording status & Elapsed Timer */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200/80 text-rose-600 text-[10px] font-bold tracking-wider uppercase select-none">
+            <span
+              className={`w-2 h-2 rounded-full bg-rose-500 ${
+                isPaused ? 'opacity-50' : 'animate-ping'
+              }`}
+            />
+            <span>{isPaused ? 'PAUSED' : 'REC'}</span>
+          </div>
+          <span className="font-mono text-xs sm:text-sm font-bold text-slate-800 select-none">
+            {formatTime(seconds)}
+          </span>
+        </div>
 
-      {/* Live Audio Visualizer Frequency Bars */}
-      <div className="flex-1 max-w-[200px] sm:max-w-[260px] h-7 flex items-center justify-center gap-[3px] px-2 overflow-hidden">
-        {frequencyData.map((heightPct, idx) => (
-          <div
-            key={idx}
-            style={{ height: `${heightPct}%` }}
-            className={`flex-1 rounded-full transition-all duration-75 ${
-              isPaused
-                ? 'bg-slate-300 dark:bg-slate-600'
-                : 'bg-gradient-to-t from-rose-500 to-purple-500 shadow-[0_0_6px_rgba(244,63,94,0.4)]'
-            }`}
-          />
-        ))}
-      </div>
+        {/* Live Audio Visualizer Frequency Bars */}
+        <div className="flex-1 max-w-[200px] sm:max-w-[280px] h-6 flex items-center justify-center gap-[3px] px-2 overflow-hidden select-none">
+          {frequencyData.map((heightPct, idx) => (
+            <div
+              key={idx}
+              style={{ height: `${Math.max(15, heightPct)}%` }}
+              className={`w-1 rounded-full transition-all duration-75 ${
+                isPaused
+                  ? 'bg-slate-300'
+                  : 'bg-purple-600'
+              }`}
+            />
+          ))}
+        </div>
 
-      {/* Action controls */}
-      <div className="flex items-center gap-1.5 shrink-0">
-        {/* Pause / Resume Button */}
-        <button
-          type="button"
-          onClick={togglePauseResume}
-          className="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-          title={isPaused ? 'Resume recording' : 'Pause recording'}
-        >
-          {isPaused ? (
-            <HiOutlinePlay className="w-4 h-4 fill-current ml-0.5" />
-          ) : (
-            <HiOutlinePause className="w-4 h-4 fill-current" />
-          )}
-        </button>
+        {/* Action controls */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Pause / Resume Button */}
+          <button
+            type="button"
+            onClick={togglePauseResume}
+            className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
+            title={isPaused ? 'Resume recording' : 'Pause recording'}
+          >
+            {isPaused ? (
+              <HiOutlinePlay className="w-4 h-4 fill-current ml-0.5 text-purple-600" />
+            ) : (
+              <HiOutlinePause className="w-4 h-4 fill-current text-slate-600" />
+            )}
+          </button>
 
-        {/* Discard Button */}
-        <button
-          type="button"
-          onClick={handleDiscard}
-          className="p-1.5 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-          title="Discard recording"
-        >
-          <HiOutlineTrash className="w-4 h-4" />
-        </button>
+          {/* Discard Button */}
+          <button
+            type="button"
+            onClick={handleDiscard}
+            className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
+            title="Discard recording"
+          >
+            <HiOutlineTrash className="w-4 h-4" />
+          </button>
 
-        {/* Send Button */}
-        <button
-          type="button"
-          onClick={handleStopAndSend}
-          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-          title="Send voice note"
-        >
-          <HiOutlinePaperAirplane className="w-3.5 h-3.5 rotate-90" />
-          <span>Send</span>
-        </button>
+          {/* Send Button */}
+          <button
+            type="button"
+            onClick={handleStopAndSend}
+            className="h-8 px-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+            title="Send voice note"
+          >
+            <HiOutlinePaperAirplane className="w-3.5 h-3.5 rotate-90" />
+            <span>Send</span>
+          </button>
+        </div>
       </div>
     </div>
   );
