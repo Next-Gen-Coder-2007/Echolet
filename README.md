@@ -43,7 +43,7 @@
 
 ## Implementation Status
 
-> **Overall Progress: ~80% (Core Platform, Stories, Reels, Custom Folders, Media Studio & High-Fidelity Messaging Active)**
+> **Overall Progress: ~85% (Core Platform, Stories, Reels, Custom Folders, Media Studio, WebRTC Voice Calls & Real-time Messaging Complete)**
 
 | Sl No | Feature | Status | What's Implemented | What's Pending |
 |:---:|---|:---:|---|---|
@@ -59,7 +59,7 @@
 | 10 | **Trending** | ⚪ 0% | — | Trending ranking engine (engagement + velocity + recency) |
 | 11 | **Hashtags** | 🔴 ~10% | Hashtags can be typed into posts | Hashtag parsing/indexing, hashtag pages, follow hashtags, search hashtags |
 | 12 | **Search** | 🟡 ~35% | Real-time user search by username/display name | Search posts, reels, hashtags, and media |
-| 13 | **Messaging & Studio** | 🟢 ~98% | Real-time 1-to-1 direct messaging, group chat management, public Global Chatroom, **Media Upload Preview Studio** (Crop & Rotate with multiple aspect ratios, Paint & Doodle canvas with color palette selector & brush sizing, editable captions with emoji picker), **Voice Engine** (studio-grade Web Audio API real-time frequency visualizer bars, pause/resume, continuous 60/120 FPS liquid wave playback with gliding micro-scrubber needle), clean deleted message & voice note fallbacks, message editing restricted to text/captions, emoji reactions | Voice/video calls |
+| 13 | **Messaging & Studio** | 🟢 100% | Real-time 1-to-1 direct messaging, group chat management, public Global Chatroom, **WebRTC 1-to-1 Voice Calls** (P2P real-time audio streaming, Web Audio API ringtone synthesizer, live waveform dancing visualizer bars, minimizable floating pill widget, mute/unmute, call duration timer), **Media Upload Preview Studio** (Crop & Rotate with multiple aspect ratios, Paint & Doodle canvas with color palette selector & brush sizing, editable captions with emoji picker), **Voice Engine** (studio-grade Web Audio API real-time frequency visualizer bars, pause/resume, continuous 60/120 FPS liquid wave playback with gliding micro-scrubber needle), clean deleted message & voice note fallbacks, message editing restricted to text/captions, emoji reactions | Video calls (in roadmap) |
 | 14 | **Notifications** | 🔴 ~15% | Frontend UI layout (`Notifications.tsx`) with mock data | Backend entity, DB persistence, real-time socket triggers on interactions |
 | 15 | **Bookmarks** | 🟢 ~95% | Save/unsave posts and reels, custom user-created folders with color tags, folder filtering tabs, inline folder creation in picker modal, move items between folders, clean modern UI without emoji clutter | Shared/collaborative folders |
 | 16 | **Reactions** | 🔴 ~20% | Binary like/heart on posts & comments | Rich emoji reactions (Love, Funny, Fire, Wow, Sad, Dead, Applause) |

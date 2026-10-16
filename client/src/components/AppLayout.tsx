@@ -4,6 +4,8 @@ import Sidebar from './Sidebar';
 import authService, { type User } from '../services/authService';
 import messageService from '../services/messageService';
 import getSocket, { joinUserRoom } from '../services/socket';
+import { CallProvider } from '../context/CallContext';
+import VoiceCallModal from './VoiceCallModal';
 
 interface AppLayoutProps {
   children?: React.ReactNode;
@@ -127,30 +129,35 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
     : 'U';
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] relative flex flex-col">
-      <div className="flex-1 flex relative">
-        <Sidebar
-          avatarUrl={user?.avatarUrl}
-          userInitials={userInitials}
-          username={user?.username}
-          unreadMessagesCount={unreadMessagesCount}
-          onLogout={handleLogout}
-        />
+    <CallProvider currentUser={user}>
+      <div className="min-h-screen bg-[#f8fafc] relative flex flex-col">
+        <div className="flex-1 flex relative">
+          <Sidebar
+            avatarUrl={user?.avatarUrl}
+            userInitials={userInitials}
+            username={user?.username}
+            unreadMessagesCount={unreadMessagesCount}
+            onLogout={handleLogout}
+          />
 
-        <main className="flex-1 ml-20 sm:ml-24 md:ml-28 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-h-screen flex flex-col">
-          <div className="w-full flex-1 flex flex-col">
-            {children || (
-              <Outlet
-                context={{
-                  user,
-                  onUserUpdated: (updatedUser: User) => setUser(updatedUser),
-                  refreshUnreadCount: fetchUnreadCount,
-                }}
-              />
-            )}
-          </div>
-        </main>
+          <main className="flex-1 ml-20 sm:ml-24 md:ml-28 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 min-h-screen flex flex-col">
+            <div className="w-full flex-1 flex flex-col">
+              {children || (
+                <Outlet
+                  context={{
+                    user,
+                    onUserUpdated: (updatedUser: User) => setUser(updatedUser),
+                    refreshUnreadCount: fetchUnreadCount,
+                  }}
+                />
+              )}
+            </div>
+          </main>
+        </div>
+
+        {/* Global WebRTC Voice Call Modal / Floating Minimized Widget */}
+        <VoiceCallModal />
       </div>
-    </div>
+    </CallProvider>
   );
 }

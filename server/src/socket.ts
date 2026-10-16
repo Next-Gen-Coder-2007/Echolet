@@ -15,6 +15,9 @@ const onlineUsers = new Map<string, Set<string>>();
 // Track socketId -> userId
 const socketToUser = new Map<string, string>();
 
+// Track active ongoing calls: userId -> partnerId
+const activeCalls = new Map<string, string>();
+
 // Global chat presence tracking
 const globalChatSockets = new Set<string>();
 const globalChatUserCounts = new Map<string, number>();
@@ -256,6 +259,91 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
       socket.to('global_chat').emit('global_stop_typing', { userId });
     });
 
+    // ======================== VOICE & WEBRTC CALL SIGNALING ========================
+    socket.on(
+      'call:initiate',
+      (payload: {
+        toUserId: string;
+        caller: {
+          id: string;
+          fullName: string;
+          username: string;
+          avatarUrl?: string;
+        };
+      }) => {
+        const { toUserId, caller } = payload;
+        if (!toUserId || !caller) return;
+        const senderId = socketToUser.get(socket.id) || caller.id;
+
+        if (toUserId === senderId) return;
+
+        // Check if recipient is online
+        if (!isUserOnline(toUserId)) {
+          socket.emit('call:user_offline', { toUserId });
+          return;
+        }
+
+        // Check if either party is currently in an active call
+        if (activeCalls.has(toUserId) || activeCalls.has(senderId)) {
+          socket.emit('call:busy', { toUserId });
+          return;
+        }
+
+        // Forward incoming call event to recipient room
+        io?.to(toUserId).emit('call:incoming', {
+          caller,
+          fromUserId: senderId,
+        });
+      }
+    );
+
+    socket.on('call:accept', (payload: { toUserId: string }) => {
+      const currentUserId = socketToUser.get(socket.id);
+      if (!currentUserId || !payload?.toUserId) return;
+
+      activeCalls.set(currentUserId, payload.toUserId);
+      activeCalls.set(payload.toUserId, currentUserId);
+
+      io?.to(payload.toUserId).emit('call:accepted', {
+        fromUserId: currentUserId,
+      });
+    });
+
+    socket.on('call:reject', (payload: { toUserId: string; reason?: string }) => {
+      const currentUserId = socketToUser.get(socket.id);
+      if (!payload?.toUserId) return;
+
+      io?.to(payload.toUserId).emit('call:rejected', {
+        fromUserId: currentUserId,
+        reason: payload.reason || 'declined',
+      });
+    });
+
+    socket.on('call:signal', (payload: { toUserId: string; signal: any }) => {
+      const currentUserId = socketToUser.get(socket.id);
+      if (!payload?.toUserId || !payload?.signal) return;
+
+      io?.to(payload.toUserId).emit('call:signal', {
+        fromUserId: currentUserId,
+        signal: payload.signal,
+      });
+    });
+
+    socket.on('call:end', (payload: { toUserId?: string }) => {
+      const currentUserId = socketToUser.get(socket.id);
+      if (currentUserId) {
+        const partnerId = payload?.toUserId || activeCalls.get(currentUserId);
+        activeCalls.delete(currentUserId);
+        if (partnerId) {
+          activeCalls.delete(partnerId);
+          io?.to(partnerId).emit('call:ended', {
+            fromUserId: currentUserId,
+            reason: 'hangup',
+          });
+        }
+      }
+    });
+
     socket.on('disconnect', () => {
       const userId = socketToUser.get(socket.id);
       if (globalChatSockets.has(socket.id)) {
@@ -281,6 +369,20 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
 
 const handleUserDisconnect = async (socketId: string, userId: string) => {
   socketToUser.delete(socketId);
+
+  // Terminate active call if user disconnected
+  if (activeCalls.has(userId)) {
+    const partnerId = activeCalls.get(userId);
+    activeCalls.delete(userId);
+    if (partnerId) {
+      activeCalls.delete(partnerId);
+      io?.to(partnerId).emit('call:ended', {
+        fromUserId: userId,
+        reason: 'disconnected',
+      });
+    }
+  }
+
   const sockets = onlineUsers.get(userId);
   if (!sockets) return;
 

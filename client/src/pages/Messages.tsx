@@ -30,6 +30,7 @@ import {
   HiOutlineEnvelope,
   HiOutlineEnvelopeOpen,
   HiOutlineGlobeAlt,
+  HiOutlinePhone,
 } from 'react-icons/hi2';
 import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
 import messageService, {
@@ -48,6 +49,7 @@ import userService, { type UserProfileResponse } from '../services/userService';
 import type { User } from '../services/authService';
 import getSocket, { joinUserRoom } from '../services/socket';
 import { useMessage } from '../context/MessageContext';
+import { useVoiceCall } from '../context/CallContext';
 import CreateGroupModal from '../components/CreateGroupModal';
 import GroupInfoModal from '../components/GroupInfoModal';
 import ConversationDetailsView from '../components/ConversationDetailsView';
@@ -1090,6 +1092,7 @@ const MultiSelectActionBar: React.FC<{
 
 export default function Messages() {
   const { showSuccess, showError, showInfo, showWarning } = useMessage();
+  const { startVoiceCall } = useVoiceCall();
   const { username: paramUsername } = useParams<{ username?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -5134,6 +5137,25 @@ export default function Messages() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <button
+                    id="direct-chat-voice-call-btn"
+                    type="button"
+                    onClick={() => {
+                      if (activeUser) {
+                        startVoiceCall({
+                          id: activeUser.id,
+                          fullName: activeUser.fullName,
+                          username: activeUser.username,
+                          avatarUrl: activeUser.avatarUrl,
+                        });
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-700 text-xs sm:text-sm font-semibold cursor-pointer transition-colors shrink-0 shadow-2xs"
+                    title={`Voice Call ${activeUser.fullName}`}
+                  >
+                    <HiOutlinePhone className="w-4 h-4 text-emerald-600" />
+                    <span className="hidden sm:inline">Call</span>
+                  </button>
 
                   <button
                     onClick={() => navigate(`/profile/${activeUser.username}`)}

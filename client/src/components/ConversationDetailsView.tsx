@@ -25,6 +25,7 @@ import {
   HiOutlineSquares2X2,
   HiOutlinePlay,
   HiOutlinePause,
+  HiOutlinePhone,
 } from 'react-icons/hi2';
 import { BsPinAngleFill } from 'react-icons/bs';
 import type { User } from '../services/authService';
@@ -35,6 +36,7 @@ import groupService, {
   type GroupItem,
   type GroupMemberItem,
 } from '../services/groupService';
+import { useVoiceCall } from '../context/CallContext';
 import MediaViewerModal from './MediaViewerModal';
 import Modal from './Modal';
 
@@ -287,6 +289,7 @@ export default function ConversationDetailsView({
   onLeaveGroup,
 }: ConversationDetailsViewProps) {
   const navigate = useNavigate();
+  const { startVoiceCall } = useVoiceCall();
   const isGroup = Boolean(group);
 
   // Synchronously initialize user profile from prop so there's zero layout shift
@@ -972,13 +975,37 @@ export default function ConversationDetailsView({
 
             {/* Presence status */}
             {!isGroup && (
-              <p
-                className={`text-xs mt-1.5 font-semibold ${
-                  isOnline ? 'text-emerald-600' : 'text-slate-400'
-                }`}
-              >
-                {isOnline ? 'Active Now' : formatLastSeen(lastSeen)}
-              </p>
+              <>
+                <p
+                  className={`text-xs mt-1.5 font-semibold ${
+                    isOnline ? 'text-emerald-600' : 'text-slate-400'
+                  }`}
+                >
+                  {isOnline ? 'Active Now' : formatLastSeen(lastSeen)}
+                </p>
+
+                {/* Direct Voice Call Quick Action Button */}
+                <div className="mt-3.5 flex items-center justify-center gap-2">
+                  <button
+                    id="conversation-details-voice-call-btn"
+                    type="button"
+                    onClick={() => {
+                      if (user) {
+                        startVoiceCall({
+                          id: user.id,
+                          fullName: user.fullName,
+                          username: user.username,
+                          avatarUrl: user.avatarUrl,
+                        });
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all hover:scale-102 active:scale-95 cursor-pointer"
+                  >
+                    <HiOutlinePhone className="w-4 h-4" />
+                    <span>Voice Call</span>
+                  </button>
+                </div>
+              </>
             )}
 
             {/* Bio or Group Description */}
