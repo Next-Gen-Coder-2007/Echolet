@@ -22,6 +22,8 @@ import { ReelComment } from '../entities/ReelComment';
 import { ReelCommentReaction } from '../entities/ReelCommentReaction';
 import { Story } from '../entities/Story';
 import { BookmarkCollection } from '../entities/BookmarkCollection';
+import { FollowRequest } from '../entities/FollowRequest';
+import { Notification } from '../entities/Notification';
 
 dotenv.config();
 
@@ -32,6 +34,8 @@ const isPostgres =
 const entitiesList = [
   User,
   Follow,
+  FollowRequest,
+  Notification,
   Message,
   Post,
   PostLike,

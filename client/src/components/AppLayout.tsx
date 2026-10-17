@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import authService, { type User } from '../services/authService';
 import messageService from '../services/messageService';
+import notificationService from '../services/notificationService';
 import getSocket, { joinUserRoom } from '../services/socket';
 import { CallProvider } from '../context/CallContext';
 import VoiceCallModal from './VoiceCallModal';
@@ -18,6 +19,7 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
   const [user, setUser] = useState<User | null>(initialUser ?? null);
   const [loading, setLoading] = useState(initialUser === undefined);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
 
   const fetchUnreadCount = useCallback(async () => {
     try {
@@ -25,6 +27,15 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
       setUnreadMessagesCount(count);
     } catch {
       // silently fail if network or unauthorized
+    }
+  }, []);
+
+  const fetchNotificationCount = useCallback(async () => {
+    try {
+      const count = await notificationService.getUnreadCount();
+      setUnreadNotificationsCount(count);
+    } catch {
+      // silently fail
     }
   }, []);
 
@@ -52,12 +63,13 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
     };
   }, [initialUser]);
 
-  // Load unread count and listen for socket message events
+  // Load unread counts and listen for socket message and notification events
   useEffect(() => {
     if (!user?.id) return;
 
     joinUserRoom(user.id);
     fetchUnreadCount();
+    fetchNotificationCount();
 
     const socket = getSocket();
 
@@ -65,10 +77,18 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
       setUnreadMessagesCount(count);
     };
 
+    const handleNotificationCount = ({ count }: { count: number }) => {
+      setUnreadNotificationsCount(count);
+    };
+
     const handleNewMessage = (msg: { receiverId: string }) => {
       if (msg.receiverId === user.id) {
         fetchUnreadCount();
       }
+    };
+
+    const handleNewNotification = () => {
+      fetchNotificationCount();
     };
 
     const handleMessagesRead = ({ readerId }: { readerId?: string } = {}) => {
@@ -78,20 +98,25 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
     };
 
     socket.on('unread_count', handleUnreadCount);
+    socket.on('notification_count', handleNotificationCount);
     socket.on('new_message', handleNewMessage);
+    socket.on('new_notification', handleNewNotification);
     socket.on('messages_read', handleMessagesRead);
 
     return () => {
       socket.off('unread_count', handleUnreadCount);
+      socket.off('notification_count', handleNotificationCount);
       socket.off('new_message', handleNewMessage);
+      socket.off('new_notification', handleNewNotification);
       socket.off('messages_read', handleMessagesRead);
     };
-  }, [user?.id, fetchUnreadCount]);
+  }, [user?.id, fetchUnreadCount, fetchNotificationCount]);
 
-  // Whenever the user navigates, refresh unread count
+  // Whenever the user navigates, refresh unread counts
   useEffect(() => {
     if (user?.id) {
       fetchUnreadCount();
+      fetchNotificationCount();
     }
   }, [location.pathname, user?.id, fetchUnreadCount]);
 
@@ -137,6 +162,7 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
             userInitials={userInitials}
             username={user?.username}
             unreadMessagesCount={unreadMessagesCount}
+            unreadNotificationsCount={unreadNotificationsCount}
             onLogout={handleLogout}
           />
 
@@ -148,6 +174,7 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
                     user,
                     onUserUpdated: (updatedUser: User) => setUser(updatedUser),
                     refreshUnreadCount: fetchUnreadCount,
+                    refreshNotificationCount: fetchNotificationCount,
                   }}
                 />
               )}

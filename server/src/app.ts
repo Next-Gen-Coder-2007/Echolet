@@ -14,6 +14,7 @@ import reelRoutes from './routes/reel.routes';
 import searchRoutes from './routes/search.routes';
 import storyRoutes from './routes/story.routes';
 import collectionRoutes from './routes/collection.routes';
+import notificationRoutes from './routes/notification.routes';
 
 dotenv.config();
 
@@ -88,5 +89,6 @@ app.use('/api/reels', reelRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/stories', storyRoutes);
 app.use('/api/collections', collectionRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 export default app;
