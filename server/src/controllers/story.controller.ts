@@ -84,11 +84,21 @@ export const getStories = async (req: AuthenticatedRequest, res: Response): Prom
       },
     });
 
+    const iFollowUserIds = new Set<string>();
+    follows.forEach((f) => {
+      if (f.followerId === currentUserId) {
+        iFollowUserIds.add(f.followingId);
+      }
+    });
+
     // Group stories by userId
     const groupMap = new Map<string, UserStoryGroup>();
 
     activeStories.forEach((story) => {
       if (!story.user) return;
+      if (story.user.isPrivate && story.userId !== currentUserId && !iFollowUserIds.has(story.userId)) {
+        return;
+      }
 
       const viewers: StoryViewerItem[] = Array.isArray(story.viewers) ? story.viewers : [];
       const isViewed = Boolean(currentUserId && viewers.some((v) => v.userId === currentUserId));

@@ -9,6 +9,7 @@ import { CommentLike } from '../entities/CommentLike';
 import { PollVote } from '../entities/PollVote';
 import { User } from '../entities/User';
 import { Follow } from '../entities/Follow';
+import { Notification } from '../entities/Notification';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import {
   emitNewPost,
@@ -16,6 +17,7 @@ import {
   emitPostLiked,
   emitNewComment,
   emitPostPollVoted,
+  emitNotification,
 } from '../socket';
 
 /**
@@ -312,6 +314,29 @@ export const getFeedPosts = async (
       queryBuilder = queryBuilder.where('post.userId IN (:...followingIds)', {
         followingIds,
       });
+    } else {
+      // For 'for-you' feed: exclude posts from private accounts unless viewer is author or following author
+      if (currentUserId) {
+        const followings = await followRepo.find({
+          where: { followerId: currentUserId },
+          select: { followingId: true },
+        });
+        const followingIds = followings.map((f) => f.followingId);
+
+        if (followingIds.length > 0) {
+          queryBuilder = queryBuilder.where(
+            '(user.isPrivate = :isFalse OR post.userId = :currentUserId OR post.userId IN (:...followingIds))',
+            { isFalse: false, currentUserId, followingIds }
+          );
+        } else {
+          queryBuilder = queryBuilder.where(
+            '(user.isPrivate = :isFalse OR post.userId = :currentUserId)',
+            { isFalse: false, currentUserId }
+          );
+        }
+      } else {
+        queryBuilder = queryBuilder.where('user.isPrivate = :isFalse', { isFalse: false });
+      }
     }
 
     const [posts, totalCount] = await queryBuilder.getManyAndCount();
@@ -358,6 +383,35 @@ export const getUserPosts = async (
         message: 'User not found',
       });
       return;
+    }
+
+    const isTargetPrivate = Boolean(targetUser.isPrivate);
+    if (isTargetPrivate && currentUserId !== targetUser.id) {
+      const followRepo = AppDataSource.getRepository(Follow);
+      const isFollowing = currentUserId
+        ? Boolean(
+            await followRepo.findOne({
+              where: { followerId: currentUserId, followingId: targetUser.id },
+            })
+          )
+        : false;
+
+      if (!isFollowing) {
+        res.json({
+          status: 'success',
+          user: {
+            id: targetUser.id,
+            username: targetUser.username,
+            fullName: targetUser.fullName,
+            isPrivate: true,
+          },
+          type,
+          isPrivate: true,
+          canViewPosts: false,
+          posts: [],
+        });
+        return;
+      }
     }
 
     const postRepo = AppDataSource.getRepository(Post);
@@ -448,6 +502,26 @@ export const getPostById = async (
         message: 'Post not found',
       });
       return;
+    }
+
+    if (post.user?.isPrivate && post.userId !== currentUserId) {
+      const followRepo = AppDataSource.getRepository(Follow);
+      const isFollowing = currentUserId
+        ? Boolean(
+            await followRepo.findOne({
+              where: { followerId: currentUserId, followingId: post.userId },
+            })
+          )
+        : false;
+
+      if (!isFollowing) {
+        res.status(403).json({
+          status: 'error',
+          isPrivate: true,
+          message: 'This account is private. Follow this user to see their posts.',
+        });
+        return;
+      }
     }
 
     const [enrichedPost] = await enrichPostsWithUserData([post], currentUserId);
@@ -559,6 +633,26 @@ export const toggleLikePost = async (
     }
 
     await postRepo.save(post);
+
+    if (isLiked && currentUserId !== post.userId) {
+      const notificationRepo = AppDataSource.getRepository(Notification);
+      const notif = notificationRepo.create({
+        recipientId: post.userId,
+        actorId: currentUserId,
+        type: 'like',
+        entityType: 'post',
+        entityId: id,
+        message: post.content ? post.content.slice(0, 60) : 'liked your post',
+      });
+      const savedNotif = await notificationRepo.save(notif);
+      const fullNotif = await notificationRepo.findOne({
+        where: { id: savedNotif.id },
+        relations: { actor: true },
+      });
+      if (fullNotif) {
+        emitNotification(fullNotif);
+      }
+    }
 
     emitPostLiked({
       postId: id,
@@ -987,6 +1081,26 @@ export const addComment = async (
     });
 
     emitNewComment(populatedComment);
+
+    if (currentUserId !== post.userId) {
+      const notificationRepo = AppDataSource.getRepository(Notification);
+      const notif = notificationRepo.create({
+        recipientId: post.userId,
+        actorId: currentUserId,
+        type: 'comment',
+        entityType: 'post',
+        entityId: id,
+        message: trimmedContent.slice(0, 60),
+      });
+      const savedNotif = await notificationRepo.save(notif);
+      const fullNotif = await notificationRepo.findOne({
+        where: { id: savedNotif.id },
+        relations: { actor: true },
+      });
+      if (fullNotif) {
+        emitNotification(fullNotif);
+      }
+    }
 
     res.status(201).json({
       status: 'success',

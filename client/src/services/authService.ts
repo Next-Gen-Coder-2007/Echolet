@@ -14,6 +14,10 @@ export interface User {
   followingCount?: number;
   lastSeen?: string;
   isOnline?: boolean;
+  isPrivate?: boolean;
+  isFollowing?: boolean;
+  isFollowedBy?: boolean;
+  canMessageAndCall?: boolean;
   createdAt: string;
   updatedAt: string;
 }

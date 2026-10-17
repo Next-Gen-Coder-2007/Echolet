@@ -7,6 +7,7 @@ import { ReelBookmark } from '../entities/ReelBookmark';
 import { ReelComment } from '../entities/ReelComment';
 import { ReelCommentReaction } from '../entities/ReelCommentReaction';
 import { User } from '../entities/User';
+import { Follow } from '../entities/Follow';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 const getParamString = (param: string | string[] | undefined): string => {
@@ -228,6 +229,30 @@ export const getUserReels = async (
     if (!targetUser) {
       res.status(404).json({ status: 'error', message: 'User not found' });
       return;
+    }
+
+    const isTargetPrivate = Boolean(targetUser.isPrivate);
+    if (isTargetPrivate && currentUserId !== targetUser.id) {
+      const followRepo = AppDataSource.getRepository(Follow);
+      const isFollowing = currentUserId
+        ? Boolean(
+            await followRepo.findOne({
+              where: { followerId: currentUserId, followingId: targetUser.id },
+            })
+          )
+        : false;
+
+      if (!isFollowing) {
+        res.json({
+          status: 'success',
+          isPrivate: true,
+          canViewReels: false,
+          reels: [],
+          hasMore: false,
+          total: 0,
+        });
+        return;
+      }
     }
 
     const offset = Math.max(0, parseInt(req.query.offset as string) || 0);

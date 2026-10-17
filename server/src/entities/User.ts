@@ -64,6 +64,9 @@ export class User {
   @Column({ type: 'simple-json', nullable: true })
   blockedUsers?: string[];
 
+  @Column({ type: 'boolean', default: false })
+  isPrivate: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
