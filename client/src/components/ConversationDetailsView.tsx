@@ -26,6 +26,7 @@ import {
   HiOutlinePlay,
   HiOutlinePause,
   HiOutlinePhone,
+  HiOutlineLockClosed,
 } from 'react-icons/hi2';
 import { BsPinAngleFill } from 'react-icons/bs';
 import type { User } from '../services/authService';
@@ -985,26 +986,57 @@ export default function ConversationDetailsView({
                 </p>
 
                 {/* Direct Voice Call Quick Action Button */}
-                <div className="mt-3.5 flex items-center justify-center gap-2">
-                  <button
-                    id="conversation-details-voice-call-btn"
-                    type="button"
-                    onClick={() => {
-                      if (user) {
-                        startVoiceCall({
-                          id: user.id,
-                          fullName: user.fullName,
-                          username: user.username,
-                          avatarUrl: user.avatarUrl,
-                        });
-                      }
-                    }}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all hover:scale-102 active:scale-95 cursor-pointer"
-                  >
-                    <HiOutlinePhone className="w-4 h-4" />
-                    <span>Voice Call</span>
-                  </button>
-                </div>
+                {(() => {
+                  const canCall =
+                    !userProfile?.isPrivate ||
+                    Boolean(userProfile?.isFollowing) ||
+                    Boolean(userProfile?.isFollowedBy);
+
+                  return (
+                    <div className="mt-3.5 flex items-center justify-center gap-2">
+                      <button
+                        id="conversation-details-voice-call-btn"
+                        type="button"
+                        onClick={() => {
+                          if (!canCall) {
+                            alert(
+                              `@${user?.username}'s account is private. You can only call them once they accept your follow request or if they follow you.`
+                            );
+                            return;
+                          }
+                          if (user) {
+                            startVoiceCall({
+                              id: user.id,
+                              fullName: user.fullName,
+                              username: user.username,
+                              avatarUrl: user.avatarUrl,
+                              isPrivate: userProfile?.isPrivate,
+                              isFollowing: userProfile?.isFollowing,
+                              isFollowedBy: userProfile?.isFollowedBy,
+                            });
+                          }
+                        }}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl font-bold text-xs shadow-md transition-all active:scale-95 ${
+                          canCall
+                            ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20 hover:scale-102 cursor-pointer'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                        }`}
+                        title={
+                          canCall
+                            ? `Voice Call ${activeName}`
+                            : `Calls restricted: @${user?.username}'s account is private`
+                        }
+                      >
+                        {canCall ? (
+                          <HiOutlinePhone className="w-4 h-4" />
+                        ) : (
+                          <HiOutlineLockClosed className="w-4 h-4 text-slate-400" />
+                        )}
+                        <span>Voice Call</span>
+                      </button>
+                    </div>
+                  );
+                })()}
               </>
             )}
 

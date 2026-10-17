@@ -14,6 +14,10 @@ export interface CallPeer {
   fullName: string;
   username: string;
   avatarUrl?: string;
+  isPrivate?: boolean;
+  isFollowing?: boolean;
+  isFollowedBy?: boolean;
+  canMessageAndCall?: boolean;
 }
 
 export type CallState = 'idle' | 'calling' | 'incoming' | 'connected' | 'ended';
@@ -368,6 +372,13 @@ export const CallProvider: React.FC<{
   const startVoiceCall = async (targetUser: CallPeer) => {
     if (!currentUser || callState !== 'idle') return;
 
+    if (targetUser.isPrivate && !targetUser.isFollowing && !targetUser.isFollowedBy) {
+      alert(
+        `@${targetUser.username}'s account is private. You can only call them if they accept your follow request or if they follow you.`
+      );
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -625,6 +636,21 @@ export const CallProvider: React.FC<{
       }, 1500);
     };
 
+    // 8. Call Restricted on Private Account
+    const handleCallRestricted = ({ message }: { message?: string }) => {
+      toneGen.stop();
+      setCallStatusText(message || 'Calls restricted on this private account');
+      setCallState('ended');
+      cleanupCall(true);
+
+      setTimeout(() => {
+        setCallState('idle');
+        setActivePeer(null);
+        setCallStatusText('');
+        setIsMinimized(false);
+      }, 3500);
+    };
+
     socket.on('call:incoming', handleIncoming);
     socket.on('call:accepted', handleAccepted);
     socket.on('call:rejected', handleRejected);
@@ -632,6 +658,7 @@ export const CallProvider: React.FC<{
     socket.on('call:busy', handleUserBusy);
     socket.on('call:signal', handleSignal);
     socket.on('call:ended', handleEnded);
+    socket.on('call:restricted', handleCallRestricted);
 
     return () => {
       socket.off('call:incoming', handleIncoming);
@@ -641,6 +668,7 @@ export const CallProvider: React.FC<{
       socket.off('call:busy', handleUserBusy);
       socket.off('call:signal', handleSignal);
       socket.off('call:ended', handleEnded);
+      socket.off('call:restricted', handleCallRestricted);
     };
   }, [cleanupCall]);
 

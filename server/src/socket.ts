@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
+import { MoreThanOrEqual } from 'typeorm';
 import { AppDataSource } from './config/database';
 import { Message } from './entities/Message';
 import { User } from './entities/User';
@@ -8,6 +9,7 @@ import { GroupMessage } from './entities/GroupMessage';
 import { Group } from './entities/Group';
 import { GlobalMessage } from './entities/GlobalMessage';
 import { Follow } from './entities/Follow';
+import { Notification } from './entities/Notification';
 
 let io: SocketIOServer | null = null;
 
@@ -78,6 +80,7 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
 
       // Send current unread count to this client
       await emitUnreadCount(userId);
+      await emitNotificationCount(userId);
 
       // Broadcast user online event if user just connected
       if (!wasOnline) {
@@ -263,7 +266,7 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
     // ======================== VOICE & WEBRTC CALL SIGNALING ========================
     socket.on(
       'call:initiate',
-      (payload: {
+      async (payload: {
         toUserId: string;
         caller: {
           id: string;
@@ -288,6 +291,50 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
         if (activeCalls.has(toUserId) || activeCalls.has(senderId)) {
           socket.emit('call:busy', { toUserId });
           return;
+        }
+
+        // Verify recipient permissions and private account restrictions
+        if (AppDataSource.isInitialized) {
+          try {
+            const userRepository = AppDataSource.getRepository(User);
+            const targetUser = await userRepository.findOne({
+              where: { id: toUserId },
+              select: { id: true, isPrivate: true, blockedUsers: true },
+            });
+
+            if (!targetUser) return;
+
+            // Check if blocked
+            if (targetUser.blockedUsers && targetUser.blockedUsers.includes(senderId)) {
+              socket.emit('call:restricted', {
+                toUserId,
+                message: 'You cannot call this contact.',
+              });
+              return;
+            }
+
+            // If private account: caller must follow target (accepted follow request) OR target follows caller
+            if (targetUser.isPrivate) {
+              const followRepo = AppDataSource.getRepository(Follow);
+              const isFollowing = await followRepo.findOne({
+                where: { followerId: senderId, followingId: toUserId },
+              });
+              const isFollowedBy = await followRepo.findOne({
+                where: { followerId: toUserId, followingId: senderId },
+              });
+
+              if (!isFollowing && !isFollowedBy) {
+                socket.emit('call:restricted', {
+                  toUserId,
+                  message:
+                    'This account is private. You can only call them if they accept your follow request or if they follow you.',
+                });
+                return;
+              }
+            }
+          } catch (err) {
+            console.error('Error verifying call permissions:', err);
+          }
         }
 
         // Forward incoming call event to recipient room
@@ -747,6 +794,41 @@ export const emitGroupMessageReactionUpdated = (data: {
 }) => {
   if (!io) return;
   io.to(`group:${data.groupId}`).emit('group_message_reaction_updated', data);
+};
+
+export const emitNotificationCount = async (userId: string) => {
+  if (!io || !AppDataSource.isInitialized) return;
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const notificationRepository = AppDataSource.getRepository(Notification);
+    const count = await notificationRepository.count({
+      where: {
+        recipientId: userId,
+        isRead: false,
+        createdAt: MoreThanOrEqual(thirtyDaysAgo),
+      },
+    });
+    io.to(userId).emit('notification_count', { count });
+  } catch (err) {
+    console.error('Failed to emit notification count:', err);
+  }
+};
+
+export const emitNotification = async (notification: Notification) => {
+  if (!io) return;
+  io.to(notification.recipientId).emit('new_notification', notification);
+  await emitNotificationCount(notification.recipientId);
+};
+
+export const emitFollowRequestUpdated = (data: {
+  requesterId: string;
+  targetId: string;
+  status: string;
+  requestId?: string;
+}) => {
+  if (!io) return;
+  io.to(data.requesterId).emit('follow_request_updated', data);
+  io.to(data.targetId).emit('follow_request_updated', data);
 };
 
 

@@ -34,6 +34,7 @@ import {
   HiOutlineEnvelopeOpen,
   HiOutlineGlobeAlt,
   HiOutlinePhone,
+  HiOutlineLockClosed,
 } from 'react-icons/hi2';
 import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
 import messageService, {
@@ -1295,6 +1296,13 @@ export default function Messages() {
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [activeUser, setActiveUser] = useState<UserProfileResponse | null>(null);
   const [messages, setMessages] = useState<MessageItem[]>([]);
+
+  // Check if messaging/calling is permitted with active direct contact
+  const canMessageAndCallActiveUser = useMemo(() => {
+    if (!activeUser) return true;
+    if (!activeUser.isPrivate) return true;
+    return Boolean(activeUser.isFollowing) || Boolean(activeUser.isFollowedBy);
+  }, [activeUser]);
 
   // Group conversations state
   const [groups, setGroups] = useState<GroupItem[]>([]);
@@ -3240,8 +3248,10 @@ export default function Messages() {
           fetchConversations();
         }
       }
-    } catch {
+    } catch (err: any) {
       setText(content);
+      const msg = err.response?.data?.message || 'Failed to send message';
+      showFeedbackToast(msg, 'error');
     } finally {
       isSendingRef.current = false;
       setSending(false);
@@ -5488,19 +5498,41 @@ export default function Messages() {
                     id="direct-chat-voice-call-btn"
                     type="button"
                     onClick={() => {
+                      if (!canMessageAndCallActiveUser) {
+                        showWarning(
+                          `@${activeUser.username}'s account is private. You can only call them once they accept your follow request or if they follow you.`,
+                          'Calls Restricted'
+                        );
+                        return;
+                      }
                       if (activeUser) {
                         startVoiceCall({
                           id: activeUser.id,
                           fullName: activeUser.fullName,
                           username: activeUser.username,
                           avatarUrl: activeUser.avatarUrl,
+                          isPrivate: activeUser.isPrivate,
+                          isFollowing: activeUser.isFollowing,
+                          isFollowedBy: activeUser.isFollowedBy,
                         });
                       }
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-700 text-xs sm:text-sm font-semibold cursor-pointer transition-colors shrink-0 shadow-2xs"
-                    title={`Voice Call ${activeUser.fullName}`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-semibold transition-colors shrink-0 shadow-2xs ${
+                      canMessageAndCallActiveUser
+                        ? 'border-slate-200 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-700 cursor-pointer'
+                        : 'border-slate-200 bg-slate-100/70 text-slate-400 cursor-not-allowed'
+                    }`}
+                    title={
+                      canMessageAndCallActiveUser
+                        ? `Voice Call ${activeUser.fullName}`
+                        : `Calls restricted: @${activeUser.username}'s account is private`
+                    }
                   >
-                    <HiOutlinePhone className="w-4 h-4 text-emerald-600" />
+                    {canMessageAndCallActiveUser ? (
+                      <HiOutlinePhone className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <HiOutlineLockClosed className="w-4 h-4 text-slate-400" />
+                    )}
                     <span className="hidden sm:inline">Call</span>
                   </button>
 
@@ -6260,6 +6292,29 @@ export default function Messages() {
                       className="px-3.5 py-1.5 rounded-xl bg-white border border-rose-200 text-rose-700 font-semibold hover:bg-rose-100 cursor-pointer transition-colors shadow-2xs"
                     >
                       Unblock
+                    </button>
+                  </div>
+                ) : !canMessageAndCallActiveUser ? (
+                  <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-3 text-slate-800">
+                      <div className="w-9 h-9 rounded-full bg-purple-50 border border-purple-200/80 flex items-center justify-center shrink-0">
+                        <HiOutlineLockClosed className="w-4.5 h-4.5 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 text-xs sm:text-sm">
+                          Direct messaging is restricted
+                        </p>
+                        <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+                          @{activeUser.username}&apos;s account is private. You can only message or call them once they accept your follow request or if they follow you.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/profile/${activeUser.username}`)}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs transition-all shrink-0 shadow-xs hover:opacity-95 cursor-pointer active:scale-95"
+                    >
+                      View Profile
                     </button>
                   </div>
                 ) : isRecordingVoice ? (

@@ -1,7 +1,9 @@
 import { Response } from 'express';
+import { In } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { Message, MessageReactionItem } from '../entities/Message';
 import { User } from '../entities/User';
+import { Follow } from '../entities/Follow';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import {
   emitNewMessage,
@@ -81,10 +83,24 @@ export const getConversations = async (
         'u.avatarUrl',
         'u.lastSeen',
         'u.createdAt',
+        'u.isPrivate',
       ])
       .getMany();
 
     const partnersMap = new Map(partners.map((p) => [p.id, p]));
+
+    // Query follow relationships between current user and partners
+    const followRepo = AppDataSource.getRepository(Follow);
+    const myFollows = await followRepo.find({
+      where: { followerId: currentUserId, followingId: In(conversationPartnerIds) },
+      select: { followingId: true },
+    });
+    const followedMe = await followRepo.find({
+      where: { followerId: In(conversationPartnerIds), followingId: currentUserId },
+      select: { followerId: true },
+    });
+    const myFollowingSet = new Set(myFollows.map((f) => f.followingId));
+    const followedMeSet = new Set(followedMe.map((f) => f.followerId));
 
     const unreadCounts = await messageRepository
       .createQueryBuilder('m')
@@ -106,9 +122,18 @@ export const getConversations = async (
       .map((partnerId) => {
         const partner = partnersMap.get(partnerId);
         if (!partner) return null;
+        const isFollowing = myFollowingSet.has(partner.id);
+        const isFollowedBy = followedMeSet.has(partner.id);
+        const isPrivate = Boolean(partner.isPrivate);
+        const canMessageAndCall = !isPrivate || isFollowing || isFollowedBy;
+
         return {
           user: {
             ...partner,
+            isPrivate,
+            isFollowing,
+            isFollowedBy,
+            canMessageAndCall,
             isOnline: isUserOnline(partner.id),
           },
           lastMessage: lastMessagesMap[partnerId],
@@ -326,6 +351,27 @@ export const sendMessage = async (
         message: 'You cannot send messages to this contact.',
       });
       return;
+    }
+
+    // Check if target user has a private account
+    if (targetUser.isPrivate) {
+      const followRepo = AppDataSource.getRepository(Follow);
+      const isFollowing = await followRepo.findOne({
+        where: { followerId: currentUserId, followingId: targetUserId },
+      });
+      const isFollowedBy = await followRepo.findOne({
+        where: { followerId: targetUserId, followingId: currentUserId },
+      });
+
+      if (!isFollowing && !isFollowedBy) {
+        res.status(403).json({
+          status: 'error',
+          code: 'PRIVATE_ACCOUNT_RESTRICTED',
+          message:
+            'This account is private. You can only message them if they accept your follow request or if they follow you.',
+        });
+        return;
+      }
     }
 
     // Determine initial status based on recipient socket presence
