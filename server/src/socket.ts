@@ -7,6 +7,7 @@ import { GroupMember } from './entities/GroupMember';
 import { GroupMessage } from './entities/GroupMessage';
 import { Group } from './entities/Group';
 import { GlobalMessage } from './entities/GlobalMessage';
+import { Follow } from './entities/Follow';
 
 let io: SocketIOServer | null = null;
 
@@ -647,18 +648,105 @@ export const emitGlobalChatCleared = () => {
   io.emit('global_chat_cleared', {});
 };
 
-export const emitNewStory = (story: any) => {
-  if (!io) return;
-  io.emit('new_story', story);
+export const emitNewStory = async (story: any) => {
+  if (!io || !story?.userId) return;
+  try {
+    const followRepo = AppDataSource.getRepository(Follow);
+    const follows = await followRepo.find({
+      where: [
+        { followerId: story.userId },
+        { followingId: story.userId },
+      ],
+      select: {
+        followerId: true,
+        followingId: true,
+      },
+    });
+
+    const targetUserIds = new Set<string>();
+    targetUserIds.add(story.userId); // Always send to author
+
+    follows.forEach((f) => {
+      if (f.followerId === story.userId) {
+        // Author follows them
+        targetUserIds.add(f.followingId);
+      }
+      if (f.followingId === story.userId) {
+        // They follow the author
+        targetUserIds.add(f.followerId);
+      }
+    });
+
+    targetUserIds.forEach((targetId) => {
+      io?.to(targetId).emit('new_story', story);
+    });
+  } catch (err) {
+    console.error('Error emitting new story to followers/following:', err);
+    io.to(story.userId).emit('new_story', story);
+  }
 };
 
-export const emitStoryDeleted = (data: { storyId: string; userId: string }) => {
-  if (!io) return;
-  io.emit('story_deleted', data);
+export const emitStoryDeleted = async (data: { storyId: string; userId: string }) => {
+  if (!io || !data?.userId) return;
+  try {
+    const followRepo = AppDataSource.getRepository(Follow);
+    const follows = await followRepo.find({
+      where: [
+        { followerId: data.userId },
+        { followingId: data.userId },
+      ],
+      select: {
+        followerId: true,
+        followingId: true,
+      },
+    });
+
+    const targetUserIds = new Set<string>();
+    targetUserIds.add(data.userId);
+
+    follows.forEach((f) => {
+      if (f.followerId === data.userId) targetUserIds.add(f.followingId);
+      if (f.followingId === data.userId) targetUserIds.add(f.followerId);
+    });
+
+    targetUserIds.forEach((targetId) => {
+      io?.to(targetId).emit('story_deleted', data);
+    });
+  } catch (err) {
+    console.error('Error emitting story deleted:', err);
+    io.emit('story_deleted', data);
+  }
 };
 
 export const emitStoryViewed = (data: { storyId: string; viewer: any; viewsCount: number }) => {
   if (!io) return;
   io.emit('story_viewed', data);
 };
+
+export const emitFollowUpdated = (data: { followerId: string; followingId: string; isFollowing: boolean }) => {
+  if (!io) return;
+  io.to(data.followerId).emit('follow_updated', data);
+  io.to(data.followingId).emit('follow_updated', data);
+};
+
+export const emitMessageReactionUpdated = (data: {
+  messageId: string;
+  senderId: string;
+  receiverId: string;
+  reactions: any[];
+}) => {
+  if (!io) return;
+  io.to(data.senderId).emit('message_reaction_updated', data);
+  io.to(data.receiverId).emit('message_reaction_updated', data);
+};
+
+export const emitGroupMessageReactionUpdated = (data: {
+  messageId: string;
+  groupId: string;
+  reactions: any[];
+}) => {
+  if (!io) return;
+  io.to(`group:${data.groupId}`).emit('group_message_reaction_updated', data);
+};
+
 

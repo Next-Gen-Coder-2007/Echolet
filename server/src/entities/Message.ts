@@ -8,6 +8,15 @@ import {
 } from 'typeorm';
 import { User } from './User';
 
+export interface MessageReactionItem {
+  emoji: string;
+  userId: string;
+  fullName: string;
+  username: string;
+  avatarUrl?: string;
+  createdAt?: string;
+}
+
 @Entity('messages')
 export class Message {
   @PrimaryGeneratedColumn('uuid')
@@ -105,6 +114,9 @@ export class Message {
 
   @Column({ type: 'boolean', default: false })
   isDeletedForEveryone: boolean;
+
+  @Column({ type: 'simple-json', nullable: true })
+  reactions?: MessageReactionItem[];
 
   @Column({ type: 'simple-json', nullable: true })
   deletedFor?: string[];

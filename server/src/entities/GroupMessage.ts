@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { Group } from './Group';
 import { User } from './User';
+import { MessageReactionItem } from './Message';
 
 @Entity('group_messages')
 export class GroupMessage {
@@ -81,6 +82,9 @@ export class GroupMessage {
 
   @Column({ type: 'boolean', default: false })
   isDeletedForEveryone: boolean;
+
+  @Column({ type: 'simple-json', nullable: true })
+  reactions?: MessageReactionItem[];
 
   @Column({ type: 'simple-json', nullable: true })
   deletedFor?: string[];

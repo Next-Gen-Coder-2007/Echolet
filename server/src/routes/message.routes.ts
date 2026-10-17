@@ -14,6 +14,7 @@ import {
   getChatSettings,
   updateChatSettings,
   getConversationMedia,
+  toggleMessageReaction,
 } from '../controllers/message.controller';
 import { authMiddleware } from '../middlewares/auth.middleware';
 
@@ -25,6 +26,7 @@ router.get('/conversations', getConversations);
 router.get('/unread-count', getUnreadCount);
 router.get('/chat-settings', getChatSettings);
 router.post('/chat-settings', updateChatSettings);
+router.post('/item/:messageId/reaction', toggleMessageReaction);
 router.post('/item/:messageId/star', toggleStarMessage);
 router.post('/item/:messageId/pin', togglePinMessage);
 router.post('/item/:messageId/vote', voteMessagePoll);

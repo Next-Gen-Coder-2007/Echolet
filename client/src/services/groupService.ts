@@ -1,5 +1,5 @@
 import api from './api';
-import type { StoryMessageData } from './messageService';
+import type { StoryMessageData, MessageReactionItem } from './messageService';
 
 export interface GroupMemberUser {
   id: string;
@@ -63,6 +63,7 @@ export interface GroupMessageItem {
   editedAt?: string;
   isDeletedForEveryone?: boolean;
   deletedFor?: string[];
+  reactions?: MessageReactionItem[];
   createdAt: string;
   sender?: GroupMemberUser | null;
 }
@@ -318,6 +319,22 @@ export const groupService = {
         links: number;
       };
     }>(`/groups/${encodeURIComponent(groupId)}/media`, { params });
+    return response.data;
+  },
+
+  async toggleReaction(
+    groupId: string,
+    messageId: string,
+    emoji: string
+  ): Promise<{ messageId: string; reactions: MessageReactionItem[] }> {
+    const response = await api.post<{
+      status: string;
+      messageId: string;
+      reactions: MessageReactionItem[];
+    }>(
+      `/groups/${encodeURIComponent(groupId)}/messages/${encodeURIComponent(messageId)}/reaction`,
+      { emoji }
+    );
     return response.data;
   },
 };

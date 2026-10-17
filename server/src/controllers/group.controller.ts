@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database';
 import { Group } from '../entities/Group';
 import { GroupMember } from '../entities/GroupMember';
 import { GroupMessage } from '../entities/GroupMessage';
+import { MessageReactionItem } from '../entities/Message';
 import { User } from '../entities/User';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import {
@@ -16,6 +17,7 @@ import {
   emitGroupMessageStarred,
   emitGroupMessagePinned,
   emitGroupChatCleared,
+  emitGroupMessageReactionUpdated,
   addUsersToGroupSocketRoom,
   removeUsersFromGroupSocketRoom,
 } from '../socket';
@@ -1501,3 +1503,92 @@ export const getGroupMedia = async (
     res.status(500).json({ status: 'error', message: 'Failed to retrieve group media' });
   }
 };
+
+export const toggleGroupMessageReaction = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId || !req.user) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const groupId = getParam(req.params.groupId);
+    const messageId = getParam(req.params.messageId);
+    const { emoji } = req.body;
+
+    if (!emoji || typeof emoji !== 'string' || emoji.length > 20) {
+      res.status(400).json({ status: 'error', message: 'Valid emoji is required' });
+      return;
+    }
+
+    const memberRepo = AppDataSource.getRepository(GroupMember);
+    const isMember = await memberRepo.findOne({
+      where: { groupId, userId: currentUserId },
+    });
+    if (!isMember) {
+      res.status(403).json({ status: 'error', message: 'You are not a member of this group' });
+      return;
+    }
+
+    const groupMessageRepo = AppDataSource.getRepository(GroupMessage);
+    const message = await groupMessageRepo.findOne({
+      where: { id: messageId, groupId },
+    });
+
+    if (!message) {
+      res.status(404).json({ status: 'error', message: 'Group message not found' });
+      return;
+    }
+
+    let reactions: MessageReactionItem[] = Array.isArray(message.reactions)
+      ? [...message.reactions]
+      : [];
+
+    const existingIndex = reactions.findIndex((r) => r.userId === currentUserId);
+    if (existingIndex >= 0) {
+      if (reactions[existingIndex].emoji === emoji) {
+        reactions.splice(existingIndex, 1);
+      } else {
+        reactions[existingIndex] = {
+          emoji,
+          userId: currentUserId,
+          fullName: req.user.fullName,
+          username: req.user.username,
+          avatarUrl: req.user.avatarUrl,
+          createdAt: new Date().toISOString(),
+        };
+      }
+    } else {
+      reactions.push({
+        emoji,
+        userId: currentUserId,
+        fullName: req.user.fullName,
+        username: req.user.username,
+        avatarUrl: req.user.avatarUrl,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    message.reactions = reactions;
+    await groupMessageRepo.save(message);
+
+    emitGroupMessageReactionUpdated({
+      messageId: message.id,
+      groupId,
+      reactions,
+    });
+
+    res.json({
+      status: 'success',
+      messageId: message.id,
+      reactions,
+    });
+  } catch (error) {
+    console.error('Toggle group message reaction error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to update group reaction' });
+  }
+};
+

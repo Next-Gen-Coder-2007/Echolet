@@ -34,6 +34,15 @@ export interface StoryMessageData {
   authorAvatar?: string | null;
 }
 
+export interface MessageReactionItem {
+  emoji: string;
+  userId: string;
+  fullName: string;
+  username: string;
+  avatarUrl?: string;
+  createdAt?: string;
+}
+
 export interface MessageItem {
   id: string;
   senderId: string;
@@ -70,6 +79,7 @@ export interface MessageItem {
   isForwarded?: boolean;
   isDeletedForEveryone?: boolean;
   deletedFor?: string[];
+  reactions?: MessageReactionItem[];
   createdAt: string;
 }
 
@@ -288,6 +298,18 @@ export const messageService = {
         links: number;
       };
     }>(`/messages/${encodeURIComponent(userId)}/media`, { params });
+    return response.data;
+  },
+
+  async toggleReaction(
+    messageId: string,
+    emoji: string
+  ): Promise<{ messageId: string; reactions: MessageReactionItem[] }> {
+    const response = await api.post<{
+      status: string;
+      messageId: string;
+      reactions: MessageReactionItem[];
+    }>(`/messages/item/${encodeURIComponent(messageId)}/reaction`, { emoji });
     return response.data;
   },
 };

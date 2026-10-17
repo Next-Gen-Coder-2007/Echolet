@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AppDataSource } from '../config/database';
-import { Message } from '../entities/Message';
+import { Message, MessageReactionItem } from '../entities/Message';
 import { User } from '../entities/User';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import {
@@ -12,6 +12,7 @@ import {
   emitMessagePinned,
   emitChatCleared,
   emitChatSettingsUpdated,
+  emitMessageReactionUpdated,
   isUserOnline,
 } from '../socket';
 
@@ -1069,6 +1070,91 @@ export const getConversationMedia = async (
   } catch (error) {
     console.error('Get conversation media error:', error);
     res.status(500).json({ status: 'error', message: 'Failed to retrieve conversation media' });
+  }
+};
+
+export const toggleMessageReaction = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId || !req.user) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const rawMessageId = Array.isArray(req.params.messageId)
+      ? req.params.messageId[0]
+      : req.params.messageId;
+    const messageId = (rawMessageId || '').trim();
+    const { emoji } = req.body;
+
+    if (!emoji || typeof emoji !== 'string' || emoji.length > 20) {
+      res.status(400).json({ status: 'error', message: 'Valid emoji is required' });
+      return;
+    }
+
+    const messageRepository = AppDataSource.getRepository(Message);
+    const message = await messageRepository.findOne({ where: { id: messageId } });
+
+    if (!message) {
+      res.status(404).json({ status: 'error', message: 'Message not found' });
+      return;
+    }
+
+    if (message.senderId !== currentUserId && message.receiverId !== currentUserId) {
+      res.status(403).json({ status: 'error', message: 'Forbidden' });
+      return;
+    }
+
+    let reactions: MessageReactionItem[] = Array.isArray(message.reactions)
+      ? [...message.reactions]
+      : [];
+
+    const existingIndex = reactions.findIndex((r) => r.userId === currentUserId);
+    if (existingIndex >= 0) {
+      if (reactions[existingIndex].emoji === emoji) {
+        reactions.splice(existingIndex, 1);
+      } else {
+        reactions[existingIndex] = {
+          emoji,
+          userId: currentUserId,
+          fullName: req.user.fullName,
+          username: req.user.username,
+          avatarUrl: req.user.avatarUrl,
+          createdAt: new Date().toISOString(),
+        };
+      }
+    } else {
+      reactions.push({
+        emoji,
+        userId: currentUserId,
+        fullName: req.user.fullName,
+        username: req.user.username,
+        avatarUrl: req.user.avatarUrl,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    message.reactions = reactions;
+    await messageRepository.save(message);
+
+    emitMessageReactionUpdated({
+      messageId: message.id,
+      senderId: message.senderId,
+      receiverId: message.receiverId,
+      reactions,
+    });
+
+    res.json({
+      status: 'success',
+      messageId: message.id,
+      reactions,
+    });
+  } catch (error) {
+    console.error('Toggle message reaction error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to update reaction' });
   }
 };
 
