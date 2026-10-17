@@ -111,7 +111,10 @@ export default function Stories({
           if (newStory.userId === currentUser?.id) {
             return [newGroup, ...prev];
           }
-          return [prev[0]?.userId === currentUser?.id ? prev[0] : newGroup, ...prev.filter((g) => g.userId !== currentUser?.id)];
+          if (prev.length > 0 && prev[0]?.userId === currentUser?.id) {
+            return [prev[0], newGroup, ...prev.slice(1)];
+          }
+          return [newGroup, ...prev];
         }
       });
     };
@@ -153,16 +156,24 @@ export default function Stories({
       );
     };
 
+    const handleFollowUpdated = () => {
+      fetchStories();
+    };
+
     socket.on('new_story', handleNewStory);
     socket.on('story_deleted', handleStoryDeleted);
     socket.on('story_viewed', handleStoryViewed);
+    socket.on('follow_updated', handleFollowUpdated);
+    window.addEventListener('follow_updated', handleFollowUpdated);
 
     return () => {
       socket.off('new_story', handleNewStory);
       socket.off('story_deleted', handleStoryDeleted);
       socket.off('story_viewed', handleStoryViewed);
+      socket.off('follow_updated', handleFollowUpdated);
+      window.removeEventListener('follow_updated', handleFollowUpdated);
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, fetchStories]);
 
   const handleStoryCreated = (newStory: ApiStoryItem) => {
     setUserStoryGroups((prev) => {

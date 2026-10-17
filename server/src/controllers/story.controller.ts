@@ -1,7 +1,8 @@
 import { Response } from 'express';
-import { MoreThan } from 'typeorm';
+import { MoreThan, In } from 'typeorm';
 import { AppDataSource } from '../config/database';
 import { Story, StoryViewerItem } from '../entities/Story';
+import { Follow } from '../entities/Follow';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { emitNewStory, emitStoryDeleted, emitStoryViewed } from '../socket';
 
@@ -24,17 +25,56 @@ const getParamString = (param: string | string[] | undefined): string => {
 };
 
 /**
- * Get all active, unexpired stories grouped by user
+ * Get all active, unexpired stories grouped by user.
+ * Stories are only shown if we followed them or they followed us, or our own stories.
  */
 export const getStories = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.json({
+        status: 'success',
+        stories: [],
+        userStoryGroups: [],
+      });
+      return;
+    }
+
     const storyRepo = AppDataSource.getRepository(Story);
+    const followRepo = AppDataSource.getRepository(Follow);
+
+    // Find all follow records where current user is follower OR following
+    const follows = await followRepo.find({
+      where: [
+        { followerId: currentUserId },
+        { followingId: currentUserId },
+      ],
+      select: {
+        followerId: true,
+        followingId: true,
+      },
+    });
+
+    const allowedUserIds = new Set<string>();
+    // Always include current user's own stories
+    allowedUserIds.add(currentUserId);
+
+    follows.forEach((f) => {
+      if (f.followerId === currentUserId) {
+        // We followed them
+        allowedUserIds.add(f.followingId);
+      }
+      if (f.followingId === currentUserId) {
+        // They followed us
+        allowedUserIds.add(f.followerId);
+      }
+    });
 
     const now = new Date();
     const activeStories = await storyRepo.find({
       where: {
         expiresAt: MoreThan(now),
+        userId: In(Array.from(allowedUserIds)),
       },
       relations: {
         user: true,
@@ -207,6 +247,25 @@ export const viewStory = async (req: AuthenticatedRequest, res: Response): Promi
     if (!story) {
       res.status(404).json({ status: 'error', message: 'Story not found' });
       return;
+    }
+
+    // Verify view permissions: author, or we followed them, or they followed us
+    if (story.userId !== user.id) {
+      const followRepo = AppDataSource.getRepository(Follow);
+      const isConnected = await followRepo.findOne({
+        where: [
+          { followerId: user.id, followingId: story.userId },
+          { followerId: story.userId, followingId: user.id },
+        ],
+      });
+
+      if (!isConnected) {
+        res.status(403).json({
+          status: 'error',
+          message: 'You can only view stories of users you follow or who follow you.',
+        });
+        return;
+      }
     }
 
     const viewers: StoryViewerItem[] = Array.isArray(story.viewers) ? [...story.viewers] : [];

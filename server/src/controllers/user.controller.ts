@@ -3,6 +3,7 @@ import { AppDataSource } from '../config/database';
 import { User } from '../entities/User';
 import { Follow } from '../entities/Follow';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
+import { emitFollowUpdated } from '../socket';
 
 export const searchUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -337,6 +338,12 @@ export const followUser = async (req: AuthenticatedRequest, res: Response): Prom
       await followRepository.save(newFollow);
     }
 
+    emitFollowUpdated({
+      followerId: currentUserId,
+      followingId: targetUserId,
+      isFollowing: true,
+    });
+
     const followersCount = await followRepository.count({
       where: { followingId: targetUserId },
     });
@@ -378,6 +385,12 @@ export const unfollowUser = async (req: AuthenticatedRequest, res: Response): Pr
     await followRepository.delete({
       followerId: currentUserId,
       followingId: targetUserId,
+    });
+
+    emitFollowUpdated({
+      followerId: currentUserId,
+      followingId: targetUserId,
+      isFollowing: false,
     });
 
     const followersCount = await followRepository.count({
