@@ -158,3 +158,82 @@
     width: 100%;
   }
 }
+
+/* Premium Pure-White Unified EmojiPicker Styling */
+.EmojiPickerReact.epr-main {
+  border: none !important;
+  box-shadow: none !important;
+  background-color: #ffffff !important;
+  font-family: inherit !important;
+  --epr-bg-color: #ffffff !important;
+  --epr-category-label-bg-color: #ffffff !important;
+  --epr-category-label-text-color: #64748b !important;
+  --epr-search-border-color: #e2e8f0 !important;
+  --epr-search-input-bg-color: #f8fafc !important;
+  --epr-search-input-text-color: #0f172a !important;
+  --epr-hover-bg-color: #f1f5f9 !important;
+  --epr-focus-bg-color: #ffffff !important;
+  --epr-text-color: #0f172a !important;
+  --epr-picker-border-color: transparent !important;
+}
+
+.EmojiPickerReact .epr-header {
+  padding: 8px 12px 6px 12px !important;
+}
+
+.EmojiPickerReact .epr-search-container input.epr-search-input {
+  border-radius: 12px !important;
+  border: 1px solid #e2e8f0 !important;
+  background-color: #f8fafc !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+  outline: none !important;
+  transition: all 0.15s ease !important;
+}
+
+.EmojiPickerReact .epr-search-container input.epr-search-input:focus {
+  border-color: #a855f7 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15) !important;
+}
+
+.EmojiPickerReact .epr-body {
+  padding-bottom: 24px !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #cbd5e1 transparent !important;
+}
+
+.EmojiPickerReact .epr-category-nav {
+  padding: 6px 8px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.EmojiPickerReact .epr-category-nav > button.epr-cat-btn {
+  border-radius: 8px !important;
+  transition: all 0.15s ease !important;
+}
+
+.EmojiPickerReact .epr-category-nav > button.epr-cat-btn:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.EmojiPickerReact .epr-emoji-category-label {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #64748b !important;
+  background-color: #ffffff !important;
+  padding: 6px 12px !important;
+}
+
+.EmojiPickerReact button.epr-emoji {
+  border-radius: 10px !important;
+  transition: transform 0.12s ease, background-color 0.12s ease !important;
+}
+
+.EmojiPickerReact button.epr-emoji:hover {
+  transform: scale(1.2) !important;
+  background-color: #f1f5f9 !important;
+  z-index: 2 !important;
+}

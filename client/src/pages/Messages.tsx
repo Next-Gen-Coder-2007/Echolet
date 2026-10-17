@@ -70,6 +70,10 @@ import MediaUploadPreviewModal from '../components/MediaUploadPreviewModal';
 import storyService, {
   type UserStoryGroup,
 } from '../services/storyService';
+import MessageReactionsBar from '../components/MessageReactionsBar';
+import MessageReactionsPopup from '../components/MessageReactionsPopup';
+import MessageReactionPicker from '../components/MessageReactionPicker';
+import type { MessageReactionItem } from '../services/messageService';
 
 // WhatsApp-like dual tick SVG indicator
 const MessageTicks: React.FC<{
@@ -1319,6 +1323,10 @@ export default function Messages() {
   const [editingGroupMsg, setEditingGroupMsg] = useState<GroupMessageItem | null>(null);
   const [replyingToGroupMsg, setReplyingToGroupMsg] = useState<GroupMessageItem | null>(null);
 
+  // Message Reactions state
+  const [activeReactionPickerMessageId, setActiveReactionPickerMessageId] = useState<string | null>(null);
+  const [activeReactionsPopupMessageId, setActiveReactionsPopupMessageId] = useState<string | null>(null);
+
   // Multi-select & Batch Actions State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
@@ -1832,6 +1840,101 @@ export default function Messages() {
       }
     } catch {
       showFeedbackToast('Failed to pin message', 'error');
+    }
+  };
+
+  const handleToggleMessageReaction = async (msgId: string, emoji: string) => {
+    if (!currentUser?.id) return;
+    setActiveReactionPickerMessageId(null);
+
+    if (activeGroup) {
+      setGroupMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== msgId) return m;
+          const currentReactions: MessageReactionItem[] = Array.isArray(m.reactions)
+            ? [...m.reactions]
+            : [];
+          const idx = currentReactions.findIndex((r) => r.userId === currentUser.id);
+          if (idx >= 0) {
+            if (currentReactions[idx].emoji === emoji) {
+              currentReactions.splice(idx, 1);
+            } else {
+              currentReactions[idx] = {
+                emoji,
+                userId: currentUser.id,
+                fullName: currentUser.fullName,
+                username: currentUser.username,
+                avatarUrl: currentUser.avatarUrl,
+                createdAt: new Date().toISOString(),
+              };
+            }
+          } else {
+            currentReactions.push({
+              emoji,
+              userId: currentUser.id,
+              fullName: currentUser.fullName,
+              username: currentUser.username,
+              avatarUrl: currentUser.avatarUrl,
+              createdAt: new Date().toISOString(),
+            });
+          }
+          return { ...m, reactions: currentReactions };
+        })
+      );
+
+      try {
+        const res = await groupService.toggleReaction(activeGroup.id, msgId, emoji);
+        setGroupMessages((prev) =>
+          prev.map((m) => (m.id === msgId ? { ...m, reactions: res.reactions } : m))
+        );
+      } catch (err) {
+        console.error('Failed to toggle group message reaction:', err);
+        showFeedbackToast('Failed to update reaction', 'error');
+      }
+    } else {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== msgId) return m;
+          const currentReactions: MessageReactionItem[] = Array.isArray(m.reactions)
+            ? [...m.reactions]
+            : [];
+          const idx = currentReactions.findIndex((r) => r.userId === currentUser.id);
+          if (idx >= 0) {
+            if (currentReactions[idx].emoji === emoji) {
+              currentReactions.splice(idx, 1);
+            } else {
+              currentReactions[idx] = {
+                emoji,
+                userId: currentUser.id,
+                fullName: currentUser.fullName,
+                username: currentUser.username,
+                avatarUrl: currentUser.avatarUrl,
+                createdAt: new Date().toISOString(),
+              };
+            }
+          } else {
+            currentReactions.push({
+              emoji,
+              userId: currentUser.id,
+              fullName: currentUser.fullName,
+              username: currentUser.username,
+              avatarUrl: currentUser.avatarUrl,
+              createdAt: new Date().toISOString(),
+            });
+          }
+          return { ...m, reactions: currentReactions };
+        })
+      );
+
+      try {
+        const res = await messageService.toggleReaction(msgId, emoji);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msgId ? { ...m, reactions: res.reactions } : m))
+        );
+      } catch (err) {
+        console.error('Failed to toggle message reaction:', err);
+        showFeedbackToast('Failed to update reaction', 'error');
+      }
     }
   };
 
@@ -2722,6 +2825,24 @@ export default function Messages() {
       setChatSettings(settings);
     };
 
+    const handleMessageReactionUpdated = (data: {
+      messageId: string;
+      reactions: MessageReactionItem[];
+    }) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === data.messageId ? { ...m, reactions: data.reactions } : m))
+      );
+    };
+
+    const handleGroupMessageReactionUpdated = (data: {
+      messageId: string;
+      reactions: MessageReactionItem[];
+    }) => {
+      setGroupMessages((prev) =>
+        prev.map((m) => (m.id === data.messageId ? { ...m, reactions: data.reactions } : m))
+      );
+    };
+
     socket.on('message_starred', handleMessageStarred);
     socket.on('group_message_starred', handleGroupMessageStarred);
     socket.on('message_pinned', handleMessagePinned);
@@ -2729,6 +2850,8 @@ export default function Messages() {
     socket.on('chat_cleared', handleChatCleared);
     socket.on('group_chat_cleared', handleGroupChatCleared);
     socket.on('chat_settings_updated', handleChatSettingsUpdated);
+    socket.on('message_reaction_updated', handleMessageReactionUpdated);
+    socket.on('group_message_reaction_updated', handleGroupMessageReactionUpdated);
 
     socket.on('online_users', handleOnlineUsers);
     socket.on('user_status', handleUserStatus);
@@ -2757,6 +2880,8 @@ export default function Messages() {
       socket.off('chat_cleared', handleChatCleared);
       socket.off('group_chat_cleared', handleGroupChatCleared);
       socket.off('chat_settings_updated', handleChatSettingsUpdated);
+      socket.off('message_reaction_updated', handleMessageReactionUpdated);
+      socket.off('group_message_reaction_updated', handleGroupMessageReactionUpdated);
       socket.off('online_users', handleOnlineUsers);
       socket.off('user_status', handleUserStatus);
       socket.off('typing', handleTyping);
@@ -4586,7 +4711,27 @@ export default function Messages() {
 
                           {/* Hover action toolbar for Sender */}
                           {isMe && !m.isDeletedForEveryone && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity flex items-center gap-1 mb-1 shrink-0 relative`}>
+                              {/* Reaction trigger */}
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  data-reaction-trigger="true"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveReactionPickerMessageId((prev) => (prev === m.id ? null : m.id));
+                                  }}
+                                  className={`p-1.5 rounded-full transition-all cursor-pointer ${
+                                    activeReactionPickerMessageId === m.id
+                                      ? 'text-slate-800 bg-white shadow-sm ring-1 ring-slate-300'
+                                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                                  }`}
+                                  aria-label="React with emoji"
+                                >
+                                  <HiOutlineFaceSmile className="w-4 h-4" />
+                                </button>
+                              </div>
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -4715,7 +4860,16 @@ export default function Messages() {
                           )}
 
                           {/* Bubble */}
-                          <div className="flex flex-col max-w-[80%] sm:max-w-[70%]">
+                          <div className="flex flex-col max-w-[80%] sm:max-w-[70%] relative">
+                            {/* Reaction Picker anchored directly on message bubble */}
+                            {activeReactionPickerMessageId === m.id && (
+                              <MessageReactionPicker
+                                userCurrentReaction={m.reactions?.find((r) => r.userId === currentUser?.id)?.emoji}
+                                onSelectEmoji={(emoji) => handleToggleMessageReaction(m.id, emoji)}
+                                onClose={() => setActiveReactionPickerMessageId(null)}
+                                align={isMe ? 'right' : 'left'}
+                              />
+                            )}
                             <div
                               className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed flex flex-col gap-1 shadow-2xs relative transition-all ${
                                 isSelected ? 'ring-2 ring-purple-500 shadow-md ring-offset-2' : ''
@@ -4922,11 +5076,56 @@ export default function Messages() {
                                 </div>
                               )}
                             </div>
+
+                            {/* Group message reactions bar & popup */}
+                            <div className="relative">
+                              <MessageReactionsBar
+                                reactions={m.reactions}
+                                currentUserId={currentUser?.id}
+                                align={isMe ? 'right' : 'left'}
+                                onViewDetails={() =>
+                                  setActiveReactionsPopupMessageId((prev) =>
+                                    prev === m.id ? null : m.id
+                                  )
+                                }
+                              />
+                              {activeReactionsPopupMessageId === m.id && (
+                                <MessageReactionsPopup
+                                  reactions={m.reactions || []}
+                                  currentUserId={currentUser?.id}
+                                  align={isMe ? 'right' : 'left'}
+                                  onClose={() => setActiveReactionsPopupMessageId(null)}
+                                  onToggleReaction={(emoji) =>
+                                    handleToggleMessageReaction(m.id, emoji)
+                                  }
+                                />
+                              )}
+                            </div>
                           </div>
 
                           {/* Hover action toolbar for incoming group messages */}
                           {!isMe && !m.isDeletedForEveryone && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity flex items-center gap-1 mb-1 shrink-0 relative`}>
+                              {/* Reaction trigger */}
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  data-reaction-trigger="true"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveReactionPickerMessageId((prev) => (prev === m.id ? null : m.id));
+                                  }}
+                                  className={`p-1.5 rounded-full transition-all cursor-pointer ${
+                                    activeReactionPickerMessageId === m.id
+                                      ? 'text-slate-800 bg-white shadow-sm ring-1 ring-slate-300'
+                                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                                  }`}
+                                  aria-label="React with emoji"
+                                >
+                                  <HiOutlineFaceSmile className="w-4 h-4" />
+                                </button>
+                              </div>
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -5444,7 +5643,27 @@ export default function Messages() {
                           )}
 
                           {isMe && !m.isDeletedForEveryone && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity flex items-center gap-1 mb-1 shrink-0 relative`}>
+                              {/* Reaction trigger */}
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  data-reaction-trigger="true"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveReactionPickerMessageId((prev) => (prev === m.id ? null : m.id));
+                                  }}
+                                  className={`p-1.5 rounded-full transition-all cursor-pointer ${
+                                    activeReactionPickerMessageId === m.id
+                                      ? 'text-slate-800 bg-white shadow-sm ring-1 ring-slate-300'
+                                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                                  }`}
+                                  aria-label="React with emoji"
+                                >
+                                  <HiOutlineFaceSmile className="w-4 h-4" />
+                                </button>
+                              </div>
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -5563,7 +5782,16 @@ export default function Messages() {
                           )}
 
                           {/* Bubble */}
-                          <div className="flex flex-col max-w-[80%] sm:max-w-[70%]">
+                          <div className="flex flex-col max-w-[80%] sm:max-w-[70%] relative">
+                            {/* Reaction Picker anchored directly on message bubble */}
+                            {activeReactionPickerMessageId === m.id && (
+                              <MessageReactionPicker
+                                userCurrentReaction={m.reactions?.find((r) => r.userId === currentUser?.id)?.emoji}
+                                onSelectEmoji={(emoji) => handleToggleMessageReaction(m.id, emoji)}
+                                onClose={() => setActiveReactionPickerMessageId(null)}
+                                align={isMe ? 'right' : 'left'}
+                              />
+                            )}
                             <div
                               className={`px-3.5 py-2 rounded-2xl text-sm sm:text-base leading-relaxed flex flex-col gap-1 shadow-2xs relative transition-all ${
                                 isSelected ? 'ring-2 ring-purple-500 shadow-md ring-offset-2' : ''
@@ -5789,10 +6017,55 @@ export default function Messages() {
                                 </div>
                               )}
                             </div>
+
+                            {/* Direct message reactions bar & popup */}
+                            <div className="relative">
+                              <MessageReactionsBar
+                                reactions={m.reactions}
+                                currentUserId={currentUser?.id}
+                                align={isMe ? 'right' : 'left'}
+                                onViewDetails={() =>
+                                  setActiveReactionsPopupMessageId((prev) =>
+                                    prev === m.id ? null : m.id
+                                  )
+                                }
+                              />
+                              {activeReactionsPopupMessageId === m.id && (
+                                <MessageReactionsPopup
+                                  reactions={m.reactions || []}
+                                  currentUserId={currentUser?.id}
+                                  align={isMe ? 'right' : 'left'}
+                                  onClose={() => setActiveReactionsPopupMessageId(null)}
+                                  onToggleReaction={(emoji) =>
+                                    handleToggleMessageReaction(m.id, emoji)
+                                  }
+                                />
+                              )}
+                            </div>
                           </div>
 
                           {!isMe && !m.isDeletedForEveryone && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity flex items-center gap-1 mb-1 shrink-0 relative`}>
+                              {/* Reaction trigger */}
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  data-reaction-trigger="true"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveReactionPickerMessageId((prev) => (prev === m.id ? null : m.id));
+                                  }}
+                                  className={`p-1.5 rounded-full transition-all cursor-pointer ${
+                                    activeReactionPickerMessageId === m.id
+                                      ? 'text-slate-800 bg-white shadow-sm ring-1 ring-slate-300'
+                                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                                  }`}
+                                  aria-label="React with emoji"
+                                >
+                                  <HiOutlineFaceSmile className="w-4 h-4" />
+                                </button>
+                              </div>
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -6479,6 +6752,7 @@ export default function Messages() {
           isSending={isSendingPendingMedia}
         />
       )}
+
     </div>
   );
 }
