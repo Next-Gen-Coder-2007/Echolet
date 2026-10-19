@@ -19,6 +19,15 @@ export interface PollOptionItem {
   votes: number;
 }
 
+export interface PostReactionItem {
+  emoji: string;
+  userId: string;
+  fullName: string;
+  username: string;
+  avatarUrl?: string;
+  createdAt?: string;
+}
+
 @Entity('posts')
 export class Post {
   @PrimaryGeneratedColumn('uuid')
@@ -66,6 +75,9 @@ export class Post {
 
   @Column({ type: 'boolean', default: false })
   isPinned: boolean;
+
+  @Column({ type: 'simple-json', nullable: true })
+  reactions?: PostReactionItem[];
 
   @OneToMany(() => Comment, (comment) => comment.post)
   comments: Comment[];

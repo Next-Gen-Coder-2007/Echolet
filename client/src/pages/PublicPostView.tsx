@@ -16,6 +16,7 @@ import {
 } from 'react-icons/hi2';
 import postService, { type Post, type PostComment } from '../services/postService';
 import MediaViewerModal from '../components/MediaViewerModal';
+import Avatar from '../components/Avatar';
 
 /**
  * Recursive read-only comment component for public post view
@@ -37,8 +38,6 @@ function PublicCommentNode({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const childReplies = allComments.filter((c) => c.parentId === comment.id);
-  const authorInitial =
-    comment.user?.fullName?.[0] || comment.user?.username?.[0] || 'U';
 
   const indentClass =
     depth === 0
@@ -50,17 +49,12 @@ function PublicCommentNode({
   return (
     <div className={`mt-2.5 ${indentClass}`}>
       <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-slate-300 transition-colors">
-        {comment.user?.avatarUrl ? (
-          <img
-            src={comment.user.avatarUrl}
-            alt={comment.user.fullName}
-            className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
-          />
-        ) : (
-          <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
-            {authorInitial}
-          </div>
-        )}
+        <Avatar
+          src={comment.user?.avatarUrl}
+          name={comment.user?.fullName || comment.user?.username}
+          size="sm"
+          className="ring-1 ring-slate-200 shrink-0"
+        />
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
@@ -344,17 +338,12 @@ export default function PublicPostView() {
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  {post.user?.avatarUrl ? (
-                    <img
-                      src={post.user.avatarUrl}
-                      alt={post.user.fullName}
-                      className="w-12 h-12 rounded-full object-cover ring-1 ring-slate-200"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-slate-900 text-white font-bold text-base flex items-center justify-center">
-                      {post.user?.fullName?.[0] || 'U'}
-                    </div>
-                  )}
+                  <Avatar
+                    src={post.user?.avatarUrl}
+                    name={post.user?.fullName || post.user?.username}
+                    size="xl"
+                    className="w-12 h-12 rounded-full ring-1 ring-slate-200 shrink-0"
+                  />
 
                   <div>
                     <div className="font-bold text-base text-slate-900 leading-tight">
@@ -564,8 +553,40 @@ export default function PublicPostView() {
                 </div>
               )}
 
+              {/* Post Activity & Reactions Summary Row (Public View) */}
+              {((Array.isArray(post.reactions) && post.reactions.length > 0) || (post.commentsCount || 0) > 0) && (
+                <div className="flex items-center justify-between pb-3 px-0.5 text-xs text-slate-500 font-medium select-none">
+                  {Array.isArray(post.reactions) && post.reactions.length > 0 ? (
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center -space-x-1">
+                        {Array.from(new Set(post.reactions.map((r) => r.emoji))).slice(0, 3).map((emoji, i) => (
+                          <span
+                            key={emoji}
+                            style={{ zIndex: 3 - i }}
+                            className="w-5 h-5 rounded-full bg-slate-100 ring-2 ring-white flex items-center justify-center text-xs shadow-2xs"
+                          >
+                            {emoji}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="font-semibold text-slate-600 text-xs">
+                        {post.reactions.length} {post.reactions.length === 1 ? 'reaction' : 'reactions'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div />
+                  )}
+
+                  {(post.commentsCount || 0) > 0 && (
+                    <span className="text-xs font-semibold text-slate-400">
+                      {post.commentsCount} {post.commentsCount === 1 ? 'comment' : 'comments'}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Engagement Bar */}
-              <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-slate-600 text-xs sm:text-sm font-semibold">
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-slate-600 text-xs sm:text-sm font-semibold">
                 <button
                   type="button"
                   onClick={handlePromptLogin}
@@ -573,7 +594,7 @@ export default function PublicPostView() {
                   title="Log in to like"
                 >
                   <HiOutlineHeart className="w-5 h-5" />
-                  <span>{post.likesCount || 0}</span>
+                  <span>Like</span>
                 </button>
 
                 <button

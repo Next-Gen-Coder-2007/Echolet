@@ -574,6 +574,17 @@ export const emitPostLiked = (data: { postId: string; userId: string; likesCount
   io.emit('post_liked', data);
 };
 
+export const emitPostReactionUpdated = (data: {
+  postId: string;
+  reactions: any[];
+  likesCount: number;
+  userId?: string;
+  userReaction?: string | null;
+}) => {
+  if (!io) return;
+  io.emit('post_reaction_updated', data);
+};
+
 export const emitNewComment = (comment: any) => {
   if (!io) return;
   io.emit('new_comment', comment);
@@ -768,6 +779,17 @@ export const emitStoryDeleted = async (data: { storyId: string; userId: string }
 export const emitStoryViewed = (data: { storyId: string; viewer: any; viewsCount: number }) => {
   if (!io) return;
   io.emit('story_viewed', data);
+};
+
+export const emitStoryLiked = (data: {
+  storyId: string;
+  userId: string;
+  isLiked: boolean;
+  likesCount: number;
+  user?: any;
+}) => {
+  if (!io) return;
+  io.emit('story_liked', data);
 };
 
 export const emitFollowUpdated = (data: { followerId: string; followingId: string; isFollowing: boolean }) => {

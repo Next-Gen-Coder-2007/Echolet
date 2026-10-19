@@ -23,6 +23,7 @@ import ShareReelModal from '../components/ShareReelModal';
 import reelService, { type Reel } from '../services/reelService';
 import { useMessage } from '../context/MessageContext';
 import type { User } from '../services/authService';
+import Avatar from '../components/Avatar';
 
 function formatShortCount(num: number | undefined): string {
   if (!num || num <= 0) return '0';
@@ -526,14 +527,6 @@ export default function Reels() {
             >
               {reels.map((reel, index) => {
                 const isPaused = pausedReelIds[reel.id] ?? index !== activeReelIndex;
-                const authorInitials = reel.user?.fullName
-                  ? reel.user.fullName
-                      .split(' ')
-                      .map((n) => n[0])
-                      .join('')
-                      .toUpperCase()
-                      .slice(0, 2)
-                  : 'U';
                 const progressPct = playbackProgress[reel.id] || 0;
                 const isExpanded = expandedCaptions[reel.id];
 
@@ -611,17 +604,12 @@ export default function Reels() {
                           className="w-10 h-10 rounded-full p-[1.5px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] shrink-0 shadow-md hover:scale-105 transition-transform"
                         >
                           <div className="w-full h-full rounded-full bg-white overflow-hidden flex items-center justify-center">
-                            {reel.user?.avatarUrl ? (
-                              <img
-                                src={reel.user.avatarUrl}
-                                alt={reel.user.fullName || reel.user.username}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span className="text-[11px] font-black text-purple-600">
-                                {authorInitials}
-                              </span>
-                            )}
+                            <Avatar
+                              src={reel.user?.avatarUrl}
+                              name={reel.user?.fullName || reel.user?.username}
+                              size="w-full h-full"
+                              textClassName="text-[11px] font-black"
+                            />
                           </div>
                         </Link>
 
