@@ -10,6 +10,7 @@ import {
   HiOutlineUserMinus,
 } from 'react-icons/hi2';
 import Modal from './Modal';
+import Avatar from './Avatar';
 import userService, { type FollowUserItem } from '../services/userService';
 import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
@@ -270,15 +271,6 @@ export default function FollowListModal({
             </div>
           ) : (
             filteredList.map((user) => {
-              const userInitials = user.fullName
-                ? user.fullName
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                    .toUpperCase()
-                    .slice(0, 2)
-                : 'U';
-
               const isCurrentUser = currentUser?.id === user.id || user.isSelf;
 
               return (
@@ -291,17 +283,11 @@ export default function FollowListModal({
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full p-[2px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] shrink-0">
                       <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                        {user.avatarUrl ? (
-                          <img
-                            src={user.avatarUrl}
-                            alt={user.fullName || user.username}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xs font-bold text-slate-800">
-                            {userInitials}
-                          </span>
-                        )}
+                        <Avatar
+                          src={user.avatarUrl}
+                          name={user.fullName || user.username}
+                          size="w-full h-full"
+                        />
                       </div>
                     </div>
 

@@ -18,6 +18,7 @@ import getSocket from '../services/socket';
 import PostCard from '../components/PostCard';
 import ReelGridCard from '../components/ReelGridCard';
 import FollowListModal from '../components/FollowListModal';
+import Avatar from '../components/Avatar';
 import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
 
@@ -365,15 +366,6 @@ export default function UserProfile() {
     );
   }
 
-  const initials = profileUser.fullName
-    ? profileUser.fullName
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'U';
-
   const joinedDate = profileUser.createdAt
     ? new Date(profileUser.createdAt).toLocaleDateString('en-US', {
         month: 'long',
@@ -468,17 +460,12 @@ export default function UserProfile() {
             <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full p-[3px] bg-white shadow-md">
               <div className="w-full h-full rounded-full p-[2.5px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080]">
                 <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                  {profileUser.avatarUrl ? (
-                    <img
-                      src={profileUser.avatarUrl}
-                      alt={profileUser.fullName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] bg-clip-text text-transparent">
-                      {initials}
-                    </span>
-                  )}
+                  <Avatar
+                    src={profileUser.avatarUrl}
+                    name={profileUser.fullName || profileUser.username}
+                    size="w-full h-full"
+                    textClassName="text-2xl sm:text-3xl font-extrabold"
+                  />
                 </div>
               </div>
             </div>
