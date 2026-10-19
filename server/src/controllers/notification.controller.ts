@@ -65,7 +65,67 @@ export const getNotifications = async (
       pendingRequestMap.set(r.requesterId, r.id);
     });
 
-    const enrichedNotifications = notifications.map((n) => {
+    // Aggregate like notifications on the same entity (post, reel, story) so they display as a single consolidated item
+    const consolidatedNotifications: Notification[] = [];
+    const likeGroupMap = new Map<string, Notification[]>();
+    const duplicateIdsToDelete: string[] = [];
+
+    for (const notif of notifications) {
+      if (notif.type === 'like' && notif.entityType && notif.entityId) {
+        const key = `${notif.entityType}:${notif.entityId}`;
+        if (!likeGroupMap.has(key)) {
+          likeGroupMap.set(key, [notif]);
+          consolidatedNotifications.push(notif);
+        } else {
+          likeGroupMap.get(key)!.push(notif);
+          duplicateIdsToDelete.push(notif.id);
+        }
+      } else {
+        consolidatedNotifications.push(notif);
+      }
+    }
+
+    // Prune duplicate like records asynchronously
+    if (duplicateIdsToDelete.length > 0) {
+      notificationRepo.delete(duplicateIdsToDelete).catch((err) =>
+        console.error('Error cleaning duplicate like notifications:', err)
+      );
+    }
+
+    // Process aggregated messages and unread statuses
+    for (const [key, group] of likeGroupMap.entries()) {
+      if (group.length > 1) {
+        const main = group[0];
+        // If any notification in the group was unread, mark consolidated as unread
+        main.isRead = group.every((n) => n.isRead);
+
+        // Collect distinct actors
+        const actorMap = new Map<string, any>();
+        group.forEach((n) => {
+          if (n.actor && n.actor.id) {
+            actorMap.set(n.actor.id, n.actor);
+          }
+        });
+
+        const actors = Array.from(actorMap.values());
+        const entityLabel =
+          main.entityType === 'story'
+            ? 'story'
+            : main.entityType === 'reel'
+            ? 'reel'
+            : 'echo';
+
+        if (actors.length === 2) {
+          const secondActor = actors.find((a) => a.id !== main.actor?.id);
+          const secondName = secondActor?.fullName || secondActor?.username || '1 person';
+          main.message = `and ${secondName} liked your ${entityLabel}`;
+        } else if (actors.length > 2) {
+          main.message = `and ${actors.length - 1} others liked your ${entityLabel}`;
+        }
+      }
+    }
+
+    const enrichedNotifications = consolidatedNotifications.map((n) => {
       const isActorFollowed = followedActorIds.has(n.actorId);
       const pendingRequestId = pendingRequestMap.get(n.actorId) || (n.entityType === 'follow_request' ? n.entityId : undefined);
       const isRequestPending = n.requestStatus

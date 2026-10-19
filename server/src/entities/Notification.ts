@@ -30,7 +30,7 @@ export class Notification {
   type: NotificationType;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  entityType?: 'post' | 'reel' | 'comment' | 'user' | 'follow_request';
+  entityType?: 'post' | 'reel' | 'comment' | 'user' | 'follow_request' | 'story';
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   entityId?: string;

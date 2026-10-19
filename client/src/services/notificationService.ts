@@ -17,7 +17,7 @@ export type NotificationType =
 export interface NotificationItem {
   id: string;
   type: NotificationType;
-  entityType?: 'post' | 'reel' | 'comment' | 'user' | 'follow_request';
+  entityType?: 'post' | 'reel' | 'comment' | 'user' | 'follow_request' | 'story';
   entityId?: string;
   message?: string;
   isRead: boolean;

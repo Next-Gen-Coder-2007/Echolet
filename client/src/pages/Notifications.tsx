@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import {
   HiOutlineHeart,
   HiOutlineChatBubbleOvalLeftEllipsis,
@@ -12,8 +12,12 @@ import {
 } from 'react-icons/hi2';
 import notificationService, { type NotificationItem } from '../services/notificationService';
 import userService from '../services/userService';
+import storyService, { type UserStoryGroup } from '../services/storyService';
 import getSocket from '../services/socket';
 import { useMessage } from '../context/MessageContext';
+import Avatar from '../components/Avatar';
+import StoryViewerModal from '../components/StoryViewerModal';
+import type { User } from '../services/authService';
 
 const formatTimeAgo = (dateStr: string): string => {
   const date = new Date(dateStr);
@@ -32,11 +36,25 @@ const formatTimeAgo = (dateStr: string): string => {
 
 export default function Notifications() {
   const navigate = useNavigate();
+  const outletContext = useOutletContext<{ user?: User | null }>();
+  const currentUser = outletContext?.user;
   const { showSuccess, showError } = useMessage();
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'requests'>('all');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionInProgressId, setActionInProgressId] = useState<string | null>(null);
+
+  const [storyModalState, setStoryModalState] = useState<{
+    isOpen: boolean;
+    userStoryGroups: UserStoryGroup[];
+    initialUserIndex: number;
+    initialStoryIndex: number;
+  }>({
+    isOpen: false,
+    userStoryGroups: [],
+    initialUserIndex: 0,
+    initialStoryIndex: 0,
+  });
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -119,7 +137,37 @@ export default function Notifications() {
     }
 
     if (item.type === 'like' || item.type === 'comment') {
-      if (item.entityType === 'reel' && item.entityId) {
+      if (item.entityType === 'story' && item.entityId) {
+        try {
+          const res = await storyService.getStories();
+          const groups = res.userStoryGroups || [];
+          let foundUserIdx = -1;
+          let foundStoryIdx = -1;
+
+          for (let uIdx = 0; uIdx < groups.length; uIdx++) {
+            const sIdx = groups[uIdx].stories.findIndex((s) => s.id === item.entityId);
+            if (sIdx !== -1) {
+              foundUserIdx = uIdx;
+              foundStoryIdx = sIdx;
+              break;
+            }
+          }
+
+          if (foundUserIdx !== -1) {
+            setStoryModalState({
+              isOpen: true,
+              userStoryGroups: groups,
+              initialUserIndex: foundUserIdx,
+              initialStoryIndex: foundStoryIdx,
+            });
+          } else {
+            showError('This story is no longer available or has expired.', 'Story Expired');
+          }
+        } catch (err) {
+          console.error('Failed to open story from notification:', err);
+          showError('Failed to load story', 'Error');
+        }
+      } else if (item.entityType === 'reel' && item.entityId) {
         navigate(`/reels/${item.entityId}`);
       } else if (item.entityId) {
         navigate(`/post/${item.entityId}`);
@@ -337,15 +385,6 @@ export default function Notifications() {
             </div>
           ) : (
             filtered.map((item) => {
-              const actorInitials = item.actor?.fullName
-                ? item.actor.fullName
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')
-                    .toUpperCase()
-                    .slice(0, 2)
-                : 'U';
-
               return (
                 <div
                   key={item.id}
@@ -364,15 +403,11 @@ export default function Notifications() {
                       className="w-11 h-11 rounded-full p-[2px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] shadow-xs cursor-pointer hover:scale-105 transition-transform"
                     >
                       <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                        {item.actor?.avatarUrl ? (
-                          <img
-                            src={item.actor.avatarUrl}
-                            alt={item.actor.fullName || item.actor.username}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-xs font-bold text-slate-800">{actorInitials}</span>
-                        )}
+                        <Avatar
+                          src={item.actor?.avatarUrl}
+                          name={item.actor?.fullName || item.actor?.username}
+                          size="w-full h-full"
+                        />
                       </div>
                     </div>
                     <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white shadow-xs border border-slate-100 flex items-center justify-center">
@@ -393,15 +428,19 @@ export default function Notifications() {
                         {item.actor?.fullName || item.actor?.username}
                       </span>
                       <span>
-                        {item.type === 'like' && 'liked your echo'}
-                        {item.type === 'comment' && 'commented on your echo'}
+                        {item.type === 'like' && (
+                          item.message
+                            ? (item.message.startsWith('and ') ? item.message : item.message.startsWith('liked ') ? item.message : `liked your ${item.entityType === 'story' ? 'story' : item.entityType === 'reel' ? 'reel' : 'echo'}`)
+                            : `liked your ${item.entityType === 'story' ? 'story' : item.entityType === 'reel' ? 'reel' : 'echo'}`
+                        )}
+                        {item.type === 'comment' && `commented on your ${item.entityType === 'reel' ? 'reel' : 'echo'}`}
                         {item.type === 'follow' && 'started following you'}
                         {item.type === 'follow_request' && 'requested to follow you'}
                         {item.type === 'follow_accept' && 'accepted your follow request'}
                       </span>
                     </div>
 
-                    {item.message && (
+                    {item.message && item.type === 'comment' && (
                       <p className="text-xs text-slate-500 mt-1 line-clamp-1 italic bg-slate-50/80 px-2 py-1 rounded-lg border border-slate-100/80 inline-block max-w-full">
                         &ldquo;{item.message}&rdquo;
                       </p>
@@ -499,6 +538,18 @@ export default function Notifications() {
           )}
         </div>
       </div>
+
+      {/* Story Viewer Modal triggered by clicking a story notification */}
+      {storyModalState.isOpen && (
+        <StoryViewerModal
+          isOpen={storyModalState.isOpen}
+          onClose={() => setStoryModalState((prev) => ({ ...prev, isOpen: false }))}
+          userStoryGroups={storyModalState.userStoryGroups}
+          initialUserIndex={storyModalState.initialUserIndex}
+          initialStoryIndex={storyModalState.initialStoryIndex}
+          currentUser={currentUser}
+        />
+      )}
     </div>
   );
 }
