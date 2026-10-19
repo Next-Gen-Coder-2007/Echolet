@@ -23,6 +23,7 @@ export default function MessageReactionPicker({
   const [showFullPicker, setShowFullPicker] = useState(false);
   const [placement, setPlacement] = useState<'up' | 'down'>('up');
   const [dynamicHeight, setDynamicHeight] = useState<number>(340);
+  const [horizontalShift, setHorizontalShift] = useState<number>(0);
   const [isPositioned, setIsPositioned] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mountedAtRef = useRef<number>(Date.now());
@@ -41,9 +42,11 @@ export default function MessageReactionPicker({
     const spaceAbove = Math.max(0, parentRect.top - topMargin);
     const spaceBelow = Math.max(0, window.innerHeight - parentRect.bottom - bottomMargin);
 
-    // Reactions strictly prefer opening ABOVE the message bubble (standard chat UI).
-    // Only flip downward if space above is less than 200px AND space below is greater.
-    const placeDown = spaceAbove < 200 && spaceBelow > spaceAbove;
+    // Reactions strictly prefer opening ABOVE (standard chat UI).
+    // Quick reaction capsule is only ~44px tall (needs ~55px of space).
+    // Full picker needs ~320px of space.
+    const requiredSpace = showFullPicker ? 320 : 55;
+    const placeDown = spaceAbove < requiredSpace && spaceBelow > spaceAbove;
     const direction = placeDown ? 'down' : 'up';
     const availableSpace = direction === 'down' ? spaceBelow : spaceAbove;
 
@@ -53,8 +56,18 @@ export default function MessageReactionPicker({
       Math.min(380, Math.floor(availableSpace - 50))
     );
 
+    // Check horizontal viewport edges
+    const containerRect = containerRef.current.getBoundingClientRect();
+    let shift = 0;
+    if (containerRect.left < 12) {
+      shift = 12 - containerRect.left;
+    } else if (containerRect.right > window.innerWidth - 12) {
+      shift = window.innerWidth - 12 - containerRect.right;
+    }
+
     setPlacement(direction);
     setDynamicHeight(calculatedPickerHeight);
+    setHorizontalShift(shift);
     setIsPositioned(true);
   }, [showFullPicker]);
 
@@ -130,6 +143,9 @@ export default function MessageReactionPicker({
       } ${
         placement === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
       } ${align === 'right' ? 'right-0' : 'left-0'} ${className}`}
+      style={{
+        transform: horizontalShift ? `translateX(${horizontalShift}px)` : undefined,
+      }}
     >
       {!showFullPicker ? (
         /* 1. Quick Reaction Capsule Bar (Pure White) */

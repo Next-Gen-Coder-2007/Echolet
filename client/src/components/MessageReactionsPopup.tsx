@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } fr
 import { HiXMark, HiOutlineFaceSmile, HiPlus, HiOutlineTrash } from 'react-icons/hi2';
 import type { MessageReactionItem } from '../services/messageService';
 import MessageReactionPicker from './MessageReactionPicker';
+import Avatar from './Avatar';
 
 interface MessageReactionsPopupProps {
   reactions: MessageReactionItem[];
@@ -237,18 +238,12 @@ export default function MessageReactionsPopup({
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {/* User Circular Avatar */}
-                  {r.avatarUrl ? (
-                    <img
-                      src={r.avatarUrl}
-                      alt={r.fullName || r.username}
-                      className="w-9 h-9 rounded-full object-cover border border-slate-200/80 shrink-0"
-                    />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white font-bold flex items-center justify-center shrink-0 shadow-2xs text-xs">
-                      {(r.fullName?.[0] || r.username?.[0] || '?').toUpperCase()}
-                    </div>
-                  )}
+                  <Avatar
+                    src={r.avatarUrl}
+                    name={r.fullName || r.username}
+                    size="sm"
+                    className="w-9 h-9 border border-slate-200/80 shrink-0"
+                  />
 
                   {/* Name and handle */}
                   <div className="min-w-0 flex flex-col justify-center">

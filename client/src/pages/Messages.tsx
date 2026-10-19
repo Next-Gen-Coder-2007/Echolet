@@ -35,6 +35,8 @@ import {
   HiOutlineGlobeAlt,
   HiOutlinePhone,
   HiOutlineLockClosed,
+  HiOutlineSquares2X2,
+  HiOutlineChartBar,
 } from 'react-icons/hi2';
 import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
 import messageService, {
@@ -57,8 +59,11 @@ import { useVoiceCall } from '../context/CallContext';
 import CreateGroupModal from '../components/CreateGroupModal';
 import GroupInfoModal from '../components/GroupInfoModal';
 import ConversationDetailsView from '../components/ConversationDetailsView';
+import Avatar from '../components/Avatar';
 import GlobalChatRoom from '../components/GlobalChatRoom';
 import ChatPollWidget from '../components/ChatPollWidget';
+import PollVotersModal from '../components/PollVotersModal';
+import type { PollVotersData } from '../services/postService';
 import ChatMediaAttachment from '../components/ChatMediaAttachment';
 import ChatAttachmentMenu from '../components/ChatAttachmentMenu';
 import CreateChatPollModal from '../components/CreateChatPollModal';
@@ -879,12 +884,6 @@ const UserAvatar: React.FC<{
   isOnline?: boolean;
   showBadge?: boolean;
 }> = ({ user, size = 'md', isOnline = false, showBadge = false }) => {
-  const [imgError, setImgError] = useState(false);
-
-  useEffect(() => {
-    setImgError(false);
-  }, [user?.avatarUrl]);
-
   const sizeClasses = {
     sm: 'w-7 h-7 text-xs',
     md: 'w-10 h-10 text-sm',
@@ -899,20 +898,12 @@ const UserAvatar: React.FC<{
 
   return (
     <div className={`relative shrink-0 ${sizeClasses}`}>
-      {user?.avatarUrl && !imgError ? (
-        <img
-          src={user.avatarUrl}
-          alt={user.fullName || user.username || 'User'}
-          onError={() => setImgError(true)}
-          className={`${sizeClasses} rounded-full object-cover shadow-2xs`}
-        />
-      ) : (
-        <div
-          className={`${sizeClasses} rounded-full bg-linear-to-tr from-slate-900 to-slate-700 text-white font-bold flex items-center justify-center uppercase shadow-2xs select-none`}
-        >
-          {user?.fullName?.[0] || user?.username?.[0] || 'U'}
-        </div>
-      )}
+      <Avatar
+        src={user?.avatarUrl}
+        name={user?.fullName || user?.username}
+        size={size}
+        className={sizeClasses}
+      />
       {showBadge && (
         <span
           className={`absolute bottom-0 right-0 ${badgeSize} rounded-full ring-white transition-all ${
@@ -938,19 +929,15 @@ const GroupAvatar: React.FC<{
 
   return (
     <div className={`relative shrink-0 ${sizeClasses}`}>
-      {group?.avatarUrl ? (
-        <img
-          src={group.avatarUrl}
-          alt={group.name || 'Group'}
-          className={`${sizeClasses} rounded-2xl object-cover shadow-2xs`}
-        />
-      ) : (
-        <div
-          className={`${sizeClasses} rounded-2xl bg-gradient-to-tr from-indigo-700 via-purple-700 to-indigo-900 text-white font-bold flex items-center justify-center uppercase shadow-2xs select-none`}
-        >
-          <HiOutlineUserGroup className="w-5 h-5 text-indigo-100" />
-        </div>
-      )}
+      <Avatar
+        src={group?.avatarUrl}
+        name={group?.name}
+        size={size}
+        className={`${sizeClasses} !rounded-2xl`}
+        imageClassName="!rounded-2xl"
+        fallbackClassName="!rounded-2xl bg-gradient-to-tr from-indigo-700 via-purple-700 to-indigo-900 text-white font-bold"
+        icon={<HiOutlineUserGroup className="w-5 h-5 text-indigo-100" />}
+      />
       <span
         className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-indigo-600 text-white flex items-center justify-center ring-2 ring-white shadow-2xs"
         title="Group Chat"
@@ -1122,8 +1109,44 @@ const renderLastMessagePreview = (
     );
   }
 
-  // 2. Voice note (only if not deleted)
-  if (msg.messageType === 'voice' || (msg.audioUrl && !msg.isDeletedForEveryone)) {
+  // 2. Shared Reel (strictly check this BEFORE generic mediaUrl!)
+  const isReel =
+    msg.messageType === 'reel' ||
+    /\/reel(?:s)?\/[a-zA-Z0-9_-]+/i.test(msg.content || '');
+  if (isReel) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-purple-600 font-medium">
+        <HiOutlinePlay className="w-3.5 h-3.5 text-purple-600 shrink-0 inline" />
+        <span>Reel</span>
+      </span>
+    );
+  }
+
+  // 3. Shared Post / Echo (strictly check this BEFORE generic mediaUrl!)
+  const isPost =
+    msg.messageType === 'post' ||
+    /\/post(?:s)?\/[a-zA-Z0-9_-]+/i.test(msg.content || '');
+  if (isPost) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-indigo-600 font-medium">
+        <HiOutlineSquares2X2 className="w-3.5 h-3.5 text-indigo-600 shrink-0 inline" />
+        <span>Post</span>
+      </span>
+    );
+  }
+
+  // 4. Story Reply / Reaction
+  if (msg.messageType === 'story_reply' || msg.content?.includes('Replied to your story')) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-pink-600 font-medium">
+        <span className="text-xs">✨</span>
+        <span>Story reply</span>
+      </span>
+    );
+  }
+
+  // 5. Voice note (only if not deleted)
+  if (msg.messageType === 'voice' || msg.messageType === 'audio' || (msg.audioUrl && !msg.isDeletedForEveryone)) {
     return (
       <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
         <HiOutlineMicrophone className="w-3.5 h-3.5 text-indigo-500 shrink-0 inline" />
@@ -1132,51 +1155,56 @@ const renderLastMessagePreview = (
     );
   }
 
-  // 3. Image / Photo
-  if (
-    msg.messageType === 'image' ||
-    (msg.mediaUrl && /\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i.test(msg.mediaUrl)) ||
-    msg.mediaUrl?.startsWith('data:image/')
-  ) {
+  // 6. Document
+  if (msg.messageType === 'document') {
     return (
-      <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
-        <HiOutlinePhoto className="w-3.5 h-3.5 text-indigo-500 shrink-0 inline" />
-        <span>Photo</span>
+      <span className="inline-flex items-center gap-1 text-slate-600 font-medium truncate">
+        <HiOutlineDocumentText className="w-3.5 h-3.5 text-indigo-500 shrink-0 inline" />
+        <span className="truncate">{msg.fileName || 'Document'}</span>
       </span>
     );
   }
 
-  // 4. Video
+  // 7. Poll
+  if (msg.messageType === 'poll' || msg.poll) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-slate-600 font-medium truncate">
+        <HiOutlineChartBar className="w-3.5 h-3.5 text-purple-600 shrink-0 inline" />
+        <span className="truncate">Poll: {msg.poll?.question || 'Poll'}</span>
+      </span>
+    );
+  }
+
+  // 8. Video
   if (
     msg.messageType === 'video' ||
     (msg.mediaUrl && /\.(mp4|webm|mov|mkv)(\?.*)?$/i.test(msg.mediaUrl)) ||
     msg.mediaUrl?.startsWith('data:video/')
   ) {
     return (
-      <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
+      <span className="inline-flex items-center gap-1 text-slate-600 font-medium truncate">
         <HiOutlineFilm className="w-3.5 h-3.5 text-indigo-500 shrink-0 inline" />
-        <span>Video</span>
+        <span className="truncate">{msg.content && msg.content !== 'Video' ? msg.content : 'Video'}</span>
       </span>
     );
   }
 
-  // 5. Document
-  if (msg.messageType === 'document') {
+  // 9. Image / Photo
+  if (
+    msg.messageType === 'image' ||
+    (msg.mediaUrl && /\.(jpg|jpeg|png|webp|gif|avif)(\?.*)?$/i.test(msg.mediaUrl)) ||
+    msg.mediaUrl?.startsWith('data:image/')
+  ) {
     return (
-      <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
-        <HiOutlineDocumentText className="w-3.5 h-3.5 text-indigo-500 shrink-0 inline" />
-        <span>{msg.fileName || 'Document'}</span>
+      <span className="inline-flex items-center gap-1 text-slate-600 font-medium truncate">
+        <HiOutlinePhoto className="w-3.5 h-3.5 text-indigo-500 shrink-0 inline" />
+        <span className="truncate">{msg.content && msg.content !== 'Photo' ? msg.content : 'Photo'}</span>
       </span>
     );
   }
 
-  // 6. Poll
-  if (msg.poll) {
-    return <span>📊 Poll: {msg.poll.question}</span>;
-  }
-
-  // 7. Regular text or fallback
-  return <span>{msg.content || fallbackText}</span>;
+  // 10. Regular text or fallback
+  return <span className="truncate">{msg.content || fallbackText}</span>;
 };
 
 export default function Messages() {
@@ -1225,6 +1253,13 @@ export default function Messages() {
 
   // Clear chat modal state
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+
+  // Poll voters modal state
+  const [pollVotersModal, setPollVotersModal] = useState<{
+    isOpen: boolean;
+    question?: string;
+    loader?: () => Promise<PollVotersData>;
+  }>({ isOpen: false });
 
   // Stories in Messages state
   const [userStoryGroups, setUserStoryGroups] = useState<UserStoryGroup[]>([]);
@@ -1312,8 +1347,9 @@ export default function Messages() {
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
   const [groupTypingUsers, setGroupTypingUsers] = useState<
-    Record<string, { username: string; fullName: string }>
+    Record<string, Record<string, { username: string; fullName: string }>>
   >({});
+  const groupTypingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Input & sending state
   const [text, setText] = useState('');
@@ -1637,6 +1673,10 @@ export default function Messages() {
       const list = await groupService.getGroups();
       setGroups(list);
       groupsRef.current = list;
+      const socket = getSocket();
+      if (socket && socket.connected) {
+        list.forEach((g) => socket.emit('join_group', g.id));
+      }
       return list;
     } catch {
       return [];
@@ -2709,14 +2749,34 @@ export default function Messages() {
       userId: string;
       userName: string;
     }) => {
-      const curGroup = activeGroupRef.current;
       const curId = currentUserRef.current?.id;
-      if (curGroup && curGroup.id === groupId && userId !== curId) {
-        setGroupTypingUsers((prev) => ({
-          ...prev,
+      if (!groupId || !userId || userId === curId) return;
+
+      setGroupTypingUsers((prev) => ({
+        ...prev,
+        [groupId]: {
+          ...(prev[groupId] || {}),
           [userId]: { username: userName, fullName: userName },
-        }));
+        },
+      }));
+
+      // Auto-clear after 3.5 seconds in case stop_typing is missed
+      const timerKey = `${groupId}:${userId}`;
+      if (groupTypingTimersRef.current[timerKey]) {
+        clearTimeout(groupTypingTimersRef.current[timerKey]);
       }
+      groupTypingTimersRef.current[timerKey] = setTimeout(() => {
+        setGroupTypingUsers((prev) => {
+          if (!prev[groupId] || !prev[groupId][userId]) return prev;
+          const nextGroup = { ...prev[groupId] };
+          delete nextGroup[userId];
+          return {
+            ...prev,
+            [groupId]: nextGroup,
+          };
+        });
+        delete groupTypingTimersRef.current[timerKey];
+      }, 3500);
     };
 
     const handleGroupStopTyping = ({
@@ -2726,14 +2786,21 @@ export default function Messages() {
       groupId: string;
       userId: string;
     }) => {
-      const curGroup = activeGroupRef.current;
-      if (curGroup && curGroup.id === groupId) {
-        setGroupTypingUsers((prev) => {
-          const next = { ...prev };
-          delete next[userId];
-          return next;
-        });
+      if (!groupId || !userId) return;
+      const timerKey = `${groupId}:${userId}`;
+      if (groupTypingTimersRef.current[timerKey]) {
+        clearTimeout(groupTypingTimersRef.current[timerKey]);
+        delete groupTypingTimersRef.current[timerKey];
       }
+      setGroupTypingUsers((prev) => {
+        if (!prev[groupId] || !prev[groupId][userId]) return prev;
+        const nextGroup = { ...prev[groupId] };
+        delete nextGroup[userId];
+        return {
+          ...prev,
+          [groupId]: nextGroup,
+        };
+      });
     };
 
     const handleGroupCreated = (group: GroupItem) => {
@@ -3584,7 +3651,8 @@ export default function Messages() {
     ? Boolean(chatSettings.blockedUsers?.includes(activeUser.id))
     : false;
 
-  const groupTypingNames = Object.values(groupTypingUsers).map((u) => u.fullName || u.username);
+  const activeGroupTypers = activeGroup ? groupTypingUsers[activeGroup.id] || {} : {};
+  const groupTypingNames = Object.values(activeGroupTypers).map((u) => u.fullName || u.username);
 
   const renderMessageContent = (content: string, isDeleted: boolean, isMe: boolean) => {
     if (isDeleted) {
@@ -3763,17 +3831,11 @@ export default function Messages() {
                 }`}
               >
                 <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5">
-                  {currentUser?.avatarUrl ? (
-                    <img
-                      src={currentUser.avatarUrl}
-                      alt="You"
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center">
-                      {currentUser?.fullName?.[0] || currentUser?.username?.[0] || 'U'}
-                    </div>
-                  )}
+                  <Avatar
+                    src={currentUser?.avatarUrl}
+                    name={currentUser?.fullName || currentUser?.username}
+                    size="full"
+                  />
                 </div>
 
                 {!hasOwnStory && (
@@ -3809,17 +3871,11 @@ export default function Messages() {
                       }`}
                     >
                       <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5">
-                        {group.user.avatarUrl ? (
-                          <img
-                            src={group.user.avatarUrl}
-                            alt={group.user.fullName}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center">
-                            {group.user.fullName?.[0] || 'U'}
-                          </div>
-                        )}
+                        <Avatar
+                          src={group.user.avatarUrl}
+                          name={group.user.fullName || group.user.username}
+                          size="full"
+                        />
                       </div>
                     </div>
                     <span className="text-[10px] font-semibold text-slate-700 truncate max-w-[54px]">
@@ -3969,6 +4025,16 @@ export default function Messages() {
                 const isArchived = isChatArchived(g.id);
                 const hasUnread = isChatUnread(g.id, g.unreadCount);
 
+                const groupTypers = groupTypingUsers[g.id] || {};
+                const groupTypingList = Object.values(groupTypers);
+                const isGroupTyping = groupTypingList.length > 0;
+                const typingLabel =
+                  groupTypingList.length === 1
+                    ? `${groupTypingList[0].fullName?.split(' ')[0] || groupTypingList[0].username} is typing...`
+                    : groupTypingList.length > 1
+                    ? `${groupTypingList.slice(0, 2).map((u) => u.fullName?.split(' ')[0] || u.username).join(', ')} are typing...`
+                    : 'typing...';
+
                 return (
                   <div
                     key={g.id}
@@ -4011,7 +4077,11 @@ export default function Messages() {
                       </div>
                       <div className="flex items-center justify-between mt-0.5">
                         <p className="text-xs text-slate-500 truncate pr-2">
-                          {g.lastMessage ? (
+                          {isGroupTyping ? (
+                            <span className="text-emerald-600 font-semibold animate-pulse flex items-center gap-1">
+                              <span>{typingLabel}</span>
+                            </span>
+                          ) : g.lastMessage ? (
                             <>
                               <span className="font-semibold text-slate-700">
                                 {g.lastMessage.sender?.fullName?.split(' ')[0] ||
@@ -4256,6 +4326,16 @@ export default function Messages() {
                   const isArchived = isChatArchived(g.id);
                   const hasUnread = isChatUnread(g.id, g.unreadCount);
 
+                  const groupTypers = groupTypingUsers[g.id] || {};
+                  const groupTypingList = Object.values(groupTypers);
+                  const isGroupTyping = groupTypingList.length > 0;
+                  const typingLabel =
+                    groupTypingList.length === 1
+                      ? `${groupTypingList[0].fullName?.split(' ')[0] || groupTypingList[0].username} is typing...`
+                      : groupTypingList.length > 1
+                      ? `${groupTypingList.slice(0, 2).map((u) => u.fullName?.split(' ')[0] || u.username).join(', ')} are typing...`
+                      : 'typing...';
+
                   return (
                     <div
                       key={`group-${g.id}`}
@@ -4298,7 +4378,11 @@ export default function Messages() {
                         </div>
                         <div className="flex items-center justify-between mt-0.5">
                           <p className="text-xs text-slate-500 truncate pr-2">
-                            {g.lastMessage ? (
+                            {isGroupTyping ? (
+                              <span className="text-emerald-600 font-semibold animate-pulse flex items-center gap-1">
+                                <span>{typingLabel}</span>
+                              </span>
+                            ) : g.lastMessage ? (
                               <>
                                 <span className="font-semibold text-slate-700">
                                   {g.lastMessage.sender?.fullName?.split(' ')[0] ||
@@ -4740,6 +4824,14 @@ export default function Messages() {
                                 >
                                   <HiOutlineFaceSmile className="w-4 h-4" />
                                 </button>
+                                {activeReactionPickerMessageId === m.id && (
+                                  <MessageReactionPicker
+                                    userCurrentReaction={m.reactions?.find((r) => r.userId === currentUser?.id)?.emoji}
+                                    onSelectEmoji={(emoji) => handleToggleMessageReaction(m.id, emoji)}
+                                    onClose={() => setActiveReactionPickerMessageId(null)}
+                                    align="left"
+                                  />
+                                )}
                               </div>
 
                               <button
@@ -4871,15 +4963,6 @@ export default function Messages() {
 
                           {/* Bubble */}
                           <div className="flex flex-col max-w-[80%] sm:max-w-[70%] relative">
-                            {/* Reaction Picker anchored directly on message bubble */}
-                            {activeReactionPickerMessageId === m.id && (
-                              <MessageReactionPicker
-                                userCurrentReaction={m.reactions?.find((r) => r.userId === currentUser?.id)?.emoji}
-                                onSelectEmoji={(emoji) => handleToggleMessageReaction(m.id, emoji)}
-                                onClose={() => setActiveReactionPickerMessageId(null)}
-                                align={isMe ? 'right' : 'left'}
-                              />
-                            )}
                             <div
                               className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed flex flex-col gap-1 shadow-2xs relative transition-all ${
                                 isSelected ? 'ring-2 ring-purple-500 shadow-md ring-offset-2' : ''
@@ -4930,6 +5013,14 @@ export default function Messages() {
                                   currentUserId={currentUser?.id}
                                   onVote={(optionId) => handleVotePoll(m.id, optionId)}
                                   isMe={isMe}
+                                  canViewVoters={m.senderId === currentUser?.id}
+                                  onViewVoters={() =>
+                                    setPollVotersModal({
+                                      isOpen: true,
+                                      question: m.poll?.question,
+                                      loader: () => groupService.getPollVoters(m.groupId, m.id),
+                                    })
+                                  }
                                 />
                               ) : !m.isDeletedForEveryone && (m.messageType === 'voice' || m.audioUrl) ? (
                                 <VoiceNotePlayer
@@ -4985,7 +5076,7 @@ export default function Messages() {
                                     </span>
                                   </div>
                                 </div>
-                              ) : !m.isDeletedForEveryone && (m.messageType === 'reel' || /\/reels\/[a-zA-Z0-9_-]+/i.test(m.content || '')) ? (
+                              ) : !m.isDeletedForEveryone && (m.messageType === 'reel' || /\/reel(?:s)?\/[a-zA-Z0-9_-]+/i.test(m.content || '')) ? (
                                 <div>
                                   <ReelMessageCard
                                     content={m.content}
@@ -5134,6 +5225,14 @@ export default function Messages() {
                                 >
                                   <HiOutlineFaceSmile className="w-4 h-4" />
                                 </button>
+                                {activeReactionPickerMessageId === m.id && (
+                                  <MessageReactionPicker
+                                    userCurrentReaction={m.reactions?.find((r) => r.userId === currentUser?.id)?.emoji}
+                                    onSelectEmoji={(emoji) => handleToggleMessageReaction(m.id, emoji)}
+                                    onClose={() => setActiveReactionPickerMessageId(null)}
+                                    align="right"
+                                  />
+                                )}
                               </div>
 
                               <button
@@ -5694,6 +5793,14 @@ export default function Messages() {
                                 >
                                   <HiOutlineFaceSmile className="w-4 h-4" />
                                 </button>
+                                {activeReactionPickerMessageId === m.id && (
+                                  <MessageReactionPicker
+                                    userCurrentReaction={m.reactions?.find((r) => r.userId === currentUser?.id)?.emoji}
+                                    onSelectEmoji={(emoji) => handleToggleMessageReaction(m.id, emoji)}
+                                    onClose={() => setActiveReactionPickerMessageId(null)}
+                                    align="left"
+                                  />
+                                )}
                               </div>
 
                               <button
@@ -5815,15 +5922,6 @@ export default function Messages() {
 
                           {/* Bubble */}
                           <div className="flex flex-col max-w-[80%] sm:max-w-[70%] relative">
-                            {/* Reaction Picker anchored directly on message bubble */}
-                            {activeReactionPickerMessageId === m.id && (
-                              <MessageReactionPicker
-                                userCurrentReaction={m.reactions?.find((r) => r.userId === currentUser?.id)?.emoji}
-                                onSelectEmoji={(emoji) => handleToggleMessageReaction(m.id, emoji)}
-                                onClose={() => setActiveReactionPickerMessageId(null)}
-                                align={isMe ? 'right' : 'left'}
-                              />
-                            )}
                             <div
                               className={`px-3.5 py-2 rounded-2xl text-sm sm:text-base leading-relaxed flex flex-col gap-1 shadow-2xs relative transition-all ${
                                 isSelected ? 'ring-2 ring-purple-500 shadow-md ring-offset-2' : ''
@@ -5869,6 +5967,14 @@ export default function Messages() {
                                   currentUserId={currentUser?.id}
                                   onVote={(optionId) => handleVotePoll(m.id, optionId)}
                                   isMe={isMe}
+                                  canViewVoters={m.senderId === currentUser?.id}
+                                  onViewVoters={() =>
+                                    setPollVotersModal({
+                                      isOpen: true,
+                                      question: m.poll?.question,
+                                      loader: () => messageService.getPollVoters(m.id),
+                                    })
+                                  }
                                 />
                               ) : !m.isDeletedForEveryone && (m.messageType === 'voice' || m.audioUrl) ? (
                                 <VoiceNotePlayer
@@ -5933,7 +6039,7 @@ export default function Messages() {
                                     )}
                                   </div>
                                 </div>
-                              ) : !m.isDeletedForEveryone && (m.messageType === 'reel' || /\/reels\/[a-zA-Z0-9_-]+/i.test(m.content || '')) ? (
+                              ) : !m.isDeletedForEveryone && (m.messageType === 'reel' || /\/reel(?:s)?\/[a-zA-Z0-9_-]+/i.test(m.content || '')) ? (
                                 <div>
                                   <ReelMessageCard
                                     content={m.content}
@@ -6096,6 +6202,14 @@ export default function Messages() {
                                 >
                                   <HiOutlineFaceSmile className="w-4 h-4" />
                                 </button>
+                                {activeReactionPickerMessageId === m.id && (
+                                  <MessageReactionPicker
+                                    userCurrentReaction={m.reactions?.find((r) => r.userId === currentUser?.id)?.emoji}
+                                    onSelectEmoji={(emoji) => handleToggleMessageReaction(m.id, emoji)}
+                                    onClose={() => setActiveReactionPickerMessageId(null)}
+                                    align="right"
+                                  />
+                                )}
                               </div>
 
                               <button
@@ -6805,6 +6919,16 @@ export default function Messages() {
           isGroup={Boolean(activeGroup)}
           onSend={handleConfirmSendMedia}
           isSending={isSendingPendingMedia}
+        />
+      )}
+
+      {/* Poll Voters Modal */}
+      {pollVotersModal.isOpen && pollVotersModal.loader && (
+        <PollVotersModal
+          isOpen={pollVotersModal.isOpen}
+          onClose={() => setPollVotersModal({ isOpen: false })}
+          question={pollVotersModal.question}
+          loadVoters={pollVotersModal.loader}
         />
       )}
 

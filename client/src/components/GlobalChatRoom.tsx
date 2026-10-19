@@ -28,6 +28,7 @@ import CreateChatPollModal from './CreateChatPollModal';
 import ReelMessageCard from './ReelMessageCard';
 import PostMessageCard from './PostMessageCard';
 import StoryMessageCard from './StoryMessageCard';
+import Avatar from './Avatar';
 
 // Distinct sender colors identical to group messages
 const SENDER_COLORS = [
@@ -58,11 +59,6 @@ const UserAvatar: React.FC<{
   isOnline?: boolean;
   showBadge?: boolean;
 }> = ({ user, size = 'sm', isOnline = false, showBadge = false }) => {
-  const [imgError, setImgError] = useState(false);
-
-  useEffect(() => {
-    setImgError(false);
-  }, [user?.avatarUrl]);
 
   const sizeClasses = {
     sm: 'w-7 h-7 text-xs',
@@ -78,20 +74,12 @@ const UserAvatar: React.FC<{
 
   return (
     <div className={`relative shrink-0 ${sizeClasses}`}>
-      {user?.avatarUrl && !imgError ? (
-        <img
-          src={user.avatarUrl}
-          alt={user.fullName || user.username || 'User'}
-          onError={() => setImgError(true)}
-          className={`${sizeClasses} rounded-full object-cover shadow-2xs`}
-        />
-      ) : (
-        <div
-          className={`${sizeClasses} rounded-full bg-slate-800 text-white font-bold flex items-center justify-center uppercase shadow-2xs select-none`}
-        >
-          {user?.fullName?.[0] || user?.username?.[0] || 'U'}
-        </div>
-      )}
+      <Avatar
+        src={user?.avatarUrl}
+        name={user?.fullName || user?.username}
+        size={size}
+        className={sizeClasses}
+      />
       {showBadge && (
         <span
           className={`absolute bottom-0 right-0 ${badgeSize} rounded-full ring-white transition-all ${
