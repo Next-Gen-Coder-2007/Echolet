@@ -6,6 +6,7 @@ import {
   HiOutlineArrowRightOnRectangle,
 } from 'react-icons/hi2';
 import authService, { type User } from '../../services/authService';
+import Avatar from '../../components/Avatar';
 
 interface SettingsOutletContext {
   user?: User | null;
@@ -29,15 +30,6 @@ export default function Settings() {
       setIsLoggingOut(false);
     }
   };
-
-  const userInitials = user?.fullName
-    ? user.fullName
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'U';
 
   const navLinks = [
     { to: '/settings/profile', label: 'Edit Profile' },
@@ -112,11 +104,11 @@ export default function Settings() {
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-full p-[2px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] shrink-0">
                 <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                  {user?.avatarUrl ? (
-                    <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-xs font-bold text-slate-800">{userInitials}</span>
-                  )}
+                  <Avatar
+                    src={user?.avatarUrl}
+                    name={user?.fullName || user?.username}
+                    size="w-full h-full"
+                  />
                 </div>
               </div>
               <div className="min-w-0">

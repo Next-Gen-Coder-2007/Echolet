@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   HiOutlineUserGroup,
   HiOutlineMagnifyingGlass,
@@ -7,7 +7,8 @@ import {
   HiOutlinePhoto,
 } from 'react-icons/hi2';
 import Modal from './Modal';
-import userService, { type UserProfileResponse } from '../services/userService';
+import Avatar from './Avatar';
+import userService, { type ConnectedUser } from '../services/userService';
 import groupService, { type GroupItem } from '../services/groupService';
 
 interface CreateGroupModalProps {
@@ -35,15 +36,15 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
-  const [selectedUsers, setSelectedUsers] = useState<UserProfileResponse[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<ConnectedUser[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<UserProfileResponse[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [connections, setConnections] = useState<ConnectedUser[]>([]);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [searchResults, setSearchResults] = useState<ConnectedUser[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  // Load ONLY people we follow or our followers
   useEffect(() => {
     if (!isOpen) {
       setName('');
@@ -52,41 +53,55 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       setSelectedUsers([]);
       setSearchQuery('');
       setSearchResults([]);
+      setConnections([]);
       setError(null);
       setSubmitting(false);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-
-    const query = searchQuery.trim();
-    if (!query) {
-      setSearchResults([]);
-      setSearching(false);
       return;
     }
 
-    setSearching(true);
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const users = await userService.searchUsers(query);
-        // Exclude current user
-        const filtered = users.filter((u) => u.id !== currentUserId);
+    let isMounted = true;
+    setLoadingConnections(true);
+    userService
+      .getConnections()
+      .then((users) => {
+        if (!isMounted) return;
+        const filtered = (users || []).filter((u) => u.id !== currentUserId);
+        setConnections(filtered);
         setSearchResults(filtered);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 250);
+      })
+      .catch((err) => {
+        console.warn('Failed to load connections for group creation:', err);
+        if (isMounted) {
+          setConnections([]);
+          setSearchResults([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoadingConnections(false);
+      });
 
     return () => {
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      isMounted = false;
     };
-  }, [searchQuery, currentUserId]);
+  }, [isOpen, currentUserId]);
 
-  const toggleSelectUser = (user: UserProfileResponse) => {
+  // Filter ONLY within followed or followers when searching
+  useEffect(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) {
+      setSearchResults(connections);
+      return;
+    }
+
+    const filtered = connections.filter(
+      (u) =>
+        u.username.toLowerCase().includes(q) ||
+        (u.fullName && u.fullName.toLowerCase().includes(q))
+    );
+    setSearchResults(filtered);
+  }, [searchQuery, connections]);
+
+  const toggleSelectUser = (user: ConnectedUser) => {
     if (selectedUsers.some((u) => u.id === user.id)) {
       setSelectedUsers((prev) => prev.filter((u) => u.id !== user.id));
     } else {
@@ -238,17 +253,12 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                   key={u.id}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-slate-200 text-xs font-medium text-slate-800 shadow-2xs"
                 >
-                  {u.avatarUrl ? (
-                    <img
-                      src={u.avatarUrl}
-                      alt={u.username}
-                      className="w-4 h-4 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="w-4 h-4 rounded-full bg-slate-800 text-white text-[9px] font-bold flex items-center justify-center">
-                      {(u.fullName?.[0] || u.username[0]).toUpperCase()}
-                    </span>
-                  )}
+                  <Avatar
+                    src={u.avatarUrl}
+                    name={u.fullName || u.username}
+                    size="w-4 h-4"
+                    textClassName="text-[8px]"
+                  />
                   <span>{u.fullName || u.username}</span>
                   <button
                     type="button"
@@ -266,7 +276,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           <div className="relative mb-2">
             <input
               type="text"
-              placeholder="Search people to add..."
+              placeholder="Search people you follow or your followers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400"
@@ -274,12 +284,16 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
             <HiOutlineMagnifyingGlass className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           </div>
 
+          <p className="text-[11px] text-slate-400 mb-2 font-medium">
+            Only accounts you follow or who follow you can be added to groups.
+          </p>
+
           {/* Search Results List */}
-          <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-xl bg-white shadow-2xs">
-            {searching ? (
-              <div className="py-5 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+          <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-xl bg-white shadow-2xs">
+            {loadingConnections ? (
+              <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
                 <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
-                Searching users...
+                Loading your connections...
               </div>
             ) : searchResults.length > 0 ? (
               searchResults.map((user) => {
@@ -294,21 +308,31 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      {user.avatarUrl ? (
-                        <img
-                          src={user.avatarUrl}
-                          alt={user.username}
-                          className="w-8 h-8 rounded-full object-cover shrink-0"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-slate-800 text-white text-xs font-bold flex items-center justify-center shrink-0">
-                          {(user.fullName?.[0] || user.username[0]).toUpperCase()}
-                        </div>
-                      )}
+                      <Avatar
+                        src={user.avatarUrl}
+                        name={user.fullName || user.username}
+                        size="w-8 h-8"
+                        className="shrink-0"
+                      />
                       <div className="min-w-0 truncate">
-                        <p className="text-xs font-semibold text-slate-900 truncate">
-                          {user.fullName || user.username}
-                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-semibold text-slate-900 truncate">
+                            {user.fullName || user.username}
+                          </p>
+                          {user.isFollowing && user.isFollower ? (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 text-purple-700">
+                              Mutual
+                            </span>
+                          ) : user.isFollowing ? (
+                            <span className="text-[9px] font-medium px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                              Following
+                            </span>
+                          ) : user.isFollower ? (
+                            <span className="text-[9px] font-medium px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-600">
+                              Follower
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="text-[11px] text-slate-500 truncate">@{user.username}</p>
                       </div>
                     </div>
@@ -327,11 +351,11 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               })
             ) : searchQuery.trim() ? (
               <div className="py-6 text-center text-xs text-slate-400">
-                No users found for &ldquo;{searchQuery}&rdquo;
+                No connections found matching &ldquo;{searchQuery}&rdquo;
               </div>
             ) : (
-              <div className="py-6 text-center text-xs text-slate-400">
-                Type a name or username above to find members
+              <div className="py-6 px-4 text-center text-xs text-slate-400">
+                No followers or followed accounts found. Only accounts you follow or who follow you can be added.
               </div>
             )}
           </div>

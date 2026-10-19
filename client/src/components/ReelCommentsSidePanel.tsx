@@ -18,6 +18,7 @@ import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
 import reelService, { type Reel, type ReelComment } from '../services/reelService';
 import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
+import Avatar from './Avatar';
 
 interface ReelCommentsSidePanelProps {
   isOpen: boolean;
@@ -307,11 +308,6 @@ export default function ReelCommentsSidePanel({
   if (!isOpen) return null;
 
   const isReelCreator = currentUser?.id === reel.userId;
-  const userInitial = (
-    currentUser?.fullName?.[0] ||
-    currentUser?.username?.[0] ||
-    'U'
-  ).toUpperCase();
 
   return (
     <>
@@ -381,11 +377,6 @@ export default function ReelCommentsSidePanel({
               const isCommentByCreator = comment.userId === reel.userId;
               const hasReplies = comment.replies && comment.replies.length > 0;
               const isRepliesExpanded = expandedReplies[comment.id];
-              const authorInitial = (
-                comment.user?.fullName?.[0] ||
-                comment.user?.username?.[0] ||
-                'U'
-              ).toUpperCase();
 
               return (
                 <div
@@ -409,19 +400,14 @@ export default function ReelCommentsSidePanel({
                     {/* User Avatar */}
                     <Link
                       to={`/profile/${comment.user?.username}`}
-                      className="w-8 h-8 rounded-full bg-slate-100 shrink-0 overflow-hidden mt-0.5 border border-slate-200"
+                      className="shrink-0 mt-0.5"
                     >
-                      {comment.user?.avatarUrl ? (
-                        <img
-                          src={comment.user.avatarUrl}
-                          alt={comment.user.fullName || comment.user.username}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-xs font-bold text-purple-600">
-                          {authorInitial}
-                        </div>
-                      )}
+                      <Avatar
+                        src={comment.user?.avatarUrl}
+                        name={comment.user?.fullName || comment.user?.username}
+                        size="w-8 h-8"
+                        className="border border-slate-200"
+                      />
                     </Link>
 
                     {/* Content & Actions */}
@@ -594,11 +580,6 @@ export default function ReelCommentsSidePanel({
                               {comment.replies!.map((reply) => {
                                 const isReplyAuthor = currentUser?.id === reply.userId;
                                 const isReplyCreator = reply.userId === reel.userId;
-                                const replyInitial = (
-                                  reply.user?.fullName?.[0] ||
-                                  reply.user?.username?.[0] ||
-                                  'U'
-                                ).toUpperCase();
 
                                 return (
                                   <div
@@ -607,19 +588,14 @@ export default function ReelCommentsSidePanel({
                                   >
                                     <Link
                                       to={`/profile/${reply.user?.username}`}
-                                      className="w-6 h-6 rounded-full bg-slate-100 shrink-0 overflow-hidden mt-0.5 border border-slate-200"
+                                      className="shrink-0 mt-0.5"
                                     >
-                                      {reply.user?.avatarUrl ? (
-                                        <img
-                                          src={reply.user.avatarUrl}
-                                          alt={reply.user.fullName || reply.user.username}
-                                          className="w-full h-full object-cover"
-                                        />
-                                      ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-purple-600">
-                                          {replyInitial}
-                                        </div>
-                                      )}
+                                      <Avatar
+                                        src={reply.user?.avatarUrl}
+                                        name={reply.user?.fullName || reply.user?.username}
+                                        size="w-6 h-6"
+                                        className="border border-slate-200"
+                                      />
                                     </Link>
 
                                     <div className="flex-1 min-w-0">
@@ -741,16 +717,13 @@ export default function ReelCommentsSidePanel({
           <form onSubmit={handleSubmitComment} className="flex items-center gap-2.5">
             {/* Current User Circular Avatar */}
             <div className="w-8 h-8 rounded-full p-[1.5px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] shrink-0">
-              <div className="w-full h-full rounded-full bg-white overflow-hidden flex items-center justify-center font-bold text-xs text-purple-600">
-                {currentUser?.avatarUrl ? (
-                  <img
-                    src={currentUser.avatarUrl}
-                    alt={currentUser.fullName || currentUser.username}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span>{userInitial}</span>
-                )}
+              <div className="w-full h-full rounded-full bg-white overflow-hidden flex items-center justify-center">
+                <Avatar
+                  src={currentUser?.avatarUrl}
+                  name={currentUser?.fullName || currentUser?.username}
+                  size="w-full h-full"
+                  textClassName="text-xs"
+                />
               </div>
             </div>
 

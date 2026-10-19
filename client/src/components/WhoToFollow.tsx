@@ -4,6 +4,7 @@ import { HiOutlineUserPlus, HiOutlineCheck } from 'react-icons/hi2';
 import userService, { type UserProfileResponse } from '../services/userService';
 import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
+import Avatar from './Avatar';
 
 interface WhoToFollowProps {
   currentUser?: User | null;
@@ -93,17 +94,12 @@ export default function WhoToFollow({ currentUser, showToast }: WhoToFollowProps
                 onClick={() => navigate(`/profile/${su.username}`)}
                 className="flex items-center gap-3 min-w-0 cursor-pointer group"
               >
-                {su.avatarUrl ? (
-                  <img
-                    src={su.avatarUrl}
-                    alt={su.fullName}
-                    className="w-10 h-10 rounded-full object-cover ring-1 ring-slate-200 group-hover:ring-slate-400 shrink-0"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0 group-hover:bg-slate-800">
-                    {su.fullName?.[0] || 'U'}
-                  </div>
-                )}
+                <Avatar
+                  src={su.avatarUrl}
+                  name={su.fullName || su.username}
+                  size="w-10 h-10"
+                  className="ring-1 ring-slate-200 group-hover:ring-slate-400 shrink-0"
+                />
                 <div className="min-w-0">
                   <div className="text-xs sm:text-sm font-bold text-slate-900 truncate group-hover:text-purple-600 transition-colors">
                     {su.fullName}

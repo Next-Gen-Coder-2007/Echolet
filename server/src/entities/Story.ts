@@ -17,6 +17,14 @@ export interface StoryViewerItem {
   viewedAt: string;
 }
 
+export interface StoryLikeItem {
+  userId: string;
+  username: string;
+  fullName: string;
+  avatarUrl?: string;
+  likedAt: string;
+}
+
 @Entity('stories')
 export class Story {
   @PrimaryGeneratedColumn('uuid')
@@ -52,6 +60,12 @@ export class Story {
 
   @Column({ type: 'simple-json', nullable: true })
   viewers?: StoryViewerItem[] | null;
+
+  @Column({ type: 'int', default: 0 })
+  likesCount: number;
+
+  @Column({ type: 'simple-json', nullable: true })
+  likes?: StoryLikeItem[] | null;
 
   @Column({
     type: process.env.DATABASE_URL?.trim().startsWith('postgres') ? 'timestamp' : 'datetime',

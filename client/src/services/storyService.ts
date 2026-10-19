@@ -8,6 +8,14 @@ export interface StoryViewer {
   viewedAt: string;
 }
 
+export interface StoryLikeItem {
+  userId: string;
+  username: string;
+  fullName: string;
+  avatarUrl?: string;
+  likedAt: string;
+}
+
 export interface StoryItem {
   id: string;
   userId: string;
@@ -25,10 +33,13 @@ export interface StoryItem {
   fontStyle?: string | null;
   viewsCount: number;
   viewers?: StoryViewer[];
+  likesCount?: number;
+  likes?: StoryLikeItem[];
   expiresAt: string;
   createdAt: string;
   updatedAt: string;
   isViewed?: boolean;
+  isLiked?: boolean;
 }
 
 export interface UserStoryGroup {
@@ -74,6 +85,13 @@ const storyService = {
 
   deleteStory: async (storyId: string): Promise<{ message: string }> => {
     const response = await api.delete(`/stories/${storyId}`);
+    return response.data;
+  },
+
+  likeStory: async (
+    storyId: string
+  ): Promise<{ status: string; isLiked: boolean; likesCount: number; likes?: StoryLikeItem[] }> => {
+    const response = await api.post(`/stories/${storyId}/like`);
     return response.data;
   },
 };

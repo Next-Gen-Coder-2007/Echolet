@@ -18,6 +18,7 @@ import type { Post } from '../services/postService';
 import type { Reel } from '../services/reelService';
 import type { User } from '../services/authService';
 import PostCard from '../components/PostCard';
+import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
 import { useMessage } from '../context/MessageContext';
 
@@ -231,14 +232,6 @@ export default function Search() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                     {(activeTab === 'all' ? accounts.slice(0, 6) : accounts).map((user) => {
-                      const initials = user.fullName
-                        ? user.fullName
-                            .split(' ')
-                            .map((n) => n[0])
-                            .join('')
-                            .toUpperCase()
-                            .slice(0, 2)
-                        : 'U';
                       const isFollowing = !!followingMap[user.id];
 
                       return (
@@ -250,17 +243,11 @@ export default function Search() {
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-11 h-11 rounded-full p-[2px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] shrink-0">
                               <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                                {user.avatarUrl ? (
-                                  <img
-                                    src={user.avatarUrl}
-                                    alt={user.fullName}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="text-xs font-bold bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] bg-clip-text text-transparent">
-                                    {initials}
-                                  </span>
-                                )}
+                                <Avatar
+                                  src={user.avatarUrl}
+                                  name={user.fullName || user.username}
+                                  size="w-full h-full"
+                                />
                               </div>
                             </div>
 
@@ -369,19 +356,12 @@ export default function Search() {
                           {/* Bottom Info: Creator & Likes */}
                           <div className="absolute bottom-2.5 left-2.5 right-2.5 text-white">
                             <div className="flex items-center gap-1.5 mb-1">
-                              <div className="w-5 h-5 rounded-full overflow-hidden bg-slate-800 shrink-0">
-                                {reel.user?.avatarUrl ? (
-                                  <img
-                                    src={reel.user.avatarUrl}
-                                    alt={reel.user.username}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-purple-600 flex items-center justify-center text-[9px] font-bold">
-                                    {(reel.user?.username || 'U')[0].toUpperCase()}
-                                  </div>
-                                )}
-                              </div>
+                              <Avatar
+                                src={reel.user?.avatarUrl}
+                                name={reel.user?.fullName || reel.user?.username}
+                                size="xs"
+                                className="w-5 h-5 text-[9px] shrink-0"
+                              />
                               <span className="text-xs font-semibold truncate drop-shadow-sm">
                                 @{reel.user?.username}
                               </span>

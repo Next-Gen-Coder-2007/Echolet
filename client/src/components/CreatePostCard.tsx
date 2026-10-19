@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import Avatar from './Avatar';
 import {
   HiOutlinePhoto,
   HiXMark,
@@ -118,7 +119,6 @@ export default function CreatePostCard({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const userInitial = currentUser?.fullName?.[0] || currentUser?.username?.[0] || 'U';
 
   /**
    * Process multiple files (up to max remaining count), enforcing 1MB limit on each.
@@ -341,17 +341,12 @@ export default function CreatePostCard({
         {/* Header with User Info & Visibility Badge */}
         <div className="flex items-center justify-between mb-3.5">
           <div className="flex items-center gap-3">
-            {currentUser?.avatarUrl ? (
-              <img
-                src={currentUser.avatarUrl}
-                alt={currentUser.fullName}
-                className="w-10 h-10 rounded-full object-cover ring-1 ring-slate-200 shrink-0"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-2xs">
-                {userInitial}
-              </div>
-            )}
+            <Avatar
+              src={currentUser?.avatarUrl}
+              name={currentUser?.fullName || currentUser?.username}
+              size="md"
+              className="ring-1 ring-slate-200 shrink-0"
+            />
             <div>
               <div className="text-sm font-bold text-slate-900 leading-tight">
                 {currentUser?.fullName || 'You'}

@@ -10,11 +10,15 @@ import {
   HiOutlineChevronRight,
   HiOutlineSpeakerWave,
   HiOutlineSpeakerXMark,
+  HiHeart,
+  HiOutlineHeart,
 } from 'react-icons/hi2';
 import Modal from './Modal';
+import Avatar from './Avatar';
 import type { User } from '../services/authService';
 import storyService, { type UserStoryGroup, markOwnStoryAsViewed } from '../services/storyService';
 import messageService from '../services/messageService';
+import getSocket from '../services/socket';
 
 interface StoryViewerModalProps {
   isOpen: boolean;
@@ -131,6 +135,47 @@ export default function StoryViewerModal({
         });
     }
   }, [isOpen, currentStory?.id, currentUser?.id, onStoryViewed]);
+
+  // Real-time story like updates
+  useEffect(() => {
+    const socket = getSocket();
+    const handleStoryLiked = (data: {
+      storyId: string;
+      userId: string;
+      isLiked: boolean;
+      likesCount: number;
+      user?: any;
+    }) => {
+      if (currentStory && currentStory.id === data.storyId) {
+        currentStory.likesCount = data.likesCount;
+        if (currentUser && currentUser.id === data.userId) {
+          currentStory.isLiked = data.isLiked;
+        }
+        const likes = Array.isArray(currentStory.likes) ? [...currentStory.likes] : [];
+        if (data.isLiked && data.user) {
+          if (!likes.some((l) => l.userId === data.userId)) {
+            likes.push({
+              userId: data.userId,
+              username: data.user.username,
+              fullName: data.user.fullName,
+              avatarUrl: data.user.avatarUrl,
+              likedAt: new Date().toISOString(),
+            });
+            currentStory.likes = likes;
+          }
+        } else if (!data.isLiked) {
+          currentStory.likes = likes.filter((l) => l.userId !== data.userId);
+        }
+        // Force re-render of like state
+        setProgress((p) => p);
+      }
+    };
+
+    socket.on('story_liked', handleStoryLiked);
+    return () => {
+      socket.off('story_liked', handleStoryLiked);
+    };
+  }, [currentStory, currentUser]);
 
   const shouldPause = isPaused || isHolding || showViewersDrawer || isSendingReply;
 
@@ -346,6 +391,10 @@ export default function StoryViewerModal({
     setTimeout(() => setFloatingReaction(null), 1400);
 
     if (currentGroup?.user?.id && currentUser && currentStory) {
+      if (emoji === '❤️' && !currentStory.isLiked) {
+        handleToggleLikeStory();
+      }
+
       try {
         await messageService.sendMessage(
           currentGroup.user.id,
@@ -370,6 +419,38 @@ export default function StoryViewerModal({
       } catch (err) {
         console.error('Failed to send reaction message:', err);
       }
+    }
+  };
+
+  // Toggle like story
+  const handleToggleLikeStory = async () => {
+    if (!currentStory || !currentUser) return;
+    const targetId = currentStory.id;
+    const prevLiked = Boolean(currentStory.isLiked);
+    const prevCount = currentStory.likesCount || 0;
+
+    // Optimistic UI update
+    currentStory.isLiked = !prevLiked;
+    currentStory.likesCount = prevLiked ? Math.max(0, prevCount - 1) : prevCount + 1;
+    if (!prevLiked) {
+      setFloatingReaction('❤️');
+      setTimeout(() => setFloatingReaction(null), 1400);
+    }
+    setProgress((p) => p);
+
+    try {
+      const res = await storyService.likeStory(targetId);
+      currentStory.isLiked = res.isLiked;
+      currentStory.likesCount = res.likesCount;
+      if (res.likes) {
+        currentStory.likes = res.likes as any;
+      }
+      setProgress((p) => p);
+    } catch (err) {
+      currentStory.isLiked = prevLiked;
+      currentStory.likesCount = prevCount;
+      setProgress((p) => p);
+      showToast?.('Failed to update like on story', 'error');
     }
   };
 
@@ -502,17 +583,11 @@ export default function StoryViewerModal({
           <div className="relative z-30 px-3.5 py-2.5 flex items-center justify-between bg-white/95 backdrop-blur-md border-b border-slate-100 text-slate-900">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-full ring-2 ring-purple-600 overflow-hidden bg-purple-50 p-0.5 shadow-2xs">
-                {currentGroup.user.avatarUrl ? (
-                  <img
-                    src={currentGroup.user.avatarUrl}
-                    alt={currentGroup.user.fullName}
-                    className="w-full h-full object-cover rounded-full"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-purple-100 text-purple-700 flex items-center justify-center text-xs font-bold rounded-full">
-                    {currentGroup.user.fullName?.[0] || 'U'}
-                  </div>
-                )}
+                <Avatar
+                  src={currentGroup.user.avatarUrl}
+                  name={currentGroup.user.fullName || currentGroup.user.username}
+                  size="w-full h-full"
+                />
               </div>
 
               <div>
@@ -667,31 +742,40 @@ export default function StoryViewerModal({
             )}
           </div>
 
-          {/* Bottom Bar: Reactions / Views / Replies */}
+          {/* Bottom Bar: Reactions / Views / Replies / Likes */}
           <div className="relative z-30 p-3 bg-white/95 backdrop-blur-md border-t border-slate-100">
             {isOwnStory ? (
-              /* Author view: Viewers drawer trigger */
+              /* Author view: Viewers drawer trigger and Likes counter */
               <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPaused(true);
-                    setShowViewersDrawer(true);
-                  }}
-                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold border border-purple-200 transition-all cursor-pointer shadow-2xs"
-                >
-                  <HiOutlineEye className="w-4 h-4 text-purple-600" />
-                  <span>
-                    {currentStory.viewsCount || currentStory.viewers?.length || 0} views
-                  </span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPaused(true);
+                      setShowViewersDrawer(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold border border-purple-200 transition-all cursor-pointer shadow-2xs"
+                  >
+                    <HiOutlineEye className="w-4 h-4 text-purple-600" />
+                    <span>
+                      {currentStory.viewsCount || currentStory.viewers?.length || 0} views
+                    </span>
+                  </button>
+
+                  {(currentStory.likesCount || currentStory.likes?.length || 0) > 0 && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-50 text-rose-600 text-xs font-bold border border-rose-200 shadow-2xs">
+                      <HiHeart className="w-3.5 h-3.5 fill-rose-500 text-rose-500" />
+                      <span>{currentStory.likesCount || currentStory.likes?.length} likes</span>
+                    </div>
+                  )}
+                </div>
 
                 <span className="text-[11px] font-medium text-slate-400">
                   Disappears in 24h
                 </span>
               </div>
             ) : (
-              /* Viewer: Quick Reactions and Message Reply */
+              /* Viewer: Quick Reactions and Message Reply + Heart Button */
               <div className="space-y-2">
                 <div className="flex items-center justify-around gap-1">
                   {['❤️', '🔥', '😂', '😮', '😢', '👏'].map((emoji) => (
@@ -706,26 +790,46 @@ export default function StoryViewerModal({
                   ))}
                 </div>
 
-                <form onSubmit={handleSendReply} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={replyText}
-                    onFocus={() => setIsPaused(true)}
-                    onBlur={() => setIsPaused(false)}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    placeholder={`Reply to ${currentGroup.user.fullName}...`}
-                    maxLength={150}
-                    className="flex-1 bg-slate-100 border border-slate-200 rounded-full px-4 py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-purple-500 transition-colors"
-                  />
+                <div className="flex items-center gap-2">
+                  <form onSubmit={handleSendReply} className="flex-1 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={replyText}
+                      onFocus={() => setIsPaused(true)}
+                      onBlur={() => setIsPaused(false)}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder={`Reply to ${currentGroup.user.fullName}...`}
+                      maxLength={150}
+                      className="flex-1 bg-slate-100 border border-slate-200 rounded-full px-4 py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-purple-500 transition-colors"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!replyText.trim() || isSendingReply}
+                      className="w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 transition-all shadow-sm cursor-pointer shrink-0"
+                      title="Send reply"
+                    >
+                      <HiOutlinePaperAirplane className="w-4 h-4" />
+                    </button>
+                  </form>
+
+                  {/* Heart / Like Button */}
                   <button
-                    type="submit"
-                    disabled={!replyText.trim() || isSendingReply}
-                    className="w-9 h-9 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 transition-all shadow-sm cursor-pointer"
-                    title="Send reply"
+                    type="button"
+                    onClick={handleToggleLikeStory}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 hover:scale-110 active:scale-95 shadow-sm border ${
+                      currentStory.isLiked
+                        ? 'bg-rose-500 text-white border-rose-500 ring-2 ring-rose-300'
+                        : 'bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-500 border-slate-200'
+                    }`}
+                    title={currentStory.isLiked ? 'Unlike story' : 'Like story'}
                   >
-                    <HiOutlinePaperAirplane className="w-4 h-4" />
+                    {currentStory.isLiked ? (
+                      <HiHeart className="w-5 h-5 fill-white text-white animate-in zoom-in-75 duration-150" />
+                    ) : (
+                      <HiOutlineHeart className="w-5 h-5 stroke-[2]" />
+                    )}
                   </button>
-                </form>
+                </div>
               </div>
             )}
           </div>
@@ -754,38 +858,43 @@ export default function StoryViewerModal({
 
               <div className="flex-1 overflow-y-auto py-2 space-y-2 max-h-60 scrollbar-thin">
                 {currentStory.viewers && currentStory.viewers.length > 0 ? (
-                  currentStory.viewers.map((viewer) => (
-                    <div
-                      key={viewer.userId}
-                      className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full overflow-hidden bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center">
-                          {viewer.avatarUrl ? (
-                            <img
-                              src={viewer.avatarUrl}
-                              alt={viewer.fullName}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            viewer.fullName?.[0] || viewer.username?.[0] || 'U'
-                          )}
+                  currentStory.viewers.map((viewer) => {
+                    const viewerLiked = Array.isArray(currentStory.likes) && currentStory.likes.some((l) => l.userId === viewer.userId);
+                    return (
+                      <div
+                        key={viewer.userId}
+                        className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Avatar
+                            src={viewer.avatarUrl}
+                            name={viewer.fullName || viewer.username}
+                            size="sm"
+                          />
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-bold text-slate-900 tracking-tight">
+                                {viewer.fullName}
+                              </p>
+                              {viewerLiked && (
+                                <span className="flex items-center gap-0.5 text-[10px] font-bold text-rose-500 bg-rose-50 px-1.5 py-0.2 rounded-full border border-rose-200/80">
+                                  <HiHeart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />
+                                  <span>Liked</span>
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-500">
+                              @{viewer.username}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-900 tracking-tight">
-                            {viewer.fullName}
-                          </p>
-                          <p className="text-[10px] text-slate-500">
-                            @{viewer.username}
-                          </p>
-                        </div>
-                      </div>
 
-                      <span className="text-[10px] text-slate-400">
-                        {formatTimeAgo(viewer.viewedAt)}
-                      </span>
-                    </div>
-                  ))
+                        <span className="text-[10px] text-slate-400">
+                          {formatTimeAgo(viewer.viewedAt)}
+                        </span>
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="py-8 text-center text-xs text-slate-400">
                     No views yet. Share with friends!

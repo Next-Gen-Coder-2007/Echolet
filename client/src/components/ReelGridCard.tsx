@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Avatar from './Avatar';
 import {
   HiOutlinePlay,
   HiHeart,
@@ -221,17 +222,12 @@ export default function ReelGridCard({
             onClick={(e) => e.stopPropagation()}
             className="w-6 h-6 rounded-full bg-white/20 overflow-hidden shrink-0 border border-white/40"
           >
-            {reel.user?.avatarUrl ? (
-              <img
-                src={reel.user.avatarUrl}
-                alt={reel.user.fullName || reel.user.username}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-[9px] font-bold bg-purple-600 text-white">
-                {(reel.user?.fullName?.[0] || reel.user?.username?.[0] || 'U').toUpperCase()}
-              </div>
-            )}
+            <Avatar
+              src={reel.user?.avatarUrl}
+              name={reel.user?.fullName || reel.user?.username}
+              size="xs"
+              className="w-full h-full text-[9px]"
+            />
           </Link>
           <Link
             to={`/profile/${reel.user?.username}`}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Avatar from './Avatar';
 import {
   HiCheck,
   HiOutlineClipboardDocument,
@@ -41,6 +42,9 @@ interface FriendOption {
   username: string;
   fullName?: string;
   avatarUrl?: string;
+  isFollowing?: boolean;
+  isFollower?: boolean;
+  isMutual?: boolean;
 }
 
 export default function SharePostModal({
@@ -134,53 +138,37 @@ export default function SharePostModal({
       console.warn('Failed to parse recent sent users for post share:', e);
     }
 
-    // 2. Fetch conversations & following in parallel
-    Promise.all([
-      messageService.getConversations().catch((err) => {
-        console.warn('Failed to load conversations:', err);
-        return [];
-      }),
-      userService.getFollowing().catch((err) => {
-        console.warn('Failed to load following users:', err);
-        return [];
-      }),
-    ])
-      .then(([conversations, followingUsers]) => {
+    // 2. Fetch connections (strictly followers and following)
+    userService
+      .getConnections()
+      .then((connections) => {
         if (!isMounted) return;
 
-        const contactMap = new Map<string, FriendOption>();
+        const list: FriendOption[] = (connections || []).map((u) => ({
+          id: u.id,
+          username: u.username,
+          fullName: u.fullName,
+          avatarUrl: u.avatarUrl || undefined,
+          isFollowing: u.isFollowing,
+          isFollower: u.isFollower,
+          isMutual: u.isMutual,
+        }));
 
-        // A. Add users from conversations
-        conversations.forEach((c) => {
-          if (c.user && c.user.id !== currentUser.id) {
-            contactMap.set(c.user.id, {
-              id: c.user.id,
-              username: c.user.username,
-              fullName: c.user.fullName,
-              avatarUrl: c.user.avatarUrl,
-            });
-          }
-        });
-
-        // B. Add users from following
-        (followingUsers || []).forEach((u) => {
-          if (u && u.id !== currentUser.id && !contactMap.has(u.id)) {
-            contactMap.set(u.id, {
-              id: u.id,
-              username: u.username,
-              fullName: u.fullName,
-              avatarUrl: u.avatarUrl,
-            });
-          }
-        });
-
-        const list = Array.from(contactMap.values());
         setFriends(list);
         setFilteredFriends(list);
 
-        // Filter valid stored recent users
-        const validRecent = storedRecent.filter((r) => contactMap.has(r.id));
+        // Keep recent sent users only if they are still among current connections
+        const connectionIds = new Set(list.map((c) => c.id));
+        const validRecent = storedRecent.filter((r) => connectionIds.has(r.id));
         setRecentSentUsers(validRecent.length > 0 ? validRecent : list.slice(0, 5));
+      })
+      .catch((err) => {
+        console.warn('Failed to load connections for sharing post:', err);
+        if (isMounted) {
+          setFriends([]);
+          setFilteredFriends([]);
+          setRecentSentUsers([]);
+        }
       })
       .finally(() => {
         if (isMounted) setLoadingFriends(false);
@@ -434,18 +422,12 @@ export default function SharePostModal({
       <div className="select-none space-y-4">
         {/* Post Preview Card Banner */}
         <div className="p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80 flex items-start gap-3 transition-all">
-          {/* Author avatar */}
-          <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 shrink-0 font-bold text-xs text-slate-700 flex items-center justify-center border border-slate-300/60 shadow-2xs">
-            {post.user?.avatarUrl ? (
-              <img
-                src={post.user.avatarUrl}
-                alt={creatorUsername}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span>{(creatorUsername[0] || 'U').toUpperCase()}</span>
-            )}
-          </div>
+          <Avatar
+            src={post.user?.avatarUrl}
+            name={post.user?.fullName || creatorUsername}
+            size="sm"
+            className="shrink-0 border border-slate-300/60 shadow-2xs"
+          />
 
           {/* Post info */}
           <div className="min-w-0 flex-1">
@@ -572,11 +554,6 @@ export default function SharePostModal({
                       <div className="flex items-center gap-3 overflow-x-auto py-1 px-1 scrollbar-none justify-start">
                         {recentSentUsers.slice(0, 6).map((user) => {
                           const isSelected = selectedUserIds.has(user.id);
-                          const uInitial = (
-                            user.fullName?.[0] ||
-                            user.username?.[0] ||
-                            'U'
-                          ).toUpperCase();
 
                           return (
                             <button
@@ -598,17 +575,11 @@ export default function SharePostModal({
                                       : 'border-slate-200 group-hover:border-indigo-400'
                                   }`}
                                 >
-                                  <div className="w-full h-full rounded-full overflow-hidden bg-slate-200 flex items-center justify-center font-bold text-xs text-indigo-700">
-                                    {user.avatarUrl ? (
-                                      <img
-                                        src={user.avatarUrl}
-                                        alt={user.username}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    ) : (
-                                      <span>{uInitial}</span>
-                                    )}
-                                  </div>
+                                    <Avatar
+                                      src={user.avatarUrl}
+                                      name={user.fullName || user.username}
+                                      size="full"
+                                    />
                                 </div>
 
                                 <div
@@ -684,21 +655,31 @@ export default function SharePostModal({
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200 shrink-0 font-bold text-xs text-indigo-700 flex items-center justify-center">
-                              {f.avatarUrl ? (
-                                <img
-                                  src={f.avatarUrl}
-                                  alt={f.username}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <span>{(f.username[0] || 'U').toUpperCase()}</span>
-                              )}
-                            </div>
+                            <Avatar
+                              src={f.avatarUrl}
+                              name={f.fullName || f.username}
+                              size="sm"
+                              className="shrink-0"
+                            />
                             <div className="min-w-0">
-                              <p className="text-xs font-bold text-slate-900 truncate">
-                                {f.fullName || f.username}
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-bold text-slate-900 truncate">
+                                  {f.fullName || f.username}
+                                </p>
+                                {(f.isMutual || f.isFollowing || f.isFollower) && (
+                                  <span
+                                    className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full shrink-0 ${
+                                      f.isMutual
+                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                        : f.isFollowing
+                                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                    }`}
+                                  >
+                                    {f.isMutual ? 'Mutual' : f.isFollowing ? 'Following' : 'Follower'}
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-[11px] text-slate-400 truncate">
                                 @{f.username}
                               </p>

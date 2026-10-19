@@ -11,6 +11,7 @@ import {
 import { useMessage } from '../../context/MessageContext';
 import userService from '../../services/userService';
 import type { User } from '../../services/authService';
+import Avatar from '../../components/Avatar';
 
 interface OutletContextType {
   user?: User | null;
@@ -184,15 +185,6 @@ export default function EditProfile() {
     }
   };
 
-  const userInitials = fullName
-    ? fullName
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'U';
-
   return (
     <div className="w-full pb-8 animate-fade-in">
       {/* Header bar */}
@@ -307,17 +299,12 @@ export default function EditProfile() {
                 <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full p-[3px] bg-white shadow-xl">
                   <div className="w-full h-full rounded-full p-[2.5px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080]">
                     <div className="w-full h-full rounded-full bg-slate-100 flex items-center justify-center overflow-hidden relative">
-                      {avatarUrl ? (
-                        <img
-                          src={avatarUrl}
-                          alt="Avatar Preview"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] bg-clip-text text-transparent">
-                          {userInitials}
-                        </span>
-                      )}
+                      <Avatar
+                        src={avatarUrl}
+                        name={fullName || currentUser?.username}
+                        size="w-full h-full"
+                        textClassName="text-2xl sm:text-3xl font-extrabold"
+                      />
 
                       {/* Avatar hover overlay */}
                       <button

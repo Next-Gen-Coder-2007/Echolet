@@ -11,6 +11,7 @@ import {
   HiOutlineCog6Tooth,
   HiOutlineFilm,
 } from 'react-icons/hi2';
+import Avatar from './Avatar';
 
 export type SidebarTab =
   | 'home'
@@ -229,13 +230,11 @@ export default function Sidebar({
           className="relative w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 shadow-2xs p-[1.5px] border border-slate-200 bg-white"
         >
           <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-sm font-semibold bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] bg-clip-text text-transparent">
-                {userInitials}
-              </span>
-            )}
+            <Avatar
+              src={avatarUrl}
+              name={username || userInitials}
+              size="w-full h-full"
+            />
           </div>
         </button>
 

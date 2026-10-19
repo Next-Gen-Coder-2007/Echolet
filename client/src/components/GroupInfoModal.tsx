@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   HiOutlineUserGroup,
   HiOutlineUsers,
@@ -13,11 +13,12 @@ import {
   HiOutlineEllipsisVertical,
 } from 'react-icons/hi2';
 import Modal from './Modal';
+import Avatar from './Avatar';
 import groupService, {
   type GroupDetails,
   type GroupItem,
 } from '../services/groupService';
-import userService, { type UserProfileResponse } from '../services/userService';
+import userService, { type ConnectedUser } from '../services/userService';
 
 interface GroupInfoModalProps {
   isOpen: boolean;
@@ -50,9 +51,10 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
   // Add Member state
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [addSearchQuery, setAddSearchQuery] = useState('');
-  const [addSearchResults, setAddSearchResults] = useState<UserProfileResponse[]>([]);
-  const [searchingUsers, setSearchingUsers] = useState(false);
-  const [selectedToAdd, setSelectedToAdd] = useState<UserProfileResponse[]>([]);
+  const [availableConnections, setAvailableConnections] = useState<ConnectedUser[]>([]);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [addSearchResults, setAddSearchResults] = useState<ConnectedUser[]>([]);
+  const [selectedToAdd, setSelectedToAdd] = useState<ConnectedUser[]>([]);
   const [addingMembers, setAddingMembers] = useState(false);
 
   // Leave Confirmation state
@@ -62,8 +64,6 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
   // Member Action Menu state
   const [openMemberMenuId, setOpenMemberMenuId] = useState<string | null>(null);
   const [memberFilter, setMemberFilter] = useState('');
-
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchDetails = async () => {
     if (!groupId) return;
@@ -90,39 +90,66 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
       setShowLeaveConfirm(false);
       setOpenMemberMenuId(null);
       setSelectedToAdd([]);
+      setAddSearchQuery('');
+      setAddSearchResults([]);
+      setAvailableConnections([]);
     }
   }, [isOpen, groupId]);
 
-  // Debounced search for adding new members
+  // Load ONLY followed or followers when opening "Add Member"
   useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-
-    const q = addSearchQuery.trim();
-    if (!q || !isAddingMember) {
+    if (!isAddingMember || !isOpen) {
+      setAddSearchQuery('');
       setAddSearchResults([]);
-      setSearchingUsers(false);
+      setAvailableConnections([]);
       return;
     }
 
-    setSearchingUsers(true);
-    searchTimerRef.current = setTimeout(async () => {
-      try {
-        const users = await userService.searchUsers(q);
+    let isMounted = true;
+    setLoadingConnections(true);
+    userService
+      .getConnections()
+      .then((users) => {
+        if (!isMounted) return;
         const existingMemberIds = new Set(group?.members.map((m) => m.userId) || []);
-        // Exclude users already in the group
-        const filtered = users.filter((u) => !existingMemberIds.has(u.id));
+        // Exclude self and users who are already group members
+        const filtered = (users || []).filter(
+          (u) => u.id !== currentUserId && !existingMemberIds.has(u.id)
+        );
+        setAvailableConnections(filtered);
         setAddSearchResults(filtered);
-      } catch {
-        setAddSearchResults([]);
-      } finally {
-        setSearchingUsers(false);
-      }
-    }, 250);
+      })
+      .catch((err) => {
+        console.warn('Failed to load connections for group member addition:', err);
+        if (isMounted) {
+          setAvailableConnections([]);
+          setAddSearchResults([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoadingConnections(false);
+      });
 
     return () => {
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      isMounted = false;
     };
-  }, [addSearchQuery, isAddingMember, group?.members]);
+  }, [isAddingMember, isOpen, group?.members, currentUserId]);
+
+  // Filter connections by search query
+  useEffect(() => {
+    const q = addSearchQuery.trim().toLowerCase();
+    if (!q) {
+      setAddSearchResults(availableConnections);
+      return;
+    }
+
+    const filtered = availableConnections.filter(
+      (u) =>
+        u.username.toLowerCase().includes(q) ||
+        (u.fullName && u.fullName.toLowerCase().includes(q))
+    );
+    setAddSearchResults(filtered);
+  }, [addSearchQuery, availableConnections]);
 
   const isAdmin = group?.currentUserRole === 'admin';
 
@@ -236,17 +263,14 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
           <div className="relative p-5 rounded-2xl bg-gradient-to-b from-slate-50 to-white border border-slate-150 flex flex-col items-center text-center">
             {/* Group Avatar */}
             <div className="relative mb-3">
-              {group.avatarUrl ? (
-                <img
-                  src={group.avatarUrl}
-                  alt={group.name}
-                  className="w-20 h-20 rounded-2xl object-cover shadow-sm border-2 border-white ring-1 ring-slate-200"
-                />
-              ) : (
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-800 text-white font-bold text-2xl flex items-center justify-center uppercase shadow-sm border-2 border-white ring-1 ring-slate-200">
-                  {group.name[0]}
-                </div>
-              )}
+              <Avatar
+                src={group.avatarUrl}
+                name={group.name}
+                size="w-20 h-20"
+                className="!rounded-2xl shadow-sm border-2 border-white ring-1 ring-slate-200"
+                imageClassName="!rounded-2xl"
+                fallbackClassName="!rounded-2xl bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-800 text-white font-bold text-2xl uppercase"
+              />
               {isAdmin && !isEditing && (
                 <button
                   type="button"
@@ -379,7 +403,7 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Search people to add..."
+                    placeholder="Search people you follow or your followers..."
                     value={addSearchQuery}
                     onChange={(e) => setAddSearchQuery(e.target.value)}
                     className="w-full pl-8 pr-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
@@ -387,10 +411,13 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                   <HiOutlineMagnifyingGlass className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 </div>
 
-                {searchingUsers ? (
-                  <div className="py-3 text-center text-xs text-slate-400">Searching...</div>
+                {loadingConnections ? (
+                  <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                    <div className="w-3 h-3 border-2 border-slate-300 border-t-slate-700 rounded-full animate-spin" />
+                    Loading connections...
+                  </div>
                 ) : addSearchResults.length > 0 ? (
-                  <div className="max-h-36 overflow-y-auto divide-y divide-slate-100 bg-white rounded-lg border border-slate-200">
+                  <div className="max-h-40 overflow-y-auto divide-y divide-slate-100 bg-white rounded-lg border border-slate-200">
                     {addSearchResults.map((user) => {
                       const isSel = selectedToAdd.some((x) => x.id === user.id);
                       return (
@@ -409,17 +436,31 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                           }`}
                         >
                           <div className="flex items-center gap-2">
-                            {user.avatarUrl ? (
-                              <img src={user.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover" />
-                            ) : (
-                              <div className="w-6 h-6 rounded-full bg-slate-800 text-white text-[10px] font-bold flex items-center justify-center">
-                                {(user.fullName?.[0] || user.username[0]).toUpperCase()}
-                              </div>
-                            )}
+                            <Avatar
+                              src={user.avatarUrl}
+                              name={user.fullName || user.username}
+                              size="xs"
+                              className="shrink-0"
+                            />
                             <div>
-                              <p className="font-semibold text-slate-800 leading-tight">
-                                {user.fullName || user.username}
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-semibold text-slate-800 leading-tight">
+                                  {user.fullName || user.username}
+                                </p>
+                                {user.isFollowing && user.isFollower ? (
+                                  <span className="text-[8px] font-bold px-1 rounded bg-purple-100 text-purple-700">
+                                    Mutual
+                                  </span>
+                                ) : user.isFollowing ? (
+                                  <span className="text-[8px] font-medium px-1 rounded bg-slate-100 text-slate-600">
+                                    Following
+                                  </span>
+                                ) : user.isFollower ? (
+                                  <span className="text-[8px] font-medium px-1 rounded bg-indigo-50 text-indigo-600">
+                                    Follower
+                                  </span>
+                                ) : null}
+                              </div>
                               <p className="text-[10px] text-slate-400">@{user.username}</p>
                             </div>
                           </div>
@@ -434,7 +475,15 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                       );
                     })}
                   </div>
-                ) : null}
+                ) : (
+                  <div className="py-3 px-2 text-center text-[11px] text-slate-400">
+                    {addSearchQuery.trim()
+                      ? `No connections found matching "${addSearchQuery}"`
+                      : availableConnections.length === 0
+                      ? 'No eligible connections (all are already members, or you have no followers/following).'
+                      : 'No connections available to add.'}
+                  </div>
+                )}
 
                 {selectedToAdd.length > 0 && (
                   <div className="flex justify-end pt-1">
@@ -479,17 +528,11 @@ export const GroupInfoModal: React.FC<GroupInfoModalProps> = ({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="relative shrink-0">
-                        {member.user?.avatarUrl ? (
-                          <img
-                            src={member.user.avatarUrl}
-                            alt={member.user.username}
-                            className="w-9 h-9 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-slate-900 to-slate-700 text-white text-xs font-bold flex items-center justify-center">
-                            {(member.user?.fullName?.[0] || member.user?.username?.[0] || 'U').toUpperCase()}
-                          </div>
-                        )}
+                        <Avatar
+                          src={member.user?.avatarUrl}
+                          name={member.user?.fullName || member.user?.username}
+                          size="w-9 h-9"
+                        />
                         {member.user?.isOnline && (
                           <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
                         )}

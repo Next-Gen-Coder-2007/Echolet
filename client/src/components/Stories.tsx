@@ -14,6 +14,7 @@ import storyService, {
 import getSocket from '../services/socket';
 import CreateStoryModal from './CreateStoryModal';
 import StoryViewerModal from './StoryViewerModal';
+import Avatar from './Avatar';
 
 export interface StoryItem {
   id: string;
@@ -256,8 +257,6 @@ export default function Stories({
     scrollContainerRef.current.scrollBy({ left: distance, behavior: 'smooth' });
   };
 
-  const userInitial = currentUser?.fullName?.[0] || currentUser?.username?.[0] || 'U';
-
   const myGroupIndex = userStoryGroups.findIndex((g) => g.userId === currentUser?.id);
   const myGroup = myGroupIndex >= 0 ? userStoryGroups[myGroupIndex] : undefined;
   const otherGroups = userStoryGroups.filter((g) => g.userId !== currentUser?.id);
@@ -327,17 +326,11 @@ export default function Stories({
                 }`}
               >
                 <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5">
-                  {currentUser?.avatarUrl ? (
-                    <img
-                      src={currentUser.avatarUrl}
-                      alt="You"
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-purple-100 text-purple-700 font-bold text-sm flex items-center justify-center">
-                      {userInitial}
-                    </div>
-                  )}
+                  <Avatar
+                    src={currentUser?.avatarUrl}
+                    name={currentUser?.fullName || currentUser?.username}
+                    size="w-full h-full"
+                  />
                 </div>
               </div>
 
@@ -374,17 +367,11 @@ export default function Stories({
                   }`}
                 >
                   <div className="w-full h-full rounded-full overflow-hidden bg-white p-0.5">
-                    {group.user.avatarUrl ? (
-                      <img
-                        src={group.user.avatarUrl}
-                        alt={group.user.fullName}
-                        className="w-full h-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center">
-                        {group.user.fullName?.[0] || 'U'}
-                      </div>
-                    )}
+                    <Avatar
+                      src={group.user.avatarUrl}
+                      name={group.user.fullName || group.user.username}
+                      size="w-full h-full"
+                    />
                   </div>
                 </div>
                 <span className="text-[11px] font-medium text-slate-700 truncate max-w-[64px]">
@@ -518,17 +505,11 @@ export default function Stories({
 
             <div className="relative z-10 flex items-center justify-between">
               <div className="w-7 h-7 rounded-full bg-white p-0.5 ring-2 ring-purple-600 shadow-sm">
-                {currentUser?.avatarUrl ? (
-                  <img
-                    src={currentUser.avatarUrl}
-                    alt="You"
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-purple-600 text-white font-bold text-[10px] flex items-center justify-center rounded-full">
-                    {userInitial}
-                  </div>
-                )}
+                <Avatar
+                  src={currentUser?.avatarUrl}
+                  name={currentUser?.fullName || currentUser?.username}
+                  size="w-full h-full"
+                />
               </div>
               <span className="text-[9px] font-bold text-white bg-purple-600/90 px-1.5 py-0.5 rounded-full backdrop-blur-xs shadow-2xs">
                 You
@@ -559,17 +540,12 @@ export default function Stories({
           >
             <div className="flex items-center justify-between">
               <div className="w-7 h-7 rounded-full bg-white p-0.5 ring-1 ring-slate-300 shadow-2xs">
-                {currentUser?.avatarUrl ? (
-                  <img
-                    src={currentUser.avatarUrl}
-                    alt={currentUser.fullName || 'User'}
-                    className="w-full h-full rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-purple-100 text-purple-700 font-bold text-[10px] flex items-center justify-center rounded-full">
-                    {userInitial}
-                  </div>
-                )}
+                <Avatar
+                  src={currentUser?.avatarUrl}
+                  name={currentUser?.fullName || currentUser?.username}
+                  size="w-full h-full"
+                  textClassName="text-[10px]"
+                />
               </div>
               <span className="text-[9px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-full">
                 You
@@ -644,17 +620,11 @@ export default function Stories({
                       : 'ring-1 ring-slate-300'
                   }`}
                 >
-                  {group.user.avatarUrl ? (
-                    <img
-                      src={group.user.avatarUrl}
-                      alt={group.user.fullName}
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-purple-600 text-white font-bold text-[10px] flex items-center justify-center rounded-full">
-                      {group.user.fullName?.[0] || 'U'}
-                    </div>
-                  )}
+                  <Avatar
+                    src={group.user.avatarUrl}
+                    name={group.user.fullName || group.user.username}
+                    size="w-full h-full"
+                  />
                 </div>
               </div>
 

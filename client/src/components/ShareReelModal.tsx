@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Avatar from './Avatar';
 import {
   HiXMark,
   HiCheck,
@@ -36,6 +37,9 @@ interface FriendOption {
   username: string;
   fullName?: string;
   avatarUrl?: string;
+  isFollowing?: boolean;
+  isFollower?: boolean;
+  isMutual?: boolean;
 }
 
 export default function ShareReelModal({
@@ -129,51 +133,26 @@ export default function ShareReelModal({
       console.warn('Failed to parse recent sent users:', e);
     }
 
-    // 2. Fetch conversations (talked before) AND following list (users followed) in parallel
-    Promise.all([
-      messageService.getConversations().catch((err) => {
-        console.warn('Failed to load conversations:', err);
-        return [];
-      }),
-      userService.getFollowing().catch((err) => {
-        console.warn('Failed to load following users:', err);
-        return [];
-      }),
-    ])
-      .then(([conversations, followingUsers]) => {
+    // 2. Fetch connections (strictly followers and following)
+    userService
+      .getConnections()
+      .then((connections) => {
         if (!isMounted) return;
 
-        const contactMap = new Map<string, FriendOption>();
+        const allowedFriends: FriendOption[] = (connections || []).map((u) => ({
+          id: u.id,
+          username: u.username,
+          fullName: u.fullName,
+          avatarUrl: u.avatarUrl || undefined,
+          isFollowing: u.isFollowing,
+          isFollower: u.isFollower,
+          isMutual: u.isMutual,
+        }));
 
-        // A. Add users we have talked with before (conversations)
-        conversations.forEach((c) => {
-          if (c.user && c.user.id !== currentUser.id) {
-            contactMap.set(c.user.id, {
-              id: c.user.id,
-              username: c.user.username,
-              fullName: c.user.fullName,
-              avatarUrl: c.user.avatarUrl,
-            });
-          }
-        });
-
-        // B. Add users we have followed
-        followingUsers.forEach((u) => {
-          if (u && u.id !== currentUser.id && !contactMap.has(u.id)) {
-            contactMap.set(u.id, {
-              id: u.id,
-              username: u.username,
-              fullName: u.fullName,
-              avatarUrl: u.avatarUrl,
-            });
-          }
-        });
-
-        const allowedFriends = Array.from(contactMap.values());
         setFriends(allowedFriends);
         setFilteredFriends(allowedFriends);
 
-        // Populate recent 5 sent friends (only if they are in allowed contacts or fallback to allowed friends)
+        // Populate recent 5 sent friends (only if they are among current connections)
         const allowedIdSet = new Set(allowedFriends.map((f) => f.id));
         const validRecent = storedRecent.filter((r) => allowedIdSet.has(r.id));
         for (const f of allowedFriends) {
@@ -188,6 +167,9 @@ export default function ShareReelModal({
       .catch((err) => {
         console.error('Failed to load contacts for reel share:', err);
         if (isMounted) {
+          setFriends([]);
+          setFilteredFriends([]);
+          setRecentSentUsers([]);
           setLoadingFriends(false);
         }
       });
@@ -659,11 +641,6 @@ export default function ShareReelModal({
                         <div className="flex items-center gap-3 sm:gap-3.5 overflow-x-auto py-1 px-1 scrollbar-none justify-start">
                           {recentSentUsers.slice(0, 5).map((user) => {
                             const isSelected = selectedUserIds.has(user.id);
-                            const uInitial = (
-                              user.fullName?.[0] ||
-                              user.username?.[0] ||
-                              'U'
-                            ).toUpperCase();
 
                             return (
                               <button
@@ -686,17 +663,11 @@ export default function ShareReelModal({
                                         : 'border-slate-200 group-hover:border-purple-400'
                                     }`}
                                   >
-                                    <div className="w-full h-full rounded-full overflow-hidden bg-slate-200/70 flex items-center justify-center font-bold text-xs text-purple-700">
-                                      {user.avatarUrl ? (
-                                        <img
-                                          src={user.avatarUrl}
-                                          alt={user.username}
-                                          className="w-full h-full object-cover"
-                                        />
-                                      ) : (
-                                        <span>{uInitial}</span>
-                                      )}
-                                    </div>
+                                    <Avatar
+                                      src={user.avatarUrl}
+                                      name={user.fullName || user.username}
+                                      size="full"
+                                    />
                                   </div>
 
                                   {/* Selection Checkmark Badge */}
@@ -762,26 +733,21 @@ export default function ShareReelModal({
                         <div className="w-9 h-9 rounded-full bg-purple-50 text-purple-500 flex items-center justify-center mx-auto mb-2 text-base font-bold">
                           💬
                         </div>
-                        <p className="text-xs font-bold text-slate-700">No contacts available</p>
+                        <p className="text-xs font-bold text-slate-700">No connections available</p>
                         <p className="text-[11px] text-slate-400 mt-1 max-w-[260px] mx-auto leading-relaxed">
-                          You can only share reels with people you have chatted with before or followed.
+                          You can share reels with people you follow or who follow you.
                         </p>
                       </div>
                     ) : filteredFriends.length === 0 ? (
                       <div className="py-6 text-center px-4">
                         <p className="text-xs font-semibold text-slate-600">No contacts found</p>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          No matches in your chats or followed users
+                          No matching followers or following found
                         </p>
                       </div>
                     ) : (
                       filteredFriends.map((friend) => {
                         const isSelected = selectedUserIds.has(friend.id);
-                        const fInitials = (
-                          friend.fullName?.[0] ||
-                          friend.username?.[0] ||
-                          'U'
-                        ).toUpperCase();
 
                         return (
                           <div
@@ -792,21 +758,31 @@ export default function ShareReelModal({
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
-                              <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center font-bold text-xs text-purple-600">
-                                {friend.avatarUrl ? (
-                                  <img
-                                    src={friend.avatarUrl}
-                                    alt={friend.username}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span>{fInitials}</span>
-                                )}
-                              </div>
+                                <Avatar
+                                  src={friend.avatarUrl}
+                                  name={friend.fullName || friend.username}
+                                  size="sm"
+                                  className="shrink-0"
+                                />
                               <div className="min-w-0 flex-1">
-                                <p className="text-xs font-bold text-slate-900 truncate">
-                                  {friend.fullName || friend.username}
-                                </p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-xs font-bold text-slate-900 truncate">
+                                    {friend.fullName || friend.username}
+                                  </p>
+                                  {(friend.isMutual || friend.isFollowing || friend.isFollower) && (
+                                    <span
+                                      className={`text-[9px] font-semibold px-1.5 py-0.2 rounded-full shrink-0 ${
+                                        friend.isMutual
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : friend.isFollowing
+                                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                          : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                      }`}
+                                    >
+                                      {friend.isMutual ? 'Mutual' : friend.isFollowing ? 'Following' : 'Follower'}
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-[10px] text-slate-400 truncate">
                                   @{friend.username}
                                 </p>
@@ -871,7 +847,6 @@ export default function ShareReelModal({
                     ) : (
                       filteredGroups.map((group) => {
                         const isSelected = selectedGroupIds.has(group.id);
-                        const gInitial = (group.name?.[0] || 'G').toUpperCase();
 
                         return (
                           <div
@@ -882,17 +857,12 @@ export default function ShareReelModal({
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-indigo-500 text-white font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
-                                {group.avatarUrl ? (
-                                  <img
-                                    src={group.avatarUrl}
-                                    alt={group.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span>{gInitial}</span>
-                                )}
-                              </div>
+                                <Avatar
+                                  src={group.avatarUrl}
+                                  name={group.name}
+                                  size="sm"
+                                  className="shrink-0"
+                                />
                               <div className="min-w-0 flex-1">
                                 <p className="text-xs font-bold text-slate-900 truncate">
                                   {group.name}

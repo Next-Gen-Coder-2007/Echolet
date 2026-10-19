@@ -1,10 +1,11 @@
 import { Response } from 'express';
 import { MoreThan, In } from 'typeorm';
 import { AppDataSource } from '../config/database';
-import { Story, StoryViewerItem } from '../entities/Story';
+import { Story, StoryViewerItem, StoryLikeItem } from '../entities/Story';
 import { Follow } from '../entities/Follow';
+import { Notification } from '../entities/Notification';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
-import { emitNewStory, emitStoryDeleted, emitStoryViewed } from '../socket';
+import { emitNewStory, emitStoryDeleted, emitStoryViewed, emitStoryLiked, emitNotification } from '../socket';
 
 export interface UserStoryGroup {
   userId: string;
@@ -16,7 +17,7 @@ export interface UserStoryGroup {
   };
   hasUnviewed: boolean;
   lastStoryTimestamp: string;
-  stories: (Story & { isViewed?: boolean })[];
+  stories: (Story & { isViewed?: boolean; isLiked?: boolean })[];
 }
 
 const getParamString = (param: string | string[] | undefined): string => {
@@ -103,9 +104,13 @@ export const getStories = async (req: AuthenticatedRequest, res: Response): Prom
       const viewers: StoryViewerItem[] = Array.isArray(story.viewers) ? story.viewers : [];
       const isViewed = Boolean(currentUserId && viewers.some((v) => v.userId === currentUserId));
 
+      const likes: StoryLikeItem[] = Array.isArray(story.likes) ? story.likes : [];
+      const isLiked = Boolean(currentUserId && likes.some((l) => l.userId === currentUserId));
+
       const enrichedStory = {
         ...story,
         isViewed,
+        isLiked,
       };
 
       if (!groupMap.has(story.userId)) {
@@ -365,6 +370,164 @@ export const deleteStory = async (req: AuthenticatedRequest, res: Response): Pro
     res.status(500).json({
       status: 'error',
       message: error?.message || 'Failed to delete story',
+    });
+  }
+};
+
+/**
+ * Toggle like on a story with consolidated / aggregated notifications
+ */
+export const toggleLikeStory = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ status: 'error', message: 'Authentication required' });
+      return;
+    }
+
+    const id = getParamString(req.params.id);
+    const storyRepo = AppDataSource.getRepository(Story);
+
+    const story = await storyRepo.findOne({
+      where: { id },
+      relations: { user: true },
+    });
+
+    if (!story) {
+      res.status(404).json({ status: 'error', message: 'Story not found' });
+      return;
+    }
+
+    const likes: StoryLikeItem[] = Array.isArray(story.likes) ? [...story.likes] : [];
+    const existingIndex = likes.findIndex((l) => l.userId === user.id);
+    let isLiked = false;
+
+    if (existingIndex >= 0) {
+      // Remove like
+      likes.splice(existingIndex, 1);
+      isLiked = false;
+    } else {
+      // Add like
+      const newLike: StoryLikeItem = {
+        userId: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
+        likedAt: new Date().toISOString(),
+      };
+      likes.push(newLike);
+      isLiked = true;
+    }
+
+    story.likes = likes;
+    story.likesCount = likes.length;
+    await storyRepo.save(story);
+
+    const notificationRepo = AppDataSource.getRepository(Notification);
+
+    if (isLiked && story.userId !== user.id) {
+      // Consolidated notification:
+      // If 1 person liked: "liked your story"
+      // If 2 persons liked: "and [Second Person] liked your story"
+      // If >2 persons liked: "and [N-1] others liked your story"
+      let notifMessage = 'liked your story';
+      if (likes.length === 2) {
+        const otherLiker = likes.find((l) => l.userId !== user.id);
+        const otherName = otherLiker?.fullName || otherLiker?.username || '1 person';
+        notifMessage = `and ${otherName} liked your story`;
+      } else if (likes.length > 2) {
+        notifMessage = `and ${likes.length - 1} others liked your story`;
+      }
+
+      const existingNotif = await notificationRepo.findOne({
+        where: {
+          recipientId: story.userId,
+          type: 'like',
+          entityType: 'story',
+          entityId: story.id,
+        },
+      });
+
+      if (existingNotif) {
+        existingNotif.actorId = user.id;
+        existingNotif.message = notifMessage;
+        existingNotif.isRead = false;
+        existingNotif.createdAt = new Date();
+        const savedNotif = await notificationRepo.save(existingNotif);
+        const fullNotif = await notificationRepo.findOne({
+          where: { id: savedNotif.id },
+          relations: { actor: true },
+        });
+        if (fullNotif) emitNotification(fullNotif);
+      } else {
+        const newNotif = notificationRepo.create({
+          recipientId: story.userId,
+          actorId: user.id,
+          type: 'like',
+          entityType: 'story',
+          entityId: story.id,
+          message: notifMessage,
+        });
+        const savedNotif = await notificationRepo.save(newNotif);
+        const fullNotif = await notificationRepo.findOne({
+          where: { id: savedNotif.id },
+          relations: { actor: true },
+        });
+        if (fullNotif) emitNotification(fullNotif);
+      }
+    } else if (!isLiked && story.userId !== user.id) {
+      const existingNotif = await notificationRepo.findOne({
+        where: {
+          recipientId: story.userId,
+          type: 'like',
+          entityType: 'story',
+          entityId: story.id,
+        },
+      });
+
+      if (existingNotif) {
+        if (likes.length === 0) {
+          await notificationRepo.remove(existingNotif);
+        } else {
+          const lastLiker = likes[likes.length - 1];
+          existingNotif.actorId = lastLiker.userId;
+          if (likes.length === 1) {
+            existingNotif.message = 'liked your story';
+          } else if (likes.length === 2) {
+            const other = likes.find((l) => l.userId !== lastLiker.userId);
+            existingNotif.message = `and ${other?.fullName || other?.username || '1 person'} liked your story`;
+          } else {
+            existingNotif.message = `and ${likes.length - 1} others liked your story`;
+          }
+          await notificationRepo.save(existingNotif);
+        }
+      }
+    }
+
+    emitStoryLiked({
+      storyId: story.id,
+      userId: user.id,
+      isLiked,
+      likesCount: story.likesCount,
+      user: {
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
+      },
+    });
+
+    res.json({
+      status: 'success',
+      isLiked,
+      likesCount: story.likesCount,
+      likes: story.likes,
+    });
+  } catch (error: any) {
+    console.error('Error toggling like on story:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error?.message || 'Failed to like story',
     });
   }
 };

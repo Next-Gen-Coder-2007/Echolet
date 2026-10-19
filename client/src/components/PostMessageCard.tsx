@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Avatar from './Avatar';
 import {
   HiArrowTopRightOnSquare,
   HiOutlineChatBubbleOvalLeftEllipsis,
@@ -104,17 +105,12 @@ export const PostMessageCard: React.FC<PostMessageCardProps> = ({
         {/* Post Card Header */}
         <div className="p-3 pb-2 flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-200 shrink-0 flex items-center justify-center font-bold text-[10px] text-indigo-700">
-              {creatorAvatar ? (
-                <img
-                  src={creatorAvatar}
-                  alt={creatorUsername}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span>{(creatorUsername[0] || 'U').toUpperCase()}</span>
-              )}
-            </div>
+            <Avatar
+              src={creatorAvatar}
+              name={creatorFullName || creatorUsername}
+              size="xs"
+              className="w-6 h-6 shrink-0 text-[10px]"
+            />
             <div className="min-w-0">
               <span className="text-xs font-bold leading-tight block truncate">
                 {creatorFullName || creatorUsername}

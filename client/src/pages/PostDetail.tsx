@@ -8,6 +8,7 @@ import {
 } from 'react-icons/hi2';
 import postService, { type Post } from '../services/postService';
 import PostCard from '../components/PostCard';
+import Avatar from '../components/Avatar';
 import type { User } from '../services/authService';
 
 export default function PostDetail({ user: propUser }: { user?: User | null } = {}) {
@@ -109,17 +110,12 @@ export default function PostDetail({ user: propUser }: { user?: User | null } = 
                 onClick={() => navigate(`/profile/${post.user?.username}`)}
                 className="flex items-center gap-3 cursor-pointer group mb-4"
               >
-                {post.user.avatarUrl ? (
-                  <img
-                    src={post.user.avatarUrl}
-                    alt={post.user.fullName}
-                    className="w-12 h-12 rounded-full object-cover ring-1 ring-slate-200 group-hover:ring-slate-400 shrink-0"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0">
-                    {post.user.fullName?.[0] || 'U'}
-                  </div>
-                )}
+                <Avatar
+                  src={post.user.avatarUrl}
+                  name={post.user.fullName || post.user.username}
+                  size="w-12 h-12"
+                  className="ring-1 ring-slate-200 group-hover:ring-slate-400 shrink-0"
+                />
                 <div className="min-w-0">
                   <div className="text-sm font-bold text-slate-900 truncate group-hover:text-purple-600 transition-colors">
                     {post.user.fullName}

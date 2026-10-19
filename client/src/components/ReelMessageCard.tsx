@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HiPlay, HiArrowTopRightOnSquare } from 'react-icons/hi2';
+import Avatar from './Avatar';
 import { reelService, type Reel } from '../services/reelService';
 
 interface ReelMessageCardProps {
@@ -304,17 +305,12 @@ export const ReelMessageCard: React.FC<ReelMessageCardProps> = ({
         <div className="absolute bottom-0 inset-x-0 p-3 pt-8 flex flex-col gap-2 bg-gradient-to-t from-black via-black/85 to-transparent z-10">
           {/* Creator Profile */}
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-6 h-6 rounded-full bg-purple-600/70 border border-white/30 overflow-hidden shrink-0 flex items-center justify-center text-[10px] font-bold text-white shadow-xs">
-              {creatorAvatar ? (
-                <img
-                  src={creatorAvatar}
-                  alt={creatorUsername}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span>{(creatorUsername[0] || 'U').toUpperCase()}</span>
-              )}
-            </div>
+            <Avatar
+              src={creatorAvatar}
+              name={creatorUsername}
+              size="xs"
+              className="w-6 h-6 border border-white/30 shrink-0 text-[10px]"
+            />
             <p className="text-xs font-bold text-white truncate drop-shadow-sm">
               @{creatorUsername}
             </p>

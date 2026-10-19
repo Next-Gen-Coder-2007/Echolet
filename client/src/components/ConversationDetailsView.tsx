@@ -30,7 +30,7 @@ import {
 } from 'react-icons/hi2';
 import { BsPinAngleFill } from 'react-icons/bs';
 import type { User } from '../services/authService';
-import userService, { type UserProfileResponse } from '../services/userService';
+import userService, { type UserProfileResponse, type ConnectedUser } from '../services/userService';
 import messageService from '../services/messageService';
 import groupService, {
   type GroupDetails,
@@ -40,6 +40,7 @@ import groupService, {
 import { useVoiceCall } from '../context/CallContext';
 import MediaViewerModal from './MediaViewerModal';
 import Modal from './Modal';
+import Avatar from './Avatar';
 
 export interface ConversationDetailsViewProps {
   user?: UserProfileResponse | User | null;
@@ -334,12 +335,13 @@ export default function ConversationDetailsView({
   const [editGroupDesc, setEditGroupDesc] = useState(() => group?.description || '');
   const [savingGroupEdit, setSavingGroupEdit] = useState(false);
 
-  // Add Member to Group state
+  // Add Member to Group state (only followers / following)
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [addMemberQuery, setAddMemberQuery] = useState('');
-  const [addMemberResults, setAddMemberResults] = useState<UserProfileResponse[]>([]);
-  const [searchingUsers, setSearchingUsers] = useState(false);
-  const [selectedToAdd, setSelectedToAdd] = useState<UserProfileResponse[]>([]);
+  const [eligibleConnections, setEligibleConnections] = useState<ConnectedUser[]>([]);
+  const [filteredConnections, setFilteredConnections] = useState<ConnectedUser[]>([]);
+  const [loadingConnections, setLoadingConnections] = useState(false);
+  const [selectedToAdd, setSelectedToAdd] = useState<ConnectedUser[]>([]);
   const [addingMembers, setAddingMembers] = useState(false);
   const [openMemberMenuId, setOpenMemberMenuId] = useState<string | null>(null);
 
@@ -439,37 +441,60 @@ export default function ConversationDetailsView({
     };
   }, [group]);
 
-  // Debounced search for adding new members
+  // Load followers/following connections when Add Member modal is open
   useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-
-    const q = addMemberQuery.trim();
-    if (!q || !isAddMemberOpen) {
-      setAddMemberResults([]);
-      setSearchingUsers(false);
+    if (!isAddMemberOpen) {
+      setEligibleConnections([]);
+      setFilteredConnections([]);
+      setAddMemberQuery('');
+      setSelectedToAdd([]);
       return;
     }
 
-    setSearchingUsers(true);
-    searchTimerRef.current = setTimeout(async () => {
-      try {
-        const users = await userService.searchUsers(q);
+    let isMounted = true;
+    setLoadingConnections(true);
+    userService
+      .getConnections()
+      .then((users) => {
+        if (!isMounted) return;
         const existingMemberIds = new Set(
           groupDetails?.members.map((m) => m.userId) || []
         );
-        const filtered = users.filter((u) => !existingMemberIds.has(u.id));
-        setAddMemberResults(filtered);
-      } catch {
-        setAddMemberResults([]);
-      } finally {
-        setSearchingUsers(false);
-      }
-    }, 250);
+        const eligible = users.filter((u) => !existingMemberIds.has(u.id));
+        setEligibleConnections(eligible);
+        setFilteredConnections(eligible);
+      })
+      .catch((err) => {
+        console.error('Failed to load connections for group:', err);
+        if (isMounted) {
+          setEligibleConnections([]);
+          setFilteredConnections([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoadingConnections(false);
+      });
 
     return () => {
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      isMounted = false;
     };
-  }, [addMemberQuery, isAddMemberOpen, groupDetails]);
+  }, [isAddMemberOpen, groupDetails]);
+
+  // Filter connections locally as user types
+  useEffect(() => {
+    const q = addMemberQuery.trim().toLowerCase();
+    if (!q) {
+      setFilteredConnections(eligibleConnections);
+      return;
+    }
+    setFilteredConnections(
+      eligibleConnections.filter(
+        (u) =>
+          u.username.toLowerCase().includes(q) ||
+          (u.fullName && u.fullName.toLowerCase().includes(q))
+      )
+    );
+  }, [addMemberQuery, eligibleConnections]);
 
   // Save edited group details
   const handleSaveGroupEdit = async (e: React.FormEvent) => {
@@ -926,22 +951,14 @@ export default function ConversationDetailsView({
 
           {/* Avatar with status */}
           <div className="relative mt-2 mb-3">
-            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-slate-200 p-1 border-4 border-white shadow-md relative z-10">
-              {activeAvatar ? (
-                <img
-                  src={activeAvatar}
-                  alt={activeName}
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-2xl">
-                  {isGroup ? (
-                    <HiOutlineUserGroup className="w-10 h-10 text-indigo-400" />
-                  ) : (
-                    (activeName?.[0] || 'U').toUpperCase()
-                  )}
-                </div>
-              )}
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-slate-100 p-1 border-4 border-white shadow-md relative z-10 flex items-center justify-center">
+              <Avatar
+                src={activeAvatar}
+                name={activeName || activeUsername}
+                size="full"
+                icon={isGroup ? <HiOutlineUserGroup className="w-10 h-10 text-white" /> : undefined}
+                fallbackClassName="text-2xl sm:text-3xl font-extrabold bg-gradient-to-tr from-purple-600 to-indigo-600 text-white"
+              />
             </div>
 
             {/* Online indicator for user */}
@@ -1192,17 +1209,12 @@ export default function ConversationDetailsView({
                       className="p-2.5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between hover:bg-slate-50 transition-colors"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200 shrink-0 font-bold text-xs text-indigo-700 flex items-center justify-center">
-                          {member.user?.avatarUrl ? (
-                            <img
-                              src={member.user.avatarUrl}
-                              alt={mName}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span>{(mName[0] || 'U').toUpperCase()}</span>
-                          )}
-                        </div>
+                        <Avatar
+                          src={member.user?.avatarUrl}
+                          name={mName}
+                          size="sm"
+                          className="shrink-0"
+                        />
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-900 truncate">
                             {mName} {isCurrent && '(You)'}
@@ -2139,18 +2151,18 @@ export default function ConversationDetailsView({
 
             {/* Search Results */}
             <div data-lenis-prevent className="max-h-56 overflow-y-auto space-y-1 pr-1">
-              {searchingUsers ? (
+              {loadingConnections ? (
                 <div className="py-6 text-center text-xs text-slate-400">
-                  Searching users...
+                  Loading your connections...
                 </div>
-              ) : addMemberResults.length === 0 ? (
+              ) : filteredConnections.length === 0 ? (
                 <div className="py-6 text-center text-xs text-slate-400">
                   {addMemberQuery
-                    ? 'No matching users found'
-                    : 'Type a name to search for contacts to add'}
+                    ? 'No matching connections found'
+                    : 'No followers or following available to add'}
                 </div>
               ) : (
-                addMemberResults.map((u) => {
+                filteredConnections.map((u) => {
                   const isSelected = selectedToAdd.some((x) => x.id === u.id);
                   return (
                     <button
@@ -2170,21 +2182,29 @@ export default function ConversationDetailsView({
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 rounded-full overflow-hidden bg-slate-200 shrink-0 font-bold text-xs text-indigo-700 flex items-center justify-center">
-                          {u.avatarUrl ? (
-                            <img
-                              src={u.avatarUrl}
-                              alt={u.username}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span>{(u.username[0] || 'U').toUpperCase()}</span>
-                          )}
-                        </div>
+                        <Avatar
+                          src={u.avatarUrl}
+                          name={u.fullName || u.username}
+                          size="sm"
+                          className="shrink-0"
+                        />
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-900 truncate">
-                            {u.fullName || u.username}
-                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-xs font-bold text-slate-900 truncate">
+                              {u.fullName || u.username}
+                            </p>
+                            <span
+                              className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${
+                                u.isMutual
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : u.isFollowing
+                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+                              }`}
+                            >
+                              {u.isMutual ? 'Mutual' : u.isFollowing ? 'Following' : 'Follower'}
+                            </span>
+                          </div>
                           <p className="text-[11px] text-slate-400">@{u.username}</p>
                         </div>
                       </div>

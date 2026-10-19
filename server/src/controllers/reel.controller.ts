@@ -8,7 +8,9 @@ import { ReelComment } from '../entities/ReelComment';
 import { ReelCommentReaction } from '../entities/ReelCommentReaction';
 import { User } from '../entities/User';
 import { Follow } from '../entities/Follow';
+import { Notification } from '../entities/Notification';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
+import { emitNotification } from '../socket';
 
 const getParamString = (param: string | string[] | undefined): string => {
   if (Array.isArray(param)) return (param[0] || '').trim();
@@ -329,6 +331,95 @@ export const toggleLikeReel = async (
     }
 
     await reelRepo.save(reel);
+
+    const notificationRepo = AppDataSource.getRepository(Notification);
+
+    if (isLiked && reel.userId !== currentUserId) {
+      const allLikes = await reelLikeRepo.find({
+        where: { reelId: id },
+        relations: { user: true },
+        order: { createdAt: 'DESC' },
+      });
+
+      let notifMessage = 'liked your reel';
+      if (allLikes.length === 2) {
+        const other = allLikes.find((l) => l.userId !== currentUserId);
+        const otherName = other?.user?.fullName || other?.user?.username || '1 person';
+        notifMessage = `and ${otherName} liked your reel`;
+      } else if (allLikes.length > 2) {
+        notifMessage = `and ${allLikes.length - 1} others liked your reel`;
+      }
+
+      const existingNotif = await notificationRepo.findOne({
+        where: {
+          recipientId: reel.userId,
+          type: 'like',
+          entityType: 'reel',
+          entityId: id,
+        },
+      });
+
+      if (existingNotif) {
+        existingNotif.actorId = currentUserId;
+        existingNotif.message = notifMessage;
+        existingNotif.isRead = false;
+        existingNotif.createdAt = new Date();
+        const savedNotif = await notificationRepo.save(existingNotif);
+        const fullNotif = await notificationRepo.findOne({
+          where: { id: savedNotif.id },
+          relations: { actor: true },
+        });
+        if (fullNotif) emitNotification(fullNotif);
+      } else {
+        const newNotif = notificationRepo.create({
+          recipientId: reel.userId,
+          actorId: currentUserId,
+          type: 'like',
+          entityType: 'reel',
+          entityId: id,
+          message: notifMessage,
+        });
+        const savedNotif = await notificationRepo.save(newNotif);
+        const fullNotif = await notificationRepo.findOne({
+          where: { id: savedNotif.id },
+          relations: { actor: true },
+        });
+        if (fullNotif) emitNotification(fullNotif);
+      }
+    } else if (!isLiked && reel.userId !== currentUserId) {
+      const existingNotif = await notificationRepo.findOne({
+        where: {
+          recipientId: reel.userId,
+          type: 'like',
+          entityType: 'reel',
+          entityId: id,
+        },
+      });
+
+      if (existingNotif) {
+        const remainingLikes = await reelLikeRepo.find({
+          where: { reelId: id },
+          relations: { user: true },
+          order: { createdAt: 'DESC' },
+        });
+
+        if (remainingLikes.length === 0) {
+          await notificationRepo.remove(existingNotif);
+        } else {
+          const lastLiker = remainingLikes[0];
+          existingNotif.actorId = lastLiker.userId;
+          if (remainingLikes.length === 1) {
+            existingNotif.message = 'liked your reel';
+          } else if (remainingLikes.length === 2) {
+            const other = remainingLikes.find((l) => l.userId !== lastLiker.userId);
+            existingNotif.message = `and ${other?.user?.fullName || other?.user?.username || '1 person'} liked your reel`;
+          } else {
+            existingNotif.message = `and ${remainingLikes.length - 1} others liked your reel`;
+          }
+          await notificationRepo.save(existingNotif);
+        }
+      }
+    }
 
     res.json({
       status: 'success',
