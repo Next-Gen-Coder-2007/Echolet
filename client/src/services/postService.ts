@@ -6,6 +6,39 @@ export interface PollOptionItem {
   votes: number;
 }
 
+export interface PollVoterUser {
+  id: string;
+  fullName: string;
+  username: string;
+  avatarUrl?: string | null;
+  votedAt?: string | Date;
+}
+
+export interface PollOptionVoters {
+  id: string;
+  optionIndex: number;
+  optionText: string;
+  votesCount: number;
+  voters: PollVoterUser[];
+}
+
+export interface PollVotersData {
+  postId?: string;
+  messageId?: string;
+  pollQuestion?: string;
+  totalVotes: number;
+  options: PollOptionVoters[];
+}
+
+export interface PostReactionItem {
+  emoji: string;
+  userId: string;
+  fullName: string;
+  username: string;
+  avatarUrl?: string;
+  createdAt?: string;
+}
+
 export interface PostAuthor {
   id: string;
   fullName: string;
@@ -38,6 +71,8 @@ export interface Post {
   pollExpiresAt?: string | null;
   isPollExpired?: boolean;
   likesCount: number;
+  reactions?: PostReactionItem[];
+  userReaction?: string | null;
   commentsCount: number;
   repostsCount: number;
   bookmarksCount: number;
@@ -98,10 +133,42 @@ export const postService = {
     await api.delete(`/posts/${encodeURIComponent(id)}`);
   },
 
-  async toggleLike(id: string): Promise<{ isLiked: boolean; likesCount: number }> {
-    const res = await api.post<{ status: string; isLiked: boolean; likesCount: number }>(
+  async toggleLike(id: string): Promise<{ isLiked: boolean; userReaction?: string | null; reactions?: PostReactionItem[]; likesCount: number }> {
+    const res = await api.post<{ status: string; isLiked: boolean; userReaction?: string | null; reactions?: PostReactionItem[]; likesCount: number }>(
       `/posts/${encodeURIComponent(id)}/like`
     );
+    return res.data;
+  },
+
+  async toggleReaction(
+    id: string,
+    emoji: string
+  ): Promise<{
+    status: string;
+    isLiked: boolean;
+    userReaction: string | null;
+    reactions: PostReactionItem[];
+    likesCount: number;
+  }> {
+    const res = await api.post<{
+      status: string;
+      isLiked: boolean;
+      userReaction: string | null;
+      reactions: PostReactionItem[];
+      likesCount: number;
+    }>(`/posts/${encodeURIComponent(id)}/reaction`, { emoji });
+    return res.data;
+  },
+
+  async getReactions(
+    id: string
+  ): Promise<{ status: string; postId: string; reactions: PostReactionItem[]; likesCount: number }> {
+    const res = await api.get<{
+      status: string;
+      postId: string;
+      reactions: PostReactionItem[];
+      likesCount: number;
+    }>(`/posts/${encodeURIComponent(id)}/reactions`);
     return res.data;
   },
 
@@ -135,6 +202,13 @@ export const postService = {
       { optionIndex }
     );
     return res.data;
+  },
+
+  async getPollVoters(id: string): Promise<PollVotersData> {
+    const res = await api.get<{ status: string; data: PollVotersData }>(
+      `/posts/${encodeURIComponent(id)}/poll/voters`
+    );
+    return res.data.data;
   },
 
   async getComments(postId: string): Promise<PostComment[]> {

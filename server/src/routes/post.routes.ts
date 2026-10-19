@@ -7,9 +7,12 @@ import {
   getPostById,
   deletePost,
   toggleLikePost,
+  togglePostReaction,
+  getPostReactions,
   toggleBookmarkPost,
   updatePostBookmarkCollection,
   votePoll,
+  getPostPollVoters,
   getComments,
   addComment,
   deleteComment,
@@ -29,6 +32,7 @@ router.get('/liked', authMiddleware, getLikedPosts);
 router.get('/feed', optionalAuthMiddleware, getFeedPosts);
 router.get('/user/:username', optionalAuthMiddleware, getUserPosts);
 router.get('/:id', optionalAuthMiddleware, getPostById);
+router.get('/:id/reactions', optionalAuthMiddleware, getPostReactions);
 router.get('/:id/comments', optionalAuthMiddleware, getComments);
 
 // Single post operations (require login)
@@ -37,10 +41,12 @@ router.delete('/:id', authMiddleware, deletePost);
 
 // Interactions (require login)
 router.post('/:id/like', authMiddleware, toggleLikePost);
+router.post('/:id/reaction', authMiddleware, togglePostReaction);
 router.post('/:id/share', optionalAuthMiddleware, sharePost);
 router.post('/:id/bookmark', authMiddleware, toggleBookmarkPost);
 router.put('/:id/bookmark/collection', authMiddleware, updatePostBookmarkCollection);
 router.post('/:id/poll/vote', authMiddleware, votePoll);
+router.get('/:id/poll/voters', authMiddleware, getPostPollVoters);
 
 // Comments (require login)
 router.post('/:id/comments', authMiddleware, addComment);

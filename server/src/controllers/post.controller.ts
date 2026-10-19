@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { In } from 'typeorm';
 import { AppDataSource } from '../config/database';
-import { Post, PollOptionItem } from '../entities/Post';
+import { Post, PollOptionItem, PostReactionItem } from '../entities/Post';
 import { PostLike } from '../entities/PostLike';
 import { PostBookmark } from '../entities/PostBookmark';
 import { Comment } from '../entities/Comment';
@@ -15,6 +15,7 @@ import {
   emitNewPost,
   emitPostDeleted,
   emitPostLiked,
+  emitPostReactionUpdated,
   emitNewComment,
   emitPostPollVoted,
   emitNotification,
@@ -83,6 +84,8 @@ const enrichPostsWithUserData = async (
   if (!posts.length || !currentUserId) {
     return posts.map((post) => ({
       ...post,
+      reactions: Array.isArray(post.reactions) ? post.reactions : [],
+      userReaction: null,
       isPollExpired: Boolean(post.pollExpiresAt && new Date(post.pollExpiresAt) <= now),
       isLiked: false,
       isBookmarked: false,
@@ -127,14 +130,23 @@ const enrichPostsWithUserData = async (
   );
   const voteMap = new Map(votes.map((v) => [v.postId, v.optionIndex]));
 
-  return posts.map((post) => ({
-    ...post,
-    isPollExpired: Boolean(post.pollExpiresAt && new Date(post.pollExpiresAt) <= now),
-    isLiked: likedSet.has(post.id),
-    isBookmarked: bookmarkedSet.has(post.id),
-    bookmarkCollection: bookmarkCollectionMap.get(post.id) || null,
-    userVotedOption: voteMap.has(post.id) ? voteMap.get(post.id) : null,
-  }));
+  return posts.map((post) => {
+    const postReactions: PostReactionItem[] = Array.isArray(post.reactions) ? post.reactions : [];
+    const myReaction = postReactions.find((r) => r.userId === currentUserId);
+    const userReaction = myReaction ? myReaction.emoji : (likedSet.has(post.id) ? '❤️' : null);
+    const isLiked = Boolean(userReaction || likedSet.has(post.id));
+
+    return {
+      ...post,
+      reactions: postReactions,
+      userReaction,
+      isPollExpired: Boolean(post.pollExpiresAt && new Date(post.pollExpiresAt) <= now),
+      isLiked,
+      isBookmarked: bookmarkedSet.has(post.id),
+      bookmarkCollection: bookmarkCollectionMap.get(post.id) || null,
+      userVotedOption: voteMap.has(post.id) ? voteMap.get(post.id) : null,
+    };
+  });
 };
 
 /**
@@ -231,6 +243,7 @@ export const createPost = async (
     newPost.pollOptions = formattedPollOptions;
     newPost.pollExpiresAt = calculatedPollExpiresAt;
     newPost.likesCount = 0;
+    newPost.reactions = [];
     newPost.commentsCount = 0;
     newPost.repostsCount = 0;
     newPost.bookmarksCount = 0;
@@ -246,6 +259,8 @@ export const createPost = async (
 
     const responsePost = {
       ...fullPost,
+      reactions: [],
+      userReaction: null,
       isPollExpired: Boolean(fullPost?.pollExpiresAt && new Date(fullPost.pollExpiresAt) <= new Date()),
       isLiked: false,
       isBookmarked: false,
@@ -589,6 +604,86 @@ export const deletePost = async (
 };
 
 /**
+ * Helper: Update or delete consolidated like notification for posts
+ */
+const updatePostLikeNotification = async (
+  recipientId: string,
+  actorId: string,
+  postId: string,
+  isLiked: boolean,
+  reactions: any[]
+) => {
+  if (recipientId === actorId) return;
+
+  const notificationRepo = AppDataSource.getRepository(Notification);
+  const existingNotif = await notificationRepo.findOne({
+    where: {
+      recipientId,
+      type: 'like',
+      entityType: 'post',
+      entityId: postId,
+    },
+  });
+
+  if (isLiked) {
+    let notifMessage = 'liked your echo';
+    if (reactions.length === 2) {
+      const other = reactions.find((r: any) => r.userId !== actorId);
+      const otherName = other?.fullName || other?.username || '1 person';
+      notifMessage = `and ${otherName} liked your echo`;
+    } else if (reactions.length > 2) {
+      notifMessage = `and ${reactions.length - 1} others liked your echo`;
+    }
+
+    if (existingNotif) {
+      existingNotif.actorId = actorId;
+      existingNotif.message = notifMessage;
+      existingNotif.isRead = false;
+      existingNotif.createdAt = new Date();
+      const saved = await notificationRepo.save(existingNotif);
+      const full = await notificationRepo.findOne({
+        where: { id: saved.id },
+        relations: { actor: true },
+      });
+      if (full) emitNotification(full);
+    } else {
+      const notif = notificationRepo.create({
+        recipientId,
+        actorId,
+        type: 'like',
+        entityType: 'post',
+        entityId: postId,
+        message: notifMessage,
+      });
+      const saved = await notificationRepo.save(notif);
+      const full = await notificationRepo.findOne({
+        where: { id: saved.id },
+        relations: { actor: true },
+      });
+      if (full) emitNotification(full);
+    }
+  } else {
+    if (existingNotif) {
+      if (reactions.length === 0) {
+        await notificationRepo.remove(existingNotif);
+      } else {
+        const lastReaction = reactions[reactions.length - 1];
+        existingNotif.actorId = lastReaction.userId;
+        if (reactions.length === 1) {
+          existingNotif.message = 'liked your echo';
+        } else if (reactions.length === 2) {
+          const other = reactions.find((r: any) => r.userId !== lastReaction.userId);
+          existingNotif.message = `and ${other?.fullName || other?.username || '1 person'} liked your echo`;
+        } else {
+          existingNotif.message = `and ${reactions.length - 1} others liked your echo`;
+        }
+        await notificationRepo.save(existingNotif);
+      }
+    }
+  }
+};
+
+/**
  * Toggle Like on Post
  */
 export const toggleLikePost = async (
@@ -599,7 +694,7 @@ export const toggleLikePost = async (
     const id = getParamString(req.params.id);
     const currentUserId = req.user?.id;
 
-    if (!currentUserId) {
+    if (!currentUserId || !req.user) {
       res.status(401).json({ status: 'error', message: 'Unauthorized' });
       return;
     }
@@ -613,46 +708,51 @@ export const toggleLikePost = async (
       return;
     }
 
+    let reactions: PostReactionItem[] = Array.isArray(post.reactions)
+      ? [...post.reactions]
+      : [];
+
     const existingLike = await likeRepo.findOne({
       where: { postId: id, userId: currentUserId },
     });
+    const existingReactionIndex = reactions.findIndex((r) => r.userId === currentUserId);
 
     let isLiked = false;
+    let userReaction: string | null = null;
 
-    if (existingLike) {
-      await likeRepo.remove(existingLike);
-      post.likesCount = Math.max(0, (post.likesCount || 0) - 1);
+    if (existingLike || existingReactionIndex >= 0) {
+      if (existingLike) {
+        await likeRepo.remove(existingLike);
+      }
+      if (existingReactionIndex >= 0) {
+        reactions.splice(existingReactionIndex, 1);
+      }
       isLiked = false;
+      userReaction = null;
     } else {
       const newLike = new PostLike();
       newLike.postId = id;
       newLike.userId = currentUserId;
       await likeRepo.save(newLike);
-      post.likesCount = (post.likesCount || 0) + 1;
+
+      reactions.push({
+        emoji: '❤️',
+        userId: currentUserId,
+        fullName: req.user.fullName,
+        username: req.user.username,
+        avatarUrl: req.user.avatarUrl,
+        createdAt: new Date().toISOString(),
+      });
+
       isLiked = true;
+      userReaction = '❤️';
     }
 
+    post.reactions = reactions;
+    post.likesCount = reactions.length;
     await postRepo.save(post);
 
-    if (isLiked && currentUserId !== post.userId) {
-      const notificationRepo = AppDataSource.getRepository(Notification);
-      const notif = notificationRepo.create({
-        recipientId: post.userId,
-        actorId: currentUserId,
-        type: 'like',
-        entityType: 'post',
-        entityId: id,
-        message: post.content ? post.content.slice(0, 60) : 'liked your post',
-      });
-      const savedNotif = await notificationRepo.save(notif);
-      const fullNotif = await notificationRepo.findOne({
-        where: { id: savedNotif.id },
-        relations: { actor: true },
-      });
-      if (fullNotif) {
-        emitNotification(fullNotif);
-      }
-    }
+    await updatePostLikeNotification(post.userId, currentUserId, id, isLiked, reactions);
 
     emitPostLiked({
       postId: id,
@@ -661,9 +761,19 @@ export const toggleLikePost = async (
       isLiked,
     });
 
+    emitPostReactionUpdated({
+      postId: id,
+      reactions,
+      likesCount: post.likesCount,
+      userId: currentUserId,
+      userReaction,
+    });
+
     res.json({
       status: 'success',
       isLiked,
+      userReaction,
+      reactions,
       likesCount: post.likesCount,
     });
   } catch (error) {
@@ -672,6 +782,162 @@ export const toggleLikePost = async (
       status: 'error',
       message: 'Failed to update like status',
     });
+  }
+};
+
+/**
+ * Toggle custom reaction emoji on Post using emoji picker
+ */
+export const togglePostReaction = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = getParamString(req.params.id);
+    const currentUserId = req.user?.id;
+    const { emoji } = req.body;
+
+    if (!currentUserId || !req.user) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    if (!emoji || typeof emoji !== 'string' || emoji.length > 20) {
+      res.status(400).json({ status: 'error', message: 'Valid emoji is required' });
+      return;
+    }
+
+    const postRepo = AppDataSource.getRepository(Post);
+    const likeRepo = AppDataSource.getRepository(PostLike);
+
+    const post = await postRepo.findOne({ where: { id } });
+    if (!post) {
+      res.status(404).json({ status: 'error', message: 'Post not found' });
+      return;
+    }
+
+    let reactions: PostReactionItem[] = Array.isArray(post.reactions)
+      ? [...post.reactions]
+      : [];
+
+    const existingIndex = reactions.findIndex((r) => r.userId === currentUserId);
+    let userReaction: string | null = null;
+    let isLiked = false;
+
+    if (existingIndex >= 0) {
+      if (reactions[existingIndex].emoji === emoji) {
+        // Clicking same emoji toggles reaction off
+        reactions.splice(existingIndex, 1);
+        userReaction = null;
+        isLiked = false;
+      } else {
+        // Change emoji reaction
+        reactions[existingIndex] = {
+          emoji,
+          userId: currentUserId,
+          fullName: req.user.fullName,
+          username: req.user.username,
+          avatarUrl: req.user.avatarUrl,
+          createdAt: new Date().toISOString(),
+        };
+        userReaction = emoji;
+        isLiked = true;
+      }
+    } else {
+      // Add new reaction
+      reactions.push({
+        emoji,
+        userId: currentUserId,
+        fullName: req.user.fullName,
+        username: req.user.username,
+        avatarUrl: req.user.avatarUrl,
+        createdAt: new Date().toISOString(),
+      });
+      userReaction = emoji;
+      isLiked = true;
+    }
+
+    // Keep PostLike table in sync
+    const existingLike = await likeRepo.findOne({
+      where: { postId: id, userId: currentUserId },
+    });
+
+    if (isLiked) {
+      if (!existingLike) {
+        const newLike = new PostLike();
+        newLike.postId = id;
+        newLike.userId = currentUserId;
+        await likeRepo.save(newLike);
+      }
+    } else {
+      if (existingLike) {
+        await likeRepo.remove(existingLike);
+      }
+    }
+
+    post.reactions = reactions;
+    post.likesCount = reactions.length;
+    await postRepo.save(post);
+
+    await updatePostLikeNotification(post.userId, currentUserId, id, isLiked, reactions);
+
+    emitPostLiked({
+      postId: id,
+      userId: currentUserId,
+      likesCount: post.likesCount,
+      isLiked,
+    });
+
+    emitPostReactionUpdated({
+      postId: id,
+      reactions,
+      likesCount: post.likesCount,
+      userId: currentUserId,
+      userReaction,
+    });
+
+    res.json({
+      status: 'success',
+      isLiked,
+      userReaction,
+      reactions,
+      likesCount: post.likesCount,
+    });
+  } catch (error) {
+    console.error('Toggle post reaction error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update reaction',
+    });
+  }
+};
+
+/**
+ * Get all reactions for a post
+ */
+export const getPostReactions = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = getParamString(req.params.id);
+    const postRepo = AppDataSource.getRepository(Post);
+    const post = await postRepo.findOne({ where: { id } });
+
+    if (!post) {
+      res.status(404).json({ status: 'error', message: 'Post not found' });
+      return;
+    }
+
+    res.json({
+      status: 'success',
+      postId: id,
+      reactions: Array.isArray(post.reactions) ? post.reactions : [],
+      likesCount: post.likesCount || 0,
+    });
+  } catch (error) {
+    console.error('Get post reactions error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to get post reactions' });
   }
 };
 
@@ -1305,6 +1571,78 @@ export const sharePost = async (
       status: 'error',
       message: 'Failed to record post share',
     });
+  }
+};
+
+/**
+ * Get poll voters for a post (Poll creator only)
+ */
+export const getPostPollVoters = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const id = getParamString(req.params.id);
+    const currentUserId = req.user?.id;
+
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const postRepo = AppDataSource.getRepository(Post);
+    const post = await postRepo.findOne({ where: { id } });
+
+    if (!post || !post.pollOptions || post.pollOptions.length === 0) {
+      res.status(404).json({ status: 'error', message: 'Poll not found on this post' });
+      return;
+    }
+
+    // Only the creator of the post can view who voted
+    if (post.userId !== currentUserId) {
+      res.status(403).json({
+        status: 'error',
+        message: 'Only the poll creator can see who voted',
+      });
+      return;
+    }
+
+    const voteRepo = AppDataSource.getRepository(PollVote);
+    const votes = await voteRepo.find({
+      where: { postId: id },
+      relations: { user: true },
+      order: { createdAt: 'DESC' },
+    });
+
+    const options = post.pollOptions.map((opt, idx) => {
+      const optionVotes = votes.filter((v) => v.optionIndex === idx);
+      return {
+        id: opt.id ?? String(idx),
+        optionIndex: idx,
+        optionText: opt.text,
+        votesCount: optionVotes.length,
+        voters: optionVotes.map((v) => ({
+          id: v.user?.id || v.userId,
+          fullName: v.user?.fullName || 'User',
+          username: v.user?.username || '',
+          avatarUrl: v.user?.avatarUrl || null,
+          votedAt: v.createdAt,
+        })),
+      };
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        postId: post.id,
+        pollQuestion: post.content || 'Poll',
+        totalVotes: votes.length,
+        options,
+      },
+    });
+  } catch (error) {
+    console.error('Get post poll voters error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch poll voters' });
   }
 };
 

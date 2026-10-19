@@ -16,6 +16,7 @@ import {
   toggleStarGroupMessage,
   togglePinGroupMessage,
   voteGroupMessagePoll,
+  getGroupPollVoters,
   clearGroupChat,
   getGroupMedia,
   toggleGroupMessageReaction,
@@ -37,6 +38,7 @@ router.post('/:groupId/messages/:messageId/reaction', toggleGroupMessageReaction
 router.post('/:groupId/messages/:messageId/star', toggleStarGroupMessage);
 router.post('/:groupId/messages/:messageId/pin', togglePinGroupMessage);
 router.post('/:groupId/messages/:messageId/vote', voteGroupMessagePoll);
+router.get('/:groupId/messages/:messageId/poll/voters', getGroupPollVoters);
 router.put('/:groupId/messages/:messageId', editGroupMessage);
 router.delete('/:groupId/messages/:messageId', deleteGroupMessage);
 router.post('/:groupId/clear', clearGroupChat);

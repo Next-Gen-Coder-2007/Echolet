@@ -10,6 +10,7 @@ import {
   toggleStarMessage,
   togglePinMessage,
   voteMessagePoll,
+  getMessagePollVoters,
   clearConversation,
   getChatSettings,
   updateChatSettings,
@@ -30,6 +31,7 @@ router.post('/item/:messageId/reaction', toggleMessageReaction);
 router.post('/item/:messageId/star', toggleStarMessage);
 router.post('/item/:messageId/pin', togglePinMessage);
 router.post('/item/:messageId/vote', voteMessagePoll);
+router.get('/item/:messageId/poll/voters', getMessagePollVoters);
 router.put('/item/:messageId', editMessage);
 router.delete('/item/:messageId', deleteMessage);
 router.get('/:userId/media', getConversationMedia);

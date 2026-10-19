@@ -1,5 +1,6 @@
 import api from './api';
 import type { UserProfileResponse } from './userService';
+import type { PollVotersData } from './postService';
 
 export interface MessageReplyInfo {
   id: string;
@@ -203,6 +204,13 @@ export const messageService = {
       { optionId }
     );
     return response.data.message;
+  },
+
+  async getPollVoters(messageId: string): Promise<PollVotersData> {
+    const response = await api.get<{ status: string; data: PollVotersData }>(
+      `/messages/item/${encodeURIComponent(messageId)}/poll/voters`
+    );
+    return response.data.data;
   },
 
   async clearConversation(userId: string): Promise<void> {

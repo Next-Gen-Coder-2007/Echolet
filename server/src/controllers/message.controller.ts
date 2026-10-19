@@ -840,6 +840,87 @@ export const voteMessagePoll = async (
   }
 };
 
+export const getMessagePollVoters = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const rawMessageId = Array.isArray(req.params.messageId)
+      ? req.params.messageId[0]
+      : req.params.messageId;
+    const messageId = (rawMessageId || '').trim();
+
+    const messageRepository = AppDataSource.getRepository(Message);
+    const message = await messageRepository.findOne({ where: { id: messageId } });
+
+    if (!message || !message.poll || !Array.isArray(message.poll.options)) {
+      res.status(404).json({ status: 'error', message: 'Poll message not found' });
+      return;
+    }
+
+    // Only the creator of the poll can view voters
+    if (message.senderId !== currentUserId) {
+      res.status(403).json({
+        status: 'error',
+        message: 'Only the poll creator can see who voted',
+      });
+      return;
+    }
+
+    const allVoterIds = Array.from(
+      new Set(
+        message.poll.options.flatMap((opt) => (Array.isArray(opt.voterIds) ? opt.voterIds : []))
+      )
+    );
+
+    const userMap = new Map<string, User>();
+    if (allVoterIds.length > 0) {
+      const userRepo = AppDataSource.getRepository(User);
+      const users = await userRepo.find({ where: { id: In(allVoterIds) } });
+      users.forEach((u) => userMap.set(u.id, u));
+    }
+
+    const options = message.poll.options.map((opt, idx) => {
+      const voterList = (opt.voterIds || []).map((vId) => {
+        const u = userMap.get(vId);
+        return {
+          id: vId,
+          fullName: u?.fullName || 'User',
+          username: u?.username || '',
+          avatarUrl: u?.avatarUrl || null,
+        };
+      });
+
+      return {
+        id: opt.id ?? String(idx),
+        optionIndex: idx,
+        optionText: opt.text,
+        votesCount: voterList.length,
+        voters: voterList,
+      };
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        messageId: message.id,
+        pollQuestion: message.poll.question || 'Poll',
+        totalVotes: allVoterIds.length,
+        options,
+      },
+    });
+  } catch (error) {
+    console.error('Get message poll voters error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch message poll voters' });
+  }
+};
+
 export const clearConversation = async (
   req: AuthenticatedRequest,
   res: Response
@@ -1048,7 +1129,7 @@ export const getConversationMedia = async (
     );
 
     const isPhoto = (m: Message) =>
-      m.messageType === 'image' || (!!m.mediaUrl && !['video', 'document', 'audio', 'voice'].includes(m.messageType));
+      m.messageType === 'image' || (!!m.mediaUrl && !['video', 'document', 'audio', 'voice', 'reel', 'post'].includes(m.messageType));
     const isVideo = (m: Message) => m.messageType === 'video';
     const isDoc = (m: Message) => m.messageType === 'document' || (!!m.fileName && !isPhoto(m) && !isVideo(m));
     const isAudio = (m: Message) => m.messageType === 'audio' || m.messageType === 'voice' || !!m.audioUrl;

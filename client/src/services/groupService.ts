@@ -1,5 +1,6 @@
 import api from './api';
 import type { StoryMessageData, MessageReactionItem } from './messageService';
+import type { PollVotersData } from './postService';
 
 export interface GroupMemberUser {
   id: string;
@@ -219,6 +220,16 @@ export const groupService = {
       { optionId }
     );
     return response.data.message;
+  },
+
+  async getPollVoters(
+    groupId: string,
+    messageId: string
+  ): Promise<PollVotersData> {
+    const response = await api.get<{ status: string; data: PollVotersData }>(
+      `/groups/${encodeURIComponent(groupId)}/messages/${encodeURIComponent(messageId)}/poll/voters`
+    );
+    return response.data.data;
   },
 
   async clearGroupChat(groupId: string): Promise<void> {

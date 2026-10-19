@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   HiHeart,
@@ -21,13 +21,22 @@ import {
   HiCheck,
   HiOutlineFolder,
 } from 'react-icons/hi2';
-import postService, { type Post, type PostComment, type PollOptionItem } from '../services/postService';
+import postService, {
+  type Post,
+  type PostComment,
+  type PollOptionItem,
+  type PostReactionItem,
+} from '../services/postService';
 import collectionService, { type BookmarkCollection } from '../services/collectionService';
 import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
 import MediaViewerModal from './MediaViewerModal';
 import SaveToCollectionModal from './SaveToCollectionModal';
 import SharePostModal from './SharePostModal';
+import PostReactionPicker from './PostReactionPicker';
+import PostReactionsModal from './PostReactionsModal';
+import PollVotersModal from './PollVotersModal';
+import Avatar from './Avatar';
 import getSocket from '../services/socket';
 
 interface PostCardProps {
@@ -74,8 +83,6 @@ function RecursiveCommentItem({
   // Find all direct children of this comment
   const childReplies = allComments.filter((c) => c.parentId === comment.id);
 
-  const authorInitial =
-    comment.user?.fullName?.[0] || comment.user?.username?.[0] || 'U';
   const canDelete =
     currentUser?.id === comment.userId || currentUser?.id === postAuthorId;
 
@@ -106,17 +113,12 @@ function RecursiveCommentItem({
     <div className={`mt-2.5 ${indentClass}`}>
       <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-slate-300 transition-colors group">
         <Link to={`/profile/${comment.user?.username}`} className="shrink-0">
-          {comment.user?.avatarUrl ? (
-            <img
-              src={comment.user.avatarUrl}
-              alt={comment.user.fullName}
-              className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-200"
-            />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center">
-              {authorInitial}
-            </div>
-          )}
+          <Avatar
+            src={comment.user?.avatarUrl}
+            name={comment.user?.fullName || comment.user?.username}
+            size="w-8 h-8"
+            className="ring-1 ring-slate-200"
+          />
         </Link>
 
         <div className="flex-1 min-w-0">
@@ -282,6 +284,54 @@ export default function PostCard({
   // Post states
   const [isLiked, setIsLiked] = useState(Boolean(post.isLiked));
   const [likesCount, setLikesCount] = useState(post.likesCount || 0);
+  const [reactions, setReactions] = useState<PostReactionItem[]>(post.reactions || []);
+  const [userReaction, setUserReaction] = useState<string | null>(
+    post.userReaction || (post.isLiked ? '❤️' : null)
+  );
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
+  const [showReactionsModal, setShowReactionsModal] = useState(false);
+  const reactionHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (post.reactions !== undefined) {
+      setReactions(post.reactions || []);
+    }
+    if (post.userReaction !== undefined) {
+      setUserReaction(post.userReaction);
+    } else if (post.isLiked) {
+      setUserReaction('❤️');
+    } else {
+      setUserReaction(null);
+    }
+    if (post.likesCount !== undefined) {
+      setLikesCount(post.likesCount);
+    }
+    if (post.isLiked !== undefined) {
+      setIsLiked(Boolean(post.isLiked));
+    }
+  }, [post.reactions, post.userReaction, post.likesCount, post.isLiked]);
+
+  // Group reactions per emoji with counts and whether current user has reacted
+  const groupedReactions = useMemo(() => {
+    if (!reactions || reactions.length === 0) return [];
+    const map = new Map<string, { count: number; hasReacted: boolean }>();
+    reactions.forEach((r) => {
+      const current = map.get(r.emoji) || { count: 0, hasReacted: false };
+      current.count += 1;
+      if (r.userId === currentUser?.id) {
+        current.hasReacted = true;
+      }
+      map.set(r.emoji, current);
+    });
+
+    return Array.from(map.entries()).map(([emoji, data]) => ({
+      emoji,
+      count: data.count,
+      hasReacted: data.hasReacted,
+    }));
+  }, [reactions, currentUser?.id]);
+
   const [isBookmarked, setIsBookmarked] = useState(Boolean(post.isBookmarked));
   const [bookmarksCount, setBookmarksCount] = useState(post.bookmarksCount || 0);
   const [sharesCount, setSharesCount] = useState<number>(post.sharesCount || 0);
@@ -373,6 +423,12 @@ export default function PostCard({
     post.userVotedOption !== undefined ? post.userVotedOption : null
   );
   const [isVoting, setIsVoting] = useState(false);
+  const [showPollVotersModal, setShowPollVotersModal] = useState(false);
+
+  const isPollCreator = Boolean(
+    currentUser?.id &&
+      (currentUser.id === post.userId || currentUser.id === post.user?.id)
+  );
 
   const [prevPostPollId, setPrevPostPollId] = useState(post.id);
   if (prevPostPollId !== post.id) {
@@ -403,6 +459,66 @@ export default function PostCard({
       socket.off('post_poll_voted', handlePollVoted);
     };
   }, [post.id, currentUser?.id]);
+
+  // Real-time socket listener for post reactions and likes
+  useEffect(() => {
+    const socket = getSocket();
+
+    const handleReactionUpdated = (data: {
+      postId: string;
+      reactions: PostReactionItem[];
+      likesCount: number;
+      userId?: string;
+      userReaction?: string | null;
+    }) => {
+      if (data.postId === post.id) {
+        setReactions(data.reactions || []);
+        setLikesCount(data.likesCount);
+        if (data.userId === currentUser?.id) {
+          setUserReaction(data.userReaction ?? null);
+          setIsLiked(Boolean(data.userReaction));
+        } else {
+          const myR = data.reactions?.find((r) => r.userId === currentUser?.id);
+          if (myR) {
+            setUserReaction(myR.emoji);
+            setIsLiked(true);
+          } else if (currentUser?.id) {
+            // Check if current user was removed
+            const wasInReactions = reactions.some((r) => r.userId === currentUser.id);
+            if (wasInReactions && !data.reactions?.some((r) => r.userId === currentUser.id)) {
+              setUserReaction(null);
+              setIsLiked(false);
+            }
+          }
+        }
+      }
+    };
+
+    const handlePostLiked = (data: {
+      postId: string;
+      userId: string;
+      likesCount: number;
+      isLiked: boolean;
+    }) => {
+      if (data.postId === post.id) {
+        setLikesCount(data.likesCount);
+        if (data.userId === currentUser?.id) {
+          setIsLiked(data.isLiked);
+          if (!data.isLiked) {
+            setUserReaction(null);
+          }
+        }
+      }
+    };
+
+    socket.on('post_reaction_updated', handleReactionUpdated);
+    socket.on('post_liked', handlePostLiked);
+
+    return () => {
+      socket.off('post_reaction_updated', handleReactionUpdated);
+      socket.off('post_liked', handlePostLiked);
+    };
+  }, [post.id, currentUser?.id, reactions]);
 
   // Poll Expiration Timer Live Countdown
   const [isPollExpired, setIsPollExpired] = useState<boolean>(() => {
@@ -544,7 +660,6 @@ export default function PostCard({
   };
 
   const isAuthor = currentUser?.id === post.userId;
-  const authorInitial = post.user?.fullName?.[0] || post.user?.username?.[0] || 'U';
 
   const formatTime = (dateStr: string) => {
     try {
@@ -566,6 +681,68 @@ export default function PostCard({
     }
   };
 
+  const handleToggleReaction = async (emoji: string) => {
+    if (!currentUser) {
+      notify('Please log in to react to this echo', 'info');
+      navigate('/login');
+      return;
+    }
+
+    const prevReactions = [...reactions];
+    const prevUserReaction = userReaction;
+    const prevLikesCount = likesCount;
+    const prevIsLiked = isLiked;
+
+    // Optimistic update
+    let nextUserReaction: string | null = null;
+    let nextReactions = [...reactions];
+    const existingIdx = nextReactions.findIndex((r) => r.userId === currentUser.id);
+
+    if (existingIdx >= 0) {
+      if (nextReactions[existingIdx].emoji === emoji) {
+        // Toggle off
+        nextReactions.splice(existingIdx, 1);
+        nextUserReaction = null;
+      } else {
+        // Change emoji
+        nextReactions[existingIdx] = {
+          ...nextReactions[existingIdx],
+          emoji,
+        };
+        nextUserReaction = emoji;
+      }
+    } else {
+      nextReactions.push({
+        emoji,
+        userId: currentUser.id,
+        fullName: currentUser.fullName || currentUser.username,
+        username: currentUser.username,
+        avatarUrl: currentUser.avatarUrl,
+        createdAt: new Date().toISOString(),
+      });
+      nextUserReaction = emoji;
+    }
+
+    setReactions(nextReactions);
+    setUserReaction(nextUserReaction);
+    setIsLiked(Boolean(nextUserReaction));
+    setLikesCount(nextReactions.length);
+
+    try {
+      const res = await postService.toggleReaction(post.id, emoji);
+      setReactions(res.reactions || []);
+      setUserReaction(res.userReaction ?? null);
+      setIsLiked(res.isLiked);
+      setLikesCount(res.likesCount);
+    } catch {
+      setReactions(prevReactions);
+      setUserReaction(prevUserReaction);
+      setIsLiked(prevIsLiked);
+      setLikesCount(prevLikesCount);
+      notify('Failed to update reaction', 'error');
+    }
+  };
+
   const handleToggleLike = async () => {
     if (!currentUser) {
       notify('Please log in to like this echo', 'info');
@@ -573,19 +750,10 @@ export default function PostCard({
       return;
     }
 
-    const nextState = !isLiked;
-    setIsLiked(nextState);
-    setLikesCount((prev) => (nextState ? prev + 1 : Math.max(0, prev - 1)));
-
-    try {
-      const res = await postService.toggleLike(post.id);
-      setIsLiked(res.isLiked);
-      setLikesCount(res.likesCount);
-    } catch {
-      setIsLiked(!nextState);
-      setLikesCount((prev) => (!nextState ? prev + 1 : Math.max(0, prev - 1)));
-      notify('Failed to update like status', 'error');
-    }
+    // If user already reacted with any emoji, clicking the like button removes it (toggle off)
+    // If user has not reacted, clicking it reacts with '❤️'
+    const targetEmoji = userReaction ? userReaction : '❤️';
+    await handleToggleReaction(targetEmoji);
   };
 
   const handleToggleBookmark = async () => {
@@ -855,17 +1023,12 @@ export default function PostCard({
               to={`/profile/${post.user?.username}`}
               className="shrink-0 group block"
             >
-              {post.user?.avatarUrl ? (
-                <img
-                  src={post.user.avatarUrl}
-                  alt={post.user.fullName}
-                  className="w-10 h-10 rounded-full object-cover ring-1 ring-slate-200 group-hover:ring-slate-400 transition-all"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0 group-hover:bg-slate-800 transition-colors">
-                  {authorInitial}
-                </div>
-              )}
+              <Avatar
+                src={post.user?.avatarUrl}
+                name={post.user?.fullName || post.user?.username}
+                size="w-10 h-10"
+                className="ring-1 ring-slate-200 group-hover:ring-slate-400 transition-all"
+              />
             </Link>
 
             <div>
@@ -1212,9 +1375,20 @@ export default function PostCard({
                 const totalVotes = pollOptions.reduce((sum, opt) => sum + (opt.votes || 0), 0);
                 return (
                   <>
-                    <span>
-                      {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+                      </span>
+                      {isPollCreator && totalVotes > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowPollVotersModal(true)}
+                          className="px-2 py-0.5 text-[10px] font-bold text-purple-700 bg-purple-100 hover:bg-purple-200/90 rounded-md transition-colors cursor-pointer"
+                        >
+                          View votes
+                        </button>
+                      )}
+                    </div>
                     <span>
                       {isPollExpired
                         ? 'Poll closed · Final results'
@@ -1229,26 +1403,111 @@ export default function PostCard({
           </div>
         )}
 
-        {/* Engagement Actions Row */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-slate-600 text-xs sm:text-sm font-semibold">
-          {/* Like */}
-          <button
-            type="button"
-            onClick={handleToggleLike}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
-              isLiked
-                ? 'text-rose-600 bg-rose-50'
-                : 'hover:text-rose-600 hover:bg-slate-100'
-            }`}
-            title="Like"
-          >
-            {isLiked ? (
-              <HiHeart className="w-5 h-5 text-rose-600 scale-110 transition-transform" />
+        {/* Post Stats & Reactions Summary Row (Modern Clean Social Standard) */}
+        {(reactions.length > 0 || (commentsCount || 0) > 0) && (
+          <div className="flex items-center justify-between pb-2.5 px-0.5 text-xs text-slate-500 font-medium select-none">
+            {/* Left: Overlapping reaction emoji badges + count */}
+            {reactions.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowReactionsModal(true)}
+                className="flex items-center gap-1.5 hover:text-purple-600 transition-colors cursor-pointer group"
+                title="View who reacted"
+              >
+                <div className="flex items-center -space-x-1">
+                  {groupedReactions.slice(0, 3).map(({ emoji }, i) => (
+                    <span
+                      key={emoji}
+                      style={{ zIndex: 3 - i }}
+                      className="w-5 h-5 rounded-full bg-slate-100 ring-2 ring-white flex items-center justify-center text-xs shadow-2xs transform transition-transform group-hover:scale-110"
+                    >
+                      {emoji}
+                    </span>
+                  ))}
+                </div>
+                <span className="font-semibold text-slate-600 group-hover:text-purple-600 text-xs">
+                  {reactions.length} {reactions.length === 1 ? 'reaction' : 'reactions'}
+                </span>
+              </button>
             ) : (
-              <HiOutlineHeart className="w-5 h-5" />
+              <div />
             )}
-            <span>{likesCount}</span>
-          </button>
+
+            {/* Right: Comments count */}
+            {(commentsCount || 0) > 0 && (
+              <button
+                type="button"
+                onClick={toggleComments}
+                className="hover:text-purple-600 transition-colors cursor-pointer ml-auto text-xs font-semibold text-slate-400 hover:text-slate-600"
+              >
+                {commentsCount} {commentsCount === 1 ? 'comment' : 'comments'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Engagement Actions Row */}
+        <div className="flex items-center justify-between pt-2.5 border-t border-slate-100 text-slate-600 text-xs sm:text-sm font-semibold">
+          {/* Like / React Button with Floating Quick Bar + Full Emoji Picker */}
+          <div
+            className="relative flex items-center"
+            onMouseEnter={() => {
+              reactionHoverTimeoutRef.current = setTimeout(() => {
+                setShowReactionPicker(true);
+              }, 280);
+            }}
+            onMouseLeave={() => {
+              if (reactionHoverTimeoutRef.current) {
+                clearTimeout(reactionHoverTimeoutRef.current);
+              }
+            }}
+          >
+            {showReactionPicker && (
+              <PostReactionPicker
+                userCurrentReaction={userReaction}
+                onSelectEmoji={(emoji) => {
+                  handleToggleReaction(emoji);
+                  setShowReactionPicker(false);
+                }}
+                onClose={() => setShowReactionPicker(false)}
+                align="left"
+              />
+            )}
+
+            <button
+              type="button"
+              onClick={handleToggleLike}
+              onTouchStart={() => {
+                longPressTimeoutRef.current = setTimeout(() => {
+                  setShowReactionPicker(true);
+                }, 350);
+              }}
+              onTouchEnd={() => {
+                if (longPressTimeoutRef.current) {
+                  clearTimeout(longPressTimeoutRef.current);
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer select-none active:scale-95 ${
+                userReaction
+                  ? userReaction === '❤️'
+                    ? 'text-rose-600 bg-rose-50 font-bold'
+                    : 'text-purple-700 bg-purple-50 font-bold border border-purple-200/60'
+                  : 'hover:text-rose-600 hover:bg-slate-100'
+              }`}
+              title={userReaction ? `Reacted ${userReaction} (Click to remove, hover to change)` : 'Like or react'}
+            >
+              {userReaction ? (
+                userReaction === '❤️' ? (
+                  <HiHeart className="w-5 h-5 text-rose-600 scale-110 transition-transform" />
+                ) : (
+                  <span className="text-base leading-none scale-110 drop-shadow-2xs">{userReaction}</span>
+                )
+              ) : (
+                <HiOutlineHeart className="w-5 h-5" />
+              )}
+              <span>{userReaction ? (userReaction === '❤️' ? 'Liked' : 'Reacted') : 'Like'}</span>
+            </button>
+          </div>
 
           {/* Comment */}
           <button
@@ -1398,6 +1657,28 @@ export default function PostCard({
           onClose={() => setIsShareModalOpen(false)}
           currentUser={currentUser}
           onShareSuccess={handleShareSuccess}
+        />
+      )}
+
+      {/* Post Reactions Details Modal */}
+      {showReactionsModal && (
+        <PostReactionsModal
+          isOpen={showReactionsModal}
+          onClose={() => setShowReactionsModal(false)}
+          reactions={reactions}
+          currentUserId={currentUser?.id}
+          onToggleReaction={handleToggleReaction}
+          onOpenPicker={() => setShowReactionPicker(true)}
+        />
+      )}
+
+      {/* Poll Voters Modal (Creator only) */}
+      {showPollVotersModal && (
+        <PollVotersModal
+          isOpen={showPollVotersModal}
+          onClose={() => setShowPollVotersModal(false)}
+          question={post.content}
+          loadVoters={() => postService.getPollVoters(post.id)}
         />
       )}
     </>

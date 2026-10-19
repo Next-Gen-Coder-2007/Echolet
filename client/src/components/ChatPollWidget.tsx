@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HiOutlineCheckCircle, HiOutlineClock } from 'react-icons/hi2';
+import { HiOutlineCheckCircle, HiOutlineClock, HiOutlineChartBar } from 'react-icons/hi2';
 
 export interface PollOption {
   id: string;
@@ -15,6 +15,8 @@ interface ChatPollWidgetProps {
   currentUserId?: string;
   onVote: (optionId: string) => void | Promise<void>;
   isMe?: boolean;
+  canViewVoters?: boolean;
+  onViewVoters?: () => void;
 }
 
 export const ChatPollWidget: React.FC<ChatPollWidgetProps> = ({
@@ -25,6 +27,8 @@ export const ChatPollWidget: React.FC<ChatPollWidgetProps> = ({
   currentUserId,
   onVote,
   isMe = false,
+  canViewVoters,
+  onViewVoters,
 }) => {
   const [votingId, setVotingId] = useState<string | null>(null);
 
@@ -143,8 +147,13 @@ export const ChatPollWidget: React.FC<ChatPollWidgetProps> = ({
     <div className="flex flex-col gap-2.5 w-full min-w-[220px] max-w-sm py-1 select-none">
       {/* Question & Timer Badge */}
       <div className="flex items-start justify-between gap-2">
-        <span className={`text-sm font-bold tracking-tight leading-snug ${isMe ? 'text-white' : 'text-slate-900'}`}>
-          📊 {question}
+        <span className={`text-sm font-bold tracking-tight leading-snug flex items-center gap-1.5 ${isMe ? 'text-white' : 'text-slate-900'}`}>
+          <span className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
+            isMe ? 'bg-white/20 text-white' : 'bg-purple-600 text-white shadow-2xs'
+          }`}>
+            <HiOutlineChartBar className="w-3.5 h-3.5 stroke-[2.2]" />
+          </span>
+          <span>{question}</span>
         </span>
         {isExpired ? (
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
@@ -246,10 +255,28 @@ export const ChatPollWidget: React.FC<ChatPollWidgetProps> = ({
       </div>
 
       {/* Footer Info */}
-      <div className={`flex items-center justify-between text-[11px] font-medium pt-0.5 ${
-        isMe ? 'text-slate-300' : 'text-slate-400'
+      <div className={`flex items-center justify-between text-[11px] font-medium pt-1 border-t ${
+        isMe ? 'border-white/10 text-slate-300' : 'border-slate-100 text-slate-400'
       }`}>
-        <span>{totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}</span>
+        <div className="flex items-center gap-2">
+          <span>{totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}</span>
+          {(canViewVoters ?? isMe) && totalVotes > 0 && onViewVoters && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewVoters();
+              }}
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors cursor-pointer ${
+                isMe
+                  ? 'bg-white/20 text-white hover:bg-white/30'
+                  : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/60'
+              }`}
+            >
+              View votes
+            </button>
+          )}
+        </div>
         <span className="italic">
           {isExpired
             ? 'Poll ended · Final results'
