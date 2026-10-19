@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   searchUsers,
+  getConnections,
   getUserByUsername,
   getUserById,
   getFollowingUsers,
@@ -20,6 +21,7 @@ const router = Router();
 
 router.put('/profile', authMiddleware, updateProfile);
 router.get('/search', authMiddleware, searchUsers);
+router.get('/connections', authMiddleware, getConnections);
 router.get('/following', authMiddleware, getFollowingUsers);
 router.get('/follow-requests/pending', authMiddleware, getPendingFollowRequests);
 router.post('/follow-requests/:requestId/accept', authMiddleware, acceptFollowRequest);

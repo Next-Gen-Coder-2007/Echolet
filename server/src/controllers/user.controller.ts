@@ -379,6 +379,116 @@ export const getFollowingUsers = async (req: AuthenticatedRequest, res: Response
   }
 };
 
+/**
+ * Get all connected users (people we followed OR our followers)
+ */
+export const getConnections = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const currentUserId = req.user?.id;
+    if (!currentUserId) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const rawQuery = (req.query.q as string) || '';
+    const query = rawQuery.trim().toLowerCase();
+
+    const followRepository = AppDataSource.getRepository(Follow);
+
+    // Fetch people we follow AND our followers in parallel
+    const [followingRows, followerRows] = await Promise.all([
+      followRepository.find({
+        where: { followerId: currentUserId },
+        relations: { following: true },
+        order: { createdAt: 'DESC' },
+      }),
+      followRepository.find({
+        where: { followingId: currentUserId },
+        relations: { follower: true },
+        order: { createdAt: 'DESC' },
+      }),
+    ]);
+
+    const followingIdSet = new Set(followingRows.map((f) => f.followingId));
+    const followerIdSet = new Set(followerRows.map((f) => f.followerId));
+
+    const userMap = new Map<
+      string,
+      {
+        id: string;
+        fullName: string;
+        username: string;
+        avatarUrl?: string;
+        bio?: string;
+        isFollowing: boolean;
+        isFollower: boolean;
+      }
+    >();
+
+    for (const f of followingRows) {
+      if (f.following && f.following.id !== currentUserId) {
+        userMap.set(f.following.id, {
+          id: f.following.id,
+          fullName: f.following.fullName,
+          username: f.following.username,
+          avatarUrl: f.following.avatarUrl,
+          bio: f.following.bio,
+          isFollowing: true,
+          isFollower: followerIdSet.has(f.following.id),
+        });
+      }
+    }
+
+    for (const f of followerRows) {
+      if (f.follower && f.follower.id !== currentUserId) {
+        if (!userMap.has(f.follower.id)) {
+          userMap.set(f.follower.id, {
+            id: f.follower.id,
+            fullName: f.follower.fullName,
+            username: f.follower.username,
+            avatarUrl: f.follower.avatarUrl,
+            bio: f.follower.bio,
+            isFollowing: followingIdSet.has(f.follower.id),
+            isFollower: true,
+          });
+        }
+      }
+    }
+
+    let connectedUsers = Array.from(userMap.values());
+
+    if (query) {
+      connectedUsers = connectedUsers.filter(
+        (u) =>
+          u.username.toLowerCase().includes(query) ||
+          (u.fullName && u.fullName.toLowerCase().includes(query))
+      );
+    }
+
+    connectedUsers.sort((a, b) => {
+      const aMutual = a.isFollowing && a.isFollower ? 1 : 0;
+      const bMutual = b.isFollowing && b.isFollower ? 1 : 0;
+      if (aMutual !== bMutual) return bMutual - aMutual;
+      return (a.fullName || a.username).localeCompare(b.fullName || b.username);
+    });
+
+    res.json({
+      status: 'success',
+      users: connectedUsers,
+      totalCount: connectedUsers.length,
+    });
+  } catch (error) {
+    console.error('Get connections error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch connections',
+    });
+  }
+};
+
 export const getUserFollowers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const rawUsername = Array.isArray(req.params.username)

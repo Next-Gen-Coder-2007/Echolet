@@ -1,4 +1,5 @@
 import React from 'react';
+import Avatar from './Avatar';
 import { useVoiceCall } from '../context/CallContext';
 import {
   HiOutlinePhone,
@@ -40,7 +41,6 @@ export const VoiceCallModal: React.FC = () => {
   };
 
   const peerName = activePeer.fullName || activePeer.username || 'User';
-  const peerInitials = (peerName[0] || 'U').toUpperCase();
 
   // =========================================================================
   // 1. MINIMIZED FLOATING PILL (Docked bottom-right during active or ringing call)
@@ -54,17 +54,12 @@ export const VoiceCallModal: React.FC = () => {
       >
         <div className="relative">
           <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-            {activePeer.avatarUrl ? (
-              <img
-                src={activePeer.avatarUrl}
-                alt={peerName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center font-bold text-slate-700 text-sm bg-gradient-to-tr from-indigo-100 to-purple-100">
-                {peerInitials}
-              </div>
-            )}
+            <Avatar
+              src={activePeer.avatarUrl}
+              name={peerName}
+              size="full"
+              fallbackClassName="font-bold text-slate-700 text-sm bg-gradient-to-tr from-indigo-100 to-purple-100"
+            />
           </div>
           {callState === 'connected' && (
             <span
@@ -167,17 +162,12 @@ export const VoiceCallModal: React.FC = () => {
             <span className="absolute -inset-2 rounded-full border border-emerald-400/30 animate-pulse duration-700" />
 
             <div className="w-24 h-24 rounded-full overflow-hidden bg-slate-100 border-4 border-white shadow-xl relative z-10">
-              {activePeer.avatarUrl ? (
-                <img
-                  src={activePeer.avatarUrl}
-                  alt={peerName}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center font-bold text-2xl text-emerald-800 bg-gradient-to-tr from-emerald-100 via-teal-100 to-indigo-100">
-                  {peerInitials}
-                </div>
-              )}
+              <Avatar
+                src={activePeer.avatarUrl}
+                name={peerName}
+                size="full"
+                fallbackClassName="font-bold text-2xl text-emerald-800 bg-gradient-to-tr from-emerald-100 via-teal-100 to-indigo-100"
+              />
             </div>
 
             <span className="absolute bottom-1 right-2 z-20 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md animate-bounce">
@@ -288,17 +278,12 @@ export const VoiceCallModal: React.FC = () => {
           )}
 
           <div className="w-28 h-28 rounded-full overflow-hidden bg-slate-100 border-4 border-white shadow-xl relative z-10">
-            {activePeer.avatarUrl ? (
-              <img
-                src={activePeer.avatarUrl}
-                alt={peerName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center font-black text-3xl text-slate-700 bg-gradient-to-tr from-slate-100 via-indigo-50 to-purple-100">
-                {peerInitials}
-              </div>
-            )}
+            <Avatar
+              src={activePeer.avatarUrl}
+              name={peerName}
+              size="full"
+              fallbackClassName="font-black text-3xl text-slate-700 bg-gradient-to-tr from-slate-100 via-indigo-50 to-purple-100"
+            />
           </div>
 
           {callState === 'connected' && (

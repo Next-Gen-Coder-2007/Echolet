@@ -48,12 +48,36 @@ export interface FollowUserItem {
   isFollowedBy?: boolean;
 }
 
+export interface ConnectedUser {
+  id: string;
+  fullName?: string;
+  username: string;
+  avatarUrl?: string;
+  bio?: string;
+  isFollowing: boolean;
+  isFollower: boolean;
+  isMutual?: boolean;
+  isFollowedBy?: boolean;
+}
+
 export const userService = {
   async searchUsers(query: string): Promise<UserProfileResponse[]> {
     const response = await api.get<{ status: string; users: UserProfileResponse[] }>(
       `/users/search?q=${encodeURIComponent(query)}`
     );
     return response.data.users || [];
+  },
+
+  async getConnections(query?: string): Promise<ConnectedUser[]> {
+    const q = query ? `?q=${encodeURIComponent(query)}` : '';
+    const response = await api.get<{ status: string; users: ConnectedUser[] }>(
+      `/users/connections${q}`
+    );
+    return (response.data.users || []).map((u) => ({
+      ...u,
+      isMutual: u.isMutual ?? Boolean(u.isFollowing && u.isFollower),
+      isFollowedBy: u.isFollowedBy ?? Boolean(u.isFollower),
+    }));
   },
 
   async getFollowing(): Promise<UserProfileResponse[]> {
