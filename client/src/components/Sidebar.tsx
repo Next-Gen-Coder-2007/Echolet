@@ -168,7 +168,7 @@ export default function Sidebar({
   return (
     <aside
       aria-label="Sidebar Navigation"
-      className="fixed left-4 sm:left-6 top-1/2 -translate-y-1/2 z-40 w-16 sm:w-18 h-[640px] max-h-[94vh] bg-white rounded-3xl border border-slate-200 shadow-md flex flex-col items-center justify-between py-6 px-2 select-none"
+      className="hidden md:flex fixed left-4 sm:left-6 top-1/2 -translate-y-1/2 z-40 w-16 sm:w-18 h-[640px] max-h-[94vh] bg-white rounded-3xl border border-slate-200 shadow-md flex-col items-center justify-between py-6 px-2 select-none"
     >
       {/* Top Nav Items with Dynamic Sliding Indicator */}
       <div className="relative flex flex-col items-center gap-2 sm:gap-2.5 w-full">
