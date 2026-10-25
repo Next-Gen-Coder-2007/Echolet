@@ -899,8 +899,8 @@ export default function ConversationDetailsView({
       className="flex-1 min-h-0 w-full h-full flex flex-col bg-slate-50/70 overflow-hidden select-auto"
     >
       {/* Dedicated Header Bar */}
-      <header className="h-16 px-4 sm:px-6 border-b border-slate-200/80 bg-white/95 backdrop-blur-sm flex items-center justify-between shrink-0 shadow-xs z-10">
-        <div className="flex items-center gap-3">
+      <header className="h-14 sm:h-16 px-3 sm:px-6 border-b border-slate-200/80 bg-white/95 backdrop-blur-sm flex items-center justify-between shrink-0 shadow-xs z-10">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={onBack}
@@ -908,7 +908,7 @@ export default function ConversationDetailsView({
             title="Back to conversation"
           >
             <HiOutlineArrowLeft className="w-5 h-5 stroke-[2.2]" />
-            <span className="text-xs sm:text-sm font-bold">Back to Chat</span>
+            <span className="hidden sm:inline text-xs sm:text-sm font-bold">Back to Chat</span>
           </button>
         </div>
 
@@ -921,12 +921,12 @@ export default function ConversationDetailsView({
           </p>
         </div>
 
-        <div className="w-20 flex justify-end">
+        <div className="w-16 sm:w-20 flex justify-end">
           {!isGroup && activeUsername && (
             <button
               type="button"
               onClick={() => navigate(`/profile/${activeUsername}`)}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+              className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
             >
               Profile
             </button>
@@ -941,7 +941,7 @@ export default function ConversationDetailsView({
         className="flex-1 min-h-0 w-full overflow-y-auto overscroll-contain touch-pan-y"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        <div className="max-w-3xl w-full mx-auto p-4 sm:p-6 space-y-6 pb-28">
+        <div className="max-w-3xl w-full mx-auto p-3.5 sm:p-6 space-y-4 sm:space-y-6 pb-20 sm:pb-28">
         {/* ========================================================================= */}
         {/* 1. HERO OVERVIEW PROFILE CARD */}
         {/* ========================================================================= */}

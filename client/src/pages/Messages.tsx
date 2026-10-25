@@ -637,11 +637,11 @@ const VoiceRecorderBar: React.FC<{
   };
 
   return (
-    <div className="p-3 sm:p-4 border-t border-slate-100 bg-white shrink-0 relative animate-in fade-in duration-150">
-      <div className="h-12 w-full px-3.5 sm:px-4 bg-slate-50/90 border border-slate-200/90 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
+    <div className="p-2.5 sm:p-4 border-t border-slate-100 bg-white shrink-0 relative animate-in fade-in duration-150 pb-[calc(0.625rem+env(safe-area-inset-bottom,0px))] sm:pb-4">
+      <div className="h-12 w-full px-2.5 sm:px-4 bg-slate-50/90 border border-slate-200/90 rounded-2xl flex items-center justify-between gap-1.5 sm:gap-3 shadow-2xs">
         {/* Recording status & Elapsed Timer */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200/80 text-rose-600 text-[10px] font-bold tracking-wider uppercase select-none">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-rose-50 border border-rose-200/80 text-rose-600 text-[10px] font-bold tracking-wider uppercase select-none">
             <span
               className={`w-2 h-2 rounded-full bg-rose-500 ${
                 isPaused ? 'opacity-50' : 'animate-ping'
@@ -655,7 +655,7 @@ const VoiceRecorderBar: React.FC<{
         </div>
 
         {/* Live Audio Visualizer Frequency Bars */}
-        <div className="flex-1 max-w-[200px] sm:max-w-[280px] h-6 flex items-center justify-center gap-[3px] px-2 overflow-hidden select-none">
+        <div className="flex-1 min-w-0 max-w-[120px] sm:max-w-[280px] h-6 flex items-center justify-center gap-[2px] sm:gap-[3px] px-1 sm:px-2 overflow-hidden select-none">
           {frequencyData.map((heightPct, idx) => (
             <div
               key={idx}
@@ -993,19 +993,19 @@ const MultiSelectActionBar: React.FC<{
   onDelete,
 }) => {
   return (
-    <div className="px-4 py-3 border-b border-purple-100 bg-linear-to-r from-purple-50/90 via-white to-purple-50/90 flex items-center justify-between shrink-0 shadow-xs animate-in slide-in-from-top-2 duration-200">
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+    <div className="px-2.5 sm:px-4 py-2 sm:py-3 border-b border-purple-100 bg-linear-to-r from-purple-50/90 via-white to-purple-50/90 flex items-center justify-between shrink-0 shadow-xs animate-in slide-in-from-top-2 duration-200">
+      <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
         <button
           type="button"
           onClick={onClear}
-          className="p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+          className="p-1 sm:p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
           title="Exit selection mode"
         >
           <HiOutlineXMark className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded-full bg-purple-600 text-white text-xs font-bold shadow-2xs">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="px-2 py-0.5 rounded-full bg-purple-600 text-white text-xs font-bold shadow-2xs">
             {selectedCount}
           </span>
           <span className="text-xs sm:text-sm font-semibold text-slate-800 hidden sm:inline">
@@ -1020,7 +1020,7 @@ const MultiSelectActionBar: React.FC<{
           onClick={onToggleSelectAll}
           className="text-xs font-semibold text-purple-600 hover:text-purple-800 hover:underline cursor-pointer transition-colors"
         >
-          {isAllSelected ? 'Deselect all' : 'Select all'}
+          {isAllSelected ? 'Deselect' : 'Select all'}
         </button>
       </div>
 
@@ -1031,7 +1031,7 @@ const MultiSelectActionBar: React.FC<{
             type="button"
             disabled={selectedCount === 0}
             onClick={onStar}
-            className="p-2 sm:px-3 sm:py-1.5 rounded-xl border border-amber-200 bg-amber-50/80 hover:bg-amber-100 text-amber-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
+            className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-amber-200 bg-amber-50/80 hover:bg-amber-100 text-amber-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs"
             title="Star selected messages"
           >
             <HiStar className="w-4 h-4 text-amber-500" />
@@ -1044,7 +1044,7 @@ const MultiSelectActionBar: React.FC<{
           type="button"
           disabled={selectedCount === 0}
           onClick={onCopy}
-          className="p-2 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs hover:border-slate-300"
+          className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs hover:border-slate-300"
           title="Copy selected messages"
         >
           <HiOutlineClipboardDocument className="w-4 h-4 text-purple-600" />
@@ -1056,7 +1056,7 @@ const MultiSelectActionBar: React.FC<{
           type="button"
           disabled={selectedCount === 0}
           onClick={onForward}
-          className="p-2 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs hover:border-slate-300"
+          className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs hover:border-slate-300"
           title="Forward selected messages"
         >
           <HiOutlineArrowUturnRight className="w-4 h-4 text-blue-600" />
@@ -1068,7 +1068,7 @@ const MultiSelectActionBar: React.FC<{
           type="button"
           disabled={selectedCount === 0}
           onClick={onExport}
-          className="p-2 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs hover:border-slate-300"
+          className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5 text-xs font-semibold shadow-2xs hover:border-slate-300"
           title="Export selected messages"
         >
           <HiOutlineArrowDownTray className="w-4 h-4 text-emerald-600" />
@@ -1080,7 +1080,7 @@ const MultiSelectActionBar: React.FC<{
           type="button"
           disabled={selectedCount === 0}
           onClick={onDelete}
-          className="p-2 sm:px-3 sm:py-1.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100/70 text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-2xs"
+          className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100/70 text-rose-600 hover:text-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-2xs"
           title="Delete selected messages"
         >
           <HiOutlineTrash className="w-4 h-4" />
@@ -2348,6 +2348,7 @@ export default function Messages() {
       // 3. No active chat
       setActiveUser(null);
       setActiveGroup(null);
+      setIsGlobalActive(false);
       setMessages([]);
       setGroupMessages([]);
     }
@@ -3743,10 +3744,10 @@ export default function Messages() {
   const hasActiveChat = Boolean(activeUser || activeGroup || isGlobalActive);
 
   return (
-    <div className="w-full h-[calc(100vh-2.5rem)] sm:h-[calc(100vh-3.5rem)] min-h-[580px] flex gap-4 select-none relative">
+    <div className="w-full h-[calc(100dvh-10.5rem)] md:h-[calc(100vh-3.5rem)] md:min-h-[580px] flex gap-4 select-none relative">
       {/* Left Pane: Conversations & Groups List */}
       <div
-        className={`w-full md:w-80 lg:w-96 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden shrink-0 h-full ${
+        className={`w-full md:w-80 lg:w-96 bg-white rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden shrink-0 h-full ${
           hasActiveChat ? 'hidden md:flex' : 'flex'
         }`}
       >
@@ -4547,7 +4548,7 @@ export default function Messages() {
       {/* Right Pane: Active Chat Window (Global OR Direct OR Group) */}
       <div
         data-lenis-prevent
-        className={`flex-1 min-w-0 min-h-0 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden h-full ${
+        className={`fixed inset-0 z-50 md:static md:z-auto bg-white flex flex-col w-full h-[100dvh] md:h-full overflow-hidden md:flex-1 md:min-w-0 md:min-h-0 md:rounded-3xl md:border md:border-slate-200 md:shadow-sm ${
           !hasActiveChat ? 'hidden md:flex' : 'flex'
         }`}
       >
@@ -4609,8 +4610,8 @@ export default function Messages() {
                 onDelete={handleDeleteSelected}
               />
             ) : (
-              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-                <div className="flex items-center gap-3 min-w-0">
+              <div className="px-3 sm:px-5 py-2.5 sm:py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   <button
                     onClick={() => {
                       setActiveGroup(null);
@@ -4623,7 +4624,7 @@ export default function Messages() {
 
                   <div
                     onClick={() => setIsViewingChatDetails(true)}
-                    className="flex items-center gap-3 cursor-pointer min-w-0 hover:opacity-90 transition-opacity"
+                    className="flex items-center gap-2.5 sm:gap-3 cursor-pointer min-w-0 hover:opacity-90 transition-opacity"
                   >
                     <GroupAvatar group={activeGroup} size="md" />
 
@@ -4726,7 +4727,7 @@ export default function Messages() {
             <div
               data-lenis-prevent
               onWheel={(e) => e.stopPropagation()}
-              className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-3 bg-slate-50/20 overscroll-contain"
+              className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 space-y-3 bg-slate-50/20 overscroll-contain"
             >
               {deduplicatedGroupMessages.length === 0 ? (
                 <div className="h-full min-h-[160px] flex flex-col items-center justify-center text-center text-slate-400 text-sm p-6">
@@ -5438,14 +5439,14 @@ export default function Messages() {
                 ) : (
                   <form
                     onSubmit={onSend}
-                    className="p-3 sm:p-4 border-t border-slate-100 bg-white flex items-center gap-2 shrink-0 relative"
+                    className="p-2 sm:p-3 md:p-4 border-t border-slate-100 bg-white flex items-center gap-1.5 sm:gap-2 shrink-0 relative pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] sm:pb-3 md:pb-4"
                   >
                     <div className="relative">
                       <button
                         ref={emojiButtonRef}
                         type="button"
                         onClick={() => setShowEmojiPicker((prev) => !prev)}
-                        className={`p-2.5 rounded-full transition-colors ${
+                        className={`p-2 sm:p-2.5 rounded-full transition-colors ${
                           showEmojiPicker
                             ? 'text-purple-600 bg-purple-50'
                             : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
@@ -5457,7 +5458,7 @@ export default function Messages() {
                       {showEmojiPicker && (
                         <div
                           ref={emojiPickerRef}
-                          className="absolute bottom-14 left-0 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200"
+                          className="absolute bottom-14 left-0 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 max-w-[calc(100vw-1.5rem)]"
                         >
                           <EmojiPicker
                             onEmojiClick={handleEmojiClick}
@@ -5482,13 +5483,15 @@ export default function Messages() {
                       onChange={(e) => handleInputChange(e.target.value)}
                       onPaste={handleChatPaste}
                       placeholder={`Message #${activeGroup.name}...`}
-                      className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                      className="flex-1 min-w-0 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
                     />
 
                     <button
                       type="button"
                       onClick={() => setIsRecordingVoice(true)}
-                      className="p-2.5 rounded-full text-slate-500 hover:text-purple-600 hover:bg-purple-50 transition-colors shrink-0 cursor-pointer"
+                      className={`p-2 sm:p-2.5 rounded-full text-slate-500 hover:text-purple-600 hover:bg-purple-50 transition-colors shrink-0 cursor-pointer ${
+                        text.trim() ? 'hidden sm:inline-flex' : 'inline-flex'
+                      }`}
                       title="Record voice note"
                     >
                       <HiOutlineMicrophone className="w-5 h-5" />
@@ -5497,7 +5500,9 @@ export default function Messages() {
                     <button
                       type="submit"
                       disabled={!text.trim() || sending}
-                      className="p-2.5 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
+                      className={`p-2 sm:p-2.5 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer shadow-sm active:scale-95 ${
+                        !text.trim() ? 'hidden sm:inline-flex' : 'inline-flex'
+                      }`}
                     >
                       <HiOutlinePaperAirplane className="w-5 h-5 rotate-90" />
                     </button>
@@ -5523,8 +5528,8 @@ export default function Messages() {
                 onDelete={handleDeleteSelected}
               />
             ) : (
-              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-                <div className="flex items-center gap-3 min-w-0">
+              <div className="px-3 sm:px-5 py-2.5 sm:py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   <button
                     onClick={() => {
                       setActiveUser(null);
@@ -5536,7 +5541,7 @@ export default function Messages() {
                   </button>
                   <div
                     onClick={() => setIsViewingChatDetails(true)}
-                    className="flex items-center gap-3 cursor-pointer min-w-0 hover:opacity-90 transition-opacity"
+                    className="flex items-center gap-2.5 sm:gap-3 cursor-pointer min-w-0 hover:opacity-90 transition-opacity"
                   >
                     <UserAvatar
                       user={activeUser}
@@ -5637,7 +5642,7 @@ export default function Messages() {
 
                   <button
                     onClick={() => navigate(`/profile/${activeUser.username}`)}
-                    className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition-colors shrink-0"
+                    className="hidden sm:inline-flex text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer transition-colors shrink-0"
                   >
                     Profile
                   </button>
@@ -5710,7 +5715,7 @@ export default function Messages() {
             <div
               data-lenis-prevent
               onWheel={(e) => e.stopPropagation()}
-              className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-3 bg-slate-50/20 overscroll-contain"
+              className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 space-y-3 bg-slate-50/20 overscroll-contain"
             >
               {deduplicatedMessages.length === 0 ? (
                 <div className="h-full min-h-[160px] flex flex-col items-center justify-center text-center text-slate-400 text-sm p-6">
@@ -6439,14 +6444,14 @@ export default function Messages() {
                 ) : (
                   <form
                     onSubmit={onSend}
-                    className="p-3 sm:p-4 border-t border-slate-100 bg-white flex items-center gap-2 shrink-0 relative"
+                    className="p-2 sm:p-3 md:p-4 border-t border-slate-100 bg-white flex items-center gap-1.5 sm:gap-2 shrink-0 relative pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] sm:pb-3 md:pb-4"
                   >
                     <div className="relative">
                       <button
                         ref={emojiButtonRef}
                         type="button"
                         onClick={() => setShowEmojiPicker((prev) => !prev)}
-                        className={`p-2.5 rounded-full transition-colors ${
+                        className={`p-2 sm:p-2.5 rounded-full transition-colors ${
                           showEmojiPicker
                             ? 'text-purple-600 bg-purple-50'
                             : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
@@ -6458,7 +6463,7 @@ export default function Messages() {
                       {showEmojiPicker && (
                         <div
                           ref={emojiPickerRef}
-                          className="absolute bottom-14 left-0 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200"
+                          className="absolute bottom-14 left-0 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 max-w-[calc(100vw-1.5rem)]"
                         >
                           <EmojiPicker
                             onEmojiClick={handleEmojiClick}
@@ -6483,13 +6488,15 @@ export default function Messages() {
                       onChange={(e) => handleInputChange(e.target.value)}
                       onPaste={handleChatPaste}
                       placeholder="Type a message..."
-                      className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
+                      className="flex-1 min-w-0 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
                     />
 
                     <button
                       type="button"
                       onClick={() => setIsRecordingVoice(true)}
-                      className="p-2.5 rounded-full text-slate-500 hover:text-purple-600 hover:bg-purple-50 transition-colors shrink-0 cursor-pointer"
+                      className={`p-2 sm:p-2.5 rounded-full text-slate-500 hover:text-purple-600 hover:bg-purple-50 transition-colors shrink-0 cursor-pointer ${
+                        text.trim() ? 'hidden sm:inline-flex' : 'inline-flex'
+                      }`}
                       title="Record voice note"
                     >
                       <HiOutlineMicrophone className="w-5 h-5" />
@@ -6498,7 +6505,9 @@ export default function Messages() {
                     <button
                       type="submit"
                       disabled={!text.trim() || sending}
-                      className="p-2.5 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
+                      className={`p-2 sm:p-2.5 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer shadow-sm active:scale-95 ${
+                        !text.trim() ? 'hidden sm:inline-flex' : 'inline-flex'
+                      }`}
                     >
                       <HiOutlinePaperAirplane className="w-5 h-5 rotate-90" />
                     </button>

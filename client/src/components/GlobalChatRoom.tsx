@@ -1016,8 +1016,8 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
   return (
     <div className="flex-1 min-h-0 flex flex-col h-full bg-white overflow-hidden relative">
       {/* Header - Simple and consistent with Messages.tsx */}
-      <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="px-3 sm:px-5 py-2.5 sm:py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {onBack && (
             <button
               type="button"
@@ -1096,7 +1096,7 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
           data-lenis-prevent
           onWheel={(e) => e.stopPropagation()}
           onScroll={handleScroll}
-          className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-3 bg-slate-50/20 overscroll-contain"
+          className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 space-y-3 bg-slate-50/20 overscroll-contain"
         >
         {loading ? (
           <div className="h-full flex items-center justify-center">
@@ -1385,12 +1385,12 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
       )}
 
       {/* Input Form Bar - Matches Messages.tsx */}
-      <div className="p-3 sm:p-4 border-t border-slate-100 bg-white flex items-center gap-2 shrink-0 relative">
+      <div className="p-2 sm:p-3 md:p-4 border-t border-slate-100 bg-white flex items-center gap-1.5 sm:gap-2 shrink-0 relative pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] sm:pb-3 md:pb-4">
         {/* Emoji Picker Popover */}
         {showEmojiPicker && (
           <div
             ref={emojiPickerRef}
-            className="absolute bottom-16 left-4 z-40 shadow-xl rounded-2xl border border-slate-200 overflow-hidden"
+            className="absolute bottom-16 left-2 sm:left-4 z-40 shadow-xl rounded-2xl border border-slate-200 overflow-hidden max-w-[calc(100vw-1.5rem)]"
           >
             <EmojiPicker
               onEmojiClick={(data: EmojiClickData) => {
@@ -1414,13 +1414,13 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
               e.preventDefault();
               handleSend();
             }}
-            className="flex-1 flex items-center gap-2"
+            className="flex-1 min-w-0 flex items-center gap-1.5 sm:gap-2"
           >
             {/* Emoji Toggle */}
             <button
               type="button"
               onClick={() => setShowEmojiPicker((prev) => !prev)}
-              className={`p-2.5 rounded-full transition-colors cursor-pointer ${
+              className={`p-2 sm:p-2.5 rounded-full transition-colors cursor-pointer ${
                 showEmojiPicker
                   ? 'text-purple-600 bg-purple-50'
                   : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
@@ -1444,14 +1444,16 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
               value={text}
               onChange={handleInputChange}
               placeholder="Message #global-chat... (@mention supported)"
-              className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+              className="flex-1 min-w-0 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
             />
 
             {/* Voice Record Toggle */}
             <button
               type="button"
               onClick={() => setIsRecordingVoice(true)}
-              className="p-2.5 rounded-full text-slate-500 hover:text-purple-600 hover:bg-purple-50 transition-colors shrink-0 cursor-pointer"
+              className={`p-2 sm:p-2.5 rounded-full text-slate-500 hover:text-purple-600 hover:bg-purple-50 transition-colors shrink-0 cursor-pointer ${
+                text.trim() ? 'hidden sm:inline-flex' : 'inline-flex'
+              }`}
               title="Record voice note"
             >
               <HiOutlineMicrophone className="w-5 h-5" />
@@ -1461,7 +1463,9 @@ export default function GlobalChatRoom({ currentUser, onBack }: GlobalChatRoomPr
             <button
               type="submit"
               disabled={!text.trim() || sending}
-              className="p-2.5 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
+              className={`p-2 sm:p-2.5 rounded-full bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer shadow-sm active:scale-95 ${
+                !text.trim() ? 'hidden sm:inline-flex' : 'inline-flex'
+              }`}
             >
               <HiOutlinePaperAirplane className="w-5 h-5 rotate-90" />
             </button>
