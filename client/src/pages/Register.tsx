@@ -75,7 +75,7 @@ export default function Register() {
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center pt-6 pb-6 sm:pb-8 relative z-10">
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center -translate-y-1 sm:-translate-y-3">
-          <div className="lg:col-span-7 flex justify-center w-full order-2 lg:order-1">
+          <div className="w-full lg:col-span-7 flex justify-center">
             <div className="w-full max-w-[670px] sm:max-w-[700px] bg-white rounded-[28px] p-6 sm:p-7 border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_16px_36px_rgba(0,0,0,0.4)] transition-all duration-300 ease-out">
               <div className="text-center mb-4 sm:mb-5">
                 <h1 className="text-2xl sm:text-[28px] font-bold tracking-tight text-slate-900 leading-tight">
@@ -287,7 +287,7 @@ export default function Register() {
             </div>
           </div>
 
-          <div className="lg:col-span-5 flex flex-col items-center justify-center order-1 lg:order-2">
+          <div className="hidden lg:flex lg:col-span-5 flex-col items-center justify-center">
             <div className="group w-full max-w-[440px] sm:max-w-[465px] bg-white rounded-[26px] p-3 sm:p-3.5 border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_16px_36px_rgba(0,0,0,0.35)] transition-all duration-300 ease-out hover:-translate-y-1">
               <div className="overflow-hidden rounded-[20px] relative border border-slate-100">
                 <img

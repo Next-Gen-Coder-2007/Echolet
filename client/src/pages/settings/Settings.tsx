@@ -41,7 +41,8 @@ export default function Settings() {
   return (
     <div className="w-full flex-1 select-none animate-fade-in">
       {/* Sticky Top Header Card */}
-      <div className="sticky top-4 sm:top-6 z-30 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3.5 sm:p-4 mb-6 flex items-center justify-between gap-3 transition-all">
+      {/* Sticky Top Header Card */}
+      <div className="sticky top-14 md:top-6 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-4 mb-4 sm:mb-6 flex items-center justify-between gap-3 transition-all">
         <div className="flex items-center gap-3 min-w-0">
           <Link
             to="/"
@@ -65,31 +66,31 @@ export default function Settings() {
 
         <Link
           to={user?.username ? `/profile/${user.username}` : '/profile'}
-          className="text-xs font-bold text-purple-600 hover:text-purple-700 hover:underline px-3 py-1.5 rounded-xl hover:bg-purple-50 transition-colors"
+          className="text-xs font-bold text-purple-600 hover:text-purple-700 hover:underline px-3 py-1.5 rounded-xl hover:bg-purple-50 transition-colors shrink-0"
         >
-          View Public Profile
+          View Profile
         </Link>
       </div>
 
       {/* Main Settings Grid Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Minimalist Settings Navigation Menu (Sticky) */}
-        <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-30 self-start">
-          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-2.5 sm:p-3">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3.5 pt-2 pb-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
+        {/* Left Column: Settings Navigation Menu */}
+        <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-30 self-start w-full">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-2 sm:p-3">
+            <p className="hidden lg:block text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3.5 pt-2 pb-2">
               Settings
             </p>
 
-            <nav className="space-y-1">
+            <nav className="flex lg:flex-col overflow-x-auto gap-1.5 lg:space-y-1 pb-1 lg:pb-0 no-scrollbar">
               {navLinks.map((link) => (
                 <NavLink
                   key={link.to}
                   to={link.to}
                   className={({ isActive }) =>
-                    `block px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                    `px-3.5 py-2 lg:py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 text-center ${
                       isActive
                         ? 'bg-slate-900 text-white shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 bg-slate-50 lg:bg-transparent'
                     }`
                   }
                 >
@@ -99,8 +100,8 @@ export default function Settings() {
             </nav>
           </div>
 
-          {/* User Status Card */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-4 flex items-center justify-between">
+          {/* User Status Card (Desktop only) */}
+          <div className="hidden lg:flex bg-white rounded-3xl border border-slate-200/90 shadow-xs p-4 items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-full p-[2px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] shrink-0">
                 <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">

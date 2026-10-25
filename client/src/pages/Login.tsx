@@ -70,7 +70,7 @@ export default function Login() {
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center pt-9 pb-4 sm:pb-8 relative z-10">
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center -translate-y-2 sm:-translate-y-5">
-          <div className="lg:col-span-7 flex flex-col items-center justify-center">
+          <div className="hidden lg:flex lg:col-span-7 flex-col items-center justify-center">
             <div className="group w-full max-w-[440px] sm:max-w-[465px] bg-white rounded-[26px] p-3 sm:p-3.5 border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.2)] hover:shadow-[0_16px_36px_rgba(0,0,0,0.35)] transition-all duration-300 ease-out hover:-translate-y-1">
               <div className="overflow-hidden rounded-[20px] relative border border-slate-100">
                 <img
