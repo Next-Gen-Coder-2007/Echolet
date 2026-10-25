@@ -251,7 +251,7 @@ export default function Saved() {
   return (
     <div className="w-full flex-1 select-none pb-14">
       {/* Top Header Bar */}
-      <div className="sticky top-6 z-30 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 transition-all">
+      <div className="sticky top-14 md:top-6 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 transition-all">
         <div className="flex items-center gap-3 min-w-0">
           <Link
             to="/"

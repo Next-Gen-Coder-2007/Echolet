@@ -108,7 +108,7 @@ export default function Home() {
     <div className="w-full flex-1 relative select-none">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8">
-          <div className="sticky top-6 z-30 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-5 flex items-center justify-between transition-all">
+          <div className="sticky top-14 md:top-6 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-2.5 sm:p-3.5 mb-4 sm:mb-5 flex items-center justify-between transition-all">
             <div className="bg-slate-100/90 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/60">
               <button
                 type="button"

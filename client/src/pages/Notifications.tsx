@@ -292,7 +292,7 @@ export default function Notifications() {
   return (
     <div className="w-full flex-1 select-none animate-fade-in">
       {/* Header Container */}
-      <div className="sticky top-4 sm:top-6 z-30 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden mb-6 transition-all">
+      <div className="sticky top-14 md:top-6 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden mb-4 sm:mb-6 transition-all">
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">

@@ -455,9 +455,9 @@ export default function UserProfile() {
           )}
         </div>
 
-        <div className="px-6 pb-6 pt-0 relative">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-16 sm:-mt-20 mb-5">
-            <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full p-[3px] bg-white shadow-md">
+        <div className="px-4 sm:px-6 pb-6 pt-0 relative">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12 sm:-mt-20 mb-5">
+            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full p-[3px] bg-white shadow-md shrink-0">
               <div className="w-full h-full rounded-full p-[2.5px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080]">
                 <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
                   <Avatar

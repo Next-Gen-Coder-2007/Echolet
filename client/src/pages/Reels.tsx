@@ -515,7 +515,7 @@ export default function Reels() {
             ref={containerRef}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            className="relative h-full max-h-[78vh] sm:max-h-[82vh] aspect-[9/16] rounded-3xl bg-black border border-slate-200/90 shadow-2xl overflow-hidden select-none shrink-0"
+            className="relative h-full max-h-[72vh] xs:max-h-[76vh] md:max-h-[82vh] aspect-[9/16] rounded-3xl bg-black border border-slate-200/90 shadow-2xl overflow-hidden select-none shrink-0"
           >
             {/* 60fps GPU-Accelerated Sliding Track */}
             <div
@@ -863,7 +863,7 @@ export default function Reels() {
 
           {/* Comments Panel: Aligned on Desktop beside the video, Bottom Sheet on Mobile */}
           {isCommentsOpen && currentReel && (
-            <div className="h-full max-h-[78vh] sm:max-h-[82vh] w-[340px] sm:w-[370px] lg:w-[390px] flex flex-col shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="fixed inset-0 z-50 md:relative md:inset-auto md:z-auto h-full md:max-h-[82vh] md:w-[340px] sm:md:w-[370px] lg:md:w-[390px] flex flex-col shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
               <ReelCommentsSidePanel
                 key={currentReel.id}
                 isOpen={isCommentsOpen}
