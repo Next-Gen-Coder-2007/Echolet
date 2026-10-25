@@ -84,6 +84,21 @@ const handleHealthCheck = async (_req: Request, res: Response) => {
 
   const isHealthy = dbStatus === 'connected';
 
+  const isSupabaseDirectIPv6 =
+    dbError?.includes('ENOTFOUND') &&
+    (dbError?.includes('supabase.co') || process.env.DATABASE_URL?.includes('supabase.co'));
+
+  let helpMessage: string | undefined;
+  if (!isHealthy) {
+    if (isSupabaseDirectIPv6) {
+      helpMessage =
+        'Supabase direct connection (db.<ref>.supabase.co) only supports IPv6, but Vercel Lambda runs on IPv4. In your Supabase project, go to Settings > Database > Connection String, select "Connection Pooling" (Session mode, port 5432 or 6543), and copy the pooler URI (e.g. aws-0-[region].pooler.supabase.com). Then update DATABASE_URL in Vercel.';
+    } else if (isVercel) {
+      helpMessage =
+        'Please set DATABASE_URL (PostgreSQL connection string from Neon, Supabase, or Railway) in your Vercel Project Settings > Environment Variables.';
+    }
+  }
+
   res.status(isHealthy ? 200 : 503).json({
     status: isHealthy ? 'OK' : 'DEGRADED',
     message: isHealthy
@@ -95,10 +110,7 @@ const handleHealthCheck = async (_req: Request, res: Response) => {
       error: dbError,
     },
     environment: isVercel ? 'vercel-serverless' : 'standalone-server',
-    help:
-      !isHealthy && isVercel
-        ? 'Please set DATABASE_URL (PostgreSQL connection string from Neon, Supabase, or Railway) in your Vercel Project Settings > Environment Variables.'
-        : undefined,
+    help: helpMessage,
     timestamp: new Date().toISOString(),
   });
 };
@@ -124,15 +136,22 @@ app.use(async (req: Request, res: Response, next) => {
       process.env.VERCEL_ENV
     );
 
+    const isSupabaseDirectIPv6 =
+      error?.message?.includes('ENOTFOUND') &&
+      (error?.message?.includes('supabase.co') || process.env.DATABASE_URL?.includes('supabase.co'));
+
     return res.status(503).json({
       error: 'Database Unavailable',
       message: error?.message || 'Failed to connect to the database.',
-      hint: isVercel
+      hint: isSupabaseDirectIPv6
+        ? 'Supabase direct connection (db.<ref>.supabase.co) is IPv6-only, but Vercel runs on IPv4. In Supabase Dashboard > Settings > Database > Connection String, choose "Connection Pooling" (Session mode, port 5432 or 6543) and copy the pooler URI (aws-0-[region].pooler.supabase.com) into Vercel DATABASE_URL.'
+        : isVercel
         ? 'A PostgreSQL database is required on Vercel. Please add DATABASE_URL to your Vercel Project Settings > Environment Variables (e.g. from Neon, Supabase, or Railway).'
         : 'Please ensure your database is running and configuration is correct.',
     });
   }
 });
+
 
 // Mount routes with and without '/api' prefix for versatile reverse-proxy and rewrite compatibility
 const mountRoutes = (prefix: string) => {
