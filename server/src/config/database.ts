@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import pg from 'pg';
 import { DataSource } from 'typeorm';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -90,6 +91,7 @@ export const getDataSource = (): DataSource => {
     actualDataSource = new DataSource({
       type: 'postgres',
       url: databaseUrl,
+      driver: pg,
       ssl: {
         rejectUnauthorized: false,
       },

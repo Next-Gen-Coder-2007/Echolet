@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import 'pg';
 import type { Request, Response } from 'express';
 import app from '../src/app';
 
