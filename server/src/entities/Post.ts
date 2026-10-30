@@ -28,6 +28,8 @@ export interface PostReactionItem {
   createdAt?: string;
 }
 
+import { getDateColumnType } from '../config/columnTypes';
+
 @Entity('posts')
 export class Post {
   @PrimaryGeneratedColumn('uuid')
@@ -52,10 +54,7 @@ export class Post {
   @Column({ type: 'simple-json', nullable: true })
   pollOptions: PollOptionItem[] | null;
 
-  @Column({
-    type: process.env.DATABASE_URL?.trim().startsWith('postgres') ? 'timestamp' : 'datetime',
-    nullable: true,
-  })
+  @Column({ type: getDateColumnType(), nullable: true })
   pollExpiresAt?: Date | null;
 
   @Column({ type: 'int', default: 0 })
