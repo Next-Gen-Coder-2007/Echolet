@@ -21,6 +21,97 @@ const socketToUser = new Map<string, string>();
 // Track active ongoing calls: userId -> partnerId
 const activeCalls = new Map<string, string>();
 
+interface PendingRingingCall {
+  callerId: string;
+  caller: {
+    id: string;
+    fullName: string;
+    username: string;
+    avatarUrl?: string;
+  };
+  toUserId: string;
+  createdAt: number;
+  timeoutTimer?: NodeJS.Timeout;
+}
+
+// Track pending ringing calls: callerId -> PendingRingingCall
+const pendingCalls = new Map<string, PendingRingingCall>();
+// Reverse index: toUserId -> callerId
+const calleeToPendingCaller = new Map<string, string>();
+
+const recordMissedCall = async (
+  callerId: string,
+  toUserId: string,
+  callerInfo?: { id: string; fullName: string; username: string; avatarUrl?: string },
+  status: 'missed' | 'declined' | 'busy' = 'missed'
+) => {
+  if (!AppDataSource.isInitialized) return;
+
+  try {
+    const messageRepo = AppDataSource.getRepository(Message);
+    const notificationRepo = AppDataSource.getRepository(Notification);
+
+    const content =
+      status === 'declined'
+        ? 'Declined voice call'
+        : status === 'busy'
+        ? 'Line busy'
+        : 'Missed voice call';
+
+    // 1. Save call log message directly into chat
+    const message = messageRepo.create({
+      senderId: callerId,
+      receiverId: toUserId,
+      content,
+      messageType: 'call',
+      callLog: {
+        duration: 0,
+        status,
+        callType: 'voice',
+      },
+      status: 'sent',
+    });
+
+    const savedMessage = await messageRepo.save(message);
+
+    const fullMessage = await messageRepo.findOne({
+      where: { id: savedMessage.id },
+      relations: { sender: true, receiver: true },
+    });
+
+    if (fullMessage && io) {
+      io.to(callerId).emit('new_message', fullMessage);
+      io.to(toUserId).emit('new_message', fullMessage);
+    }
+
+    // 2. Create and emit notification for recipient
+    if (status === 'missed' || status === 'declined') {
+      const notification = notificationRepo.create({
+        recipientId: toUserId,
+        actorId: callerId,
+        type: 'missed_call',
+        entityType: 'call',
+        entityId: savedMessage.id,
+        message: 'Missed voice call',
+        isRead: false,
+      });
+
+      const savedNotification = await notificationRepo.save(notification);
+
+      const fullNotification = await notificationRepo.findOne({
+        where: { id: savedNotification.id },
+        relations: { actor: true },
+      });
+
+      if (fullNotification) {
+        await emitNotification(fullNotification);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to record missed call or notification:', err);
+  }
+};
+
 // Global chat presence tracking
 const globalChatSockets = new Set<string>();
 const globalChatUserCounts = new Map<string, number>();
@@ -284,12 +375,14 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
         // Check if recipient is online
         if (!isUserOnline(toUserId)) {
           socket.emit('call:user_offline', { toUserId });
+          recordMissedCall(senderId, toUserId, caller, 'missed');
           return;
         }
 
-        // Check if either party is currently in an active call
-        if (activeCalls.has(toUserId) || activeCalls.has(senderId)) {
+        // Check if either party is currently in an active call or already ringing
+        if (activeCalls.has(toUserId) || activeCalls.has(senderId) || calleeToPendingCaller.has(toUserId)) {
           socket.emit('call:busy', { toUserId });
+          recordMissedCall(senderId, toUserId, caller, 'busy');
           return;
         }
 
@@ -337,6 +430,31 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
           }
         }
 
+        // Clear any previous pending ringing call for this caller
+        const prevPending = pendingCalls.get(senderId);
+        if (prevPending?.timeoutTimer) clearTimeout(prevPending.timeoutTimer);
+
+        // Store pending ringing call with 45s telecom ringing timeout
+        const pending: PendingRingingCall = {
+          callerId: senderId,
+          caller,
+          toUserId,
+          createdAt: Date.now(),
+        };
+
+        pending.timeoutTimer = setTimeout(() => {
+          if (pendingCalls.has(senderId)) {
+            pendingCalls.delete(senderId);
+            calleeToPendingCaller.delete(toUserId);
+            io?.to(senderId).emit('call:ended', { fromUserId: toUserId, reason: 'timeout' });
+            io?.to(toUserId).emit('call:ended', { fromUserId: senderId, reason: 'timeout' });
+            recordMissedCall(senderId, toUserId, caller, 'missed');
+          }
+        }, 45000);
+
+        pendingCalls.set(senderId, pending);
+        calleeToPendingCaller.set(toUserId, senderId);
+
         // Forward incoming call event to recipient room
         io?.to(toUserId).emit('call:incoming', {
           caller,
@@ -349,6 +467,15 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
       const currentUserId = socketToUser.get(socket.id);
       if (!currentUserId || !payload?.toUserId) return;
 
+      // Clear pending call timer
+      const pendingCallerId = calleeToPendingCaller.get(currentUserId);
+      if (pendingCallerId) {
+        const pending = pendingCalls.get(pendingCallerId);
+        if (pending?.timeoutTimer) clearTimeout(pending.timeoutTimer);
+        pendingCalls.delete(pendingCallerId);
+        calleeToPendingCaller.delete(currentUserId);
+      }
+
       activeCalls.set(currentUserId, payload.toUserId);
       activeCalls.set(payload.toUserId, currentUserId);
 
@@ -359,7 +486,21 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
 
     socket.on('call:reject', (payload: { toUserId: string; reason?: string }) => {
       const currentUserId = socketToUser.get(socket.id);
-      if (!payload?.toUserId) return;
+      if (!currentUserId || !payload?.toUserId) return;
+
+      const callerId = payload.toUserId;
+      const pending = pendingCalls.get(callerId);
+      if (pending) {
+        if (pending.timeoutTimer) clearTimeout(pending.timeoutTimer);
+        pendingCalls.delete(callerId);
+        calleeToPendingCaller.delete(currentUserId);
+        recordMissedCall(
+          callerId,
+          currentUserId,
+          pending.caller,
+          payload.reason === 'busy' ? 'busy' : 'declined'
+        );
+      }
 
       io?.to(payload.toUserId).emit('call:rejected', {
         fromUserId: currentUserId,
@@ -380,6 +521,15 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
     socket.on('call:end', (payload: { toUserId?: string }) => {
       const currentUserId = socketToUser.get(socket.id);
       if (currentUserId) {
+        // If caller hung up while call was still ringing: this is a MISSED CALL!
+        if (pendingCalls.has(currentUserId)) {
+          const pending = pendingCalls.get(currentUserId)!;
+          if (pending.timeoutTimer) clearTimeout(pending.timeoutTimer);
+          pendingCalls.delete(currentUserId);
+          calleeToPendingCaller.delete(pending.toUserId);
+          recordMissedCall(currentUserId, pending.toUserId, pending.caller, 'missed');
+        }
+
         const partnerId = payload?.toUserId || activeCalls.get(currentUserId);
         activeCalls.delete(currentUserId);
         if (partnerId) {
@@ -417,6 +567,29 @@ export const initSocket = (server: HttpServer, clientOrigin: string | string[]):
 
 const handleUserDisconnect = async (socketId: string, userId: string) => {
   socketToUser.delete(socketId);
+
+  // Terminate pending ringing call if caller disconnected
+  if (pendingCalls.has(userId)) {
+    const pending = pendingCalls.get(userId)!;
+    if (pending.timeoutTimer) clearTimeout(pending.timeoutTimer);
+    pendingCalls.delete(userId);
+    calleeToPendingCaller.delete(pending.toUserId);
+    io?.to(pending.toUserId).emit('call:ended', { fromUserId: userId, reason: 'hangup' });
+    recordMissedCall(userId, pending.toUserId, pending.caller, 'missed');
+  }
+
+  // Terminate pending ringing call if callee disconnected
+  if (calleeToPendingCaller.has(userId)) {
+    const callerId = calleeToPendingCaller.get(userId)!;
+    const pending = pendingCalls.get(callerId);
+    if (pending) {
+      if (pending.timeoutTimer) clearTimeout(pending.timeoutTimer);
+      pendingCalls.delete(callerId);
+      calleeToPendingCaller.delete(userId);
+      io?.to(callerId).emit('call:ended', { fromUserId: userId, reason: 'hangup' });
+      recordMissedCall(callerId, userId, pending.caller, 'missed');
+    }
+  }
 
   // Terminate active call if user disconnected
   if (activeCalls.has(userId)) {
