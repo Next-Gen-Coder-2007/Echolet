@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import ToastPopup, { type ToastItemData, type ToastType } from '../components/ToastPopup';
+import ToastPopup, { type ToastItemData, type ToastType } from '../components/common/ToastPopup';
 
 export type MessageType = ToastType;
 

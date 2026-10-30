@@ -12,12 +12,13 @@ export type NotificationType =
   | 'follow_request'
   | 'follow_accept'
   | 'like'
-  | 'comment';
+  | 'comment'
+  | 'missed_call';
 
 export interface NotificationItem {
   id: string;
   type: NotificationType;
-  entityType?: 'post' | 'reel' | 'comment' | 'user' | 'follow_request' | 'story';
+  entityType?: 'post' | 'reel' | 'comment' | 'user' | 'follow_request' | 'story' | 'call';
   entityId?: string;
   message?: string;
   isRead: boolean;

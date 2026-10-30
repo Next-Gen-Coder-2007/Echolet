@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import getSocket from '../services/socket';
 import type { User } from '../services/authService';
+import messageService from '../services/messageService';
 
 export interface CallPeer {
   id: string;
@@ -198,12 +199,65 @@ export const CallProvider: React.FC<{
   const animFrameRef = useRef<number | null>(null);
   const activePeerRef = useRef<CallPeer | null>(null);
   const callStateRef = useRef<CallState>('idle');
+  const callDurationRef = useRef<number>(0);
+  const isCallerRef = useRef<boolean>(false);
+  const callLoggedRef = useRef<boolean>(false);
 
   // Keep refs in sync for callbacks
   useEffect(() => {
     activePeerRef.current = activePeer;
     callStateRef.current = callState;
   }, [activePeer, callState]);
+
+  useEffect(() => {
+    callDurationRef.current = callDuration;
+  }, [callDuration]);
+
+  useEffect(() => {
+    isCallerRef.current = isCaller;
+  }, [isCaller]);
+
+  // Save call record with duration and status directly to chat
+  const saveCallLogToChat = useCallback(
+    async (
+      peer: CallPeer | null,
+      status: 'completed' | 'missed' | 'declined' | 'busy' | 'cancelled',
+      durationSeconds: number
+    ) => {
+      if (!peer || callLoggedRef.current) return;
+      callLoggedRef.current = true;
+
+      try {
+        let content = '';
+        if (status === 'completed') {
+          const mins = Math.floor(durationSeconds / 60);
+          const secs = durationSeconds % 60;
+          const durStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+          content = `Voice call • ${durStr}`;
+        } else if (status === 'declined') {
+          content = 'Declined voice call';
+        } else if (status === 'busy') {
+          content = 'Line busy';
+        } else if (status === 'cancelled') {
+          content = 'Cancelled voice call';
+        } else {
+          content = 'Missed voice call';
+        }
+
+        await messageService.sendMessage(peer.id, content, {
+          messageType: 'call',
+          callLog: {
+            duration: durationSeconds,
+            status,
+            callType: 'voice',
+          },
+        });
+      } catch (err) {
+        console.warn('Failed to save call log to chat:', err);
+      }
+    },
+    []
+  );
 
   // Hidden audio element for remote stream playback
   useEffect(() => {
@@ -390,6 +444,10 @@ export const CallProvider: React.FC<{
       });
 
       localStreamRef.current = stream;
+      activePeerRef.current = targetUser;
+      isCallerRef.current = true;
+      callStateRef.current = 'calling';
+      callLoggedRef.current = false;
       setActivePeer(targetUser);
       setIsCaller(true);
       setCallState('calling');
@@ -461,9 +519,22 @@ export const CallProvider: React.FC<{
   // HANG UP / END CALL
   const endCall = () => {
     const peer = activePeerRef.current;
+    const currentState = callStateRef.current;
+    const currentDuration = callDurationRef.current;
+    const callerFlag = isCallerRef.current;
+
     if (peer) {
       getSocket().emit('call:end', { toUserId: peer.id });
     }
+
+    if (callerFlag && peer && !callLoggedRef.current) {
+      if (currentState === 'connected') {
+        saveCallLogToChat(peer, 'completed', currentDuration);
+      } else if (currentState === 'calling') {
+        saveCallLogToChat(peer, 'missed', 0);
+      }
+    }
+
     setCallStatusText('Call ended');
     setCallState('ended');
     cleanupCall(true);
@@ -502,6 +573,10 @@ export const CallProvider: React.FC<{
         return;
       }
 
+      activePeerRef.current = data.caller;
+      isCallerRef.current = false;
+      callStateRef.current = 'incoming';
+      callLoggedRef.current = false;
       setActivePeer(data.caller);
       setIsCaller(false);
       setCallState('incoming');
@@ -537,6 +612,10 @@ export const CallProvider: React.FC<{
     // 3. User Rejected or Busy
     const handleRejected = ({ reason }: { reason: string }) => {
       toneGen.stop();
+      const peer = activePeerRef.current;
+      if (isCallerRef.current && peer && !callLoggedRef.current) {
+        saveCallLogToChat(peer, reason === 'busy' ? 'busy' : 'declined', 0);
+      }
       setCallStatusText(reason === 'busy' ? 'User is busy' : 'Call declined');
       setCallState('ended');
       cleanupCall(true);
@@ -551,6 +630,10 @@ export const CallProvider: React.FC<{
     // 4. Target User Offline
     const handleUserOffline = () => {
       toneGen.stop();
+      const peer = activePeerRef.current;
+      if (isCallerRef.current && peer && !callLoggedRef.current) {
+        saveCallLogToChat(peer, 'missed', 0);
+      }
       setCallStatusText('User is offline');
       setCallState('ended');
       cleanupCall(true);
@@ -565,6 +648,10 @@ export const CallProvider: React.FC<{
     // 5. Target User Busy
     const handleUserBusy = () => {
       toneGen.stop();
+      const peer = activePeerRef.current;
+      if (isCallerRef.current && peer && !callLoggedRef.current) {
+        saveCallLogToChat(peer, 'busy', 0);
+      }
       setCallStatusText('User is on another call');
       setCallState('ended');
       cleanupCall(true);
@@ -624,6 +711,23 @@ export const CallProvider: React.FC<{
     // 7. Call Ended by Peer
     const handleEnded = () => {
       toneGen.stop();
+      const peer = activePeerRef.current;
+      const currentState = callStateRef.current;
+      const currentDuration = callDurationRef.current;
+
+      if (peer && !callLoggedRef.current) {
+        if (isCallerRef.current) {
+          if (currentState === 'connected') {
+            saveCallLogToChat(peer, 'completed', currentDuration);
+          } else if (currentState === 'calling') {
+            saveCallLogToChat(peer, 'missed', 0);
+          }
+        } else if (currentState === 'connected') {
+          // Fallback if caller disconnected first
+          saveCallLogToChat(peer, 'completed', currentDuration);
+        }
+      }
+
       setCallStatusText('Call ended');
       setCallState('ended');
       cleanupCall(true);
