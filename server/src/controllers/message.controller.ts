@@ -17,6 +17,7 @@ import {
   emitMessageReactionUpdated,
   isUserOnline,
 } from '../socket';
+import { supabaseStorage } from '../services/supabaseStorage.service';
 
 export const getConversations = async (
   req: AuthenticatedRequest,
@@ -176,21 +177,42 @@ export const getMessages = async (
       return;
     }
 
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 30));
+    const before = (req.query.before as string)?.trim();
+
     const messageRepository = AppDataSource.getRepository(Message);
 
-    const rawMessages = await messageRepository
+    let qb = messageRepository
       .createQueryBuilder('m')
       .where(
-        '(m.senderId = :currentUserId AND m.receiverId = :targetUserId) OR (m.senderId = :targetUserId AND m.receiverId = :currentUserId)',
+        '((m.senderId = :currentUserId AND m.receiverId = :targetUserId) OR (m.senderId = :targetUserId AND m.receiverId = :currentUserId))',
         { currentUserId, targetUserId }
       )
-      .orderBy('m.createdAt', 'ASC')
+      .andWhere('m.isDeletedForEveryone = :isDel', { isDel: false });
+
+    if (before) {
+      const beforeDate = new Date(before);
+      if (!isNaN(beforeDate.getTime())) {
+        qb = qb.andWhere('m.createdAt < :beforeDate', { beforeDate });
+      }
+    }
+
+    const rawMessages = await qb
+      .orderBy('m.createdAt', 'DESC')
+      .take(limit + 1)
       .getMany();
 
+    const hasMore = rawMessages.length > limit;
+    const pageRaw = hasMore ? rawMessages.slice(0, limit) : rawMessages;
+
     // Filter out messages that were deleted "for me"
-    const messages = rawMessages.filter(
+    const visibleMessages = pageRaw.filter(
       (m) => !(m.deletedFor && m.deletedFor.includes(currentUserId))
     );
+
+    // Reverse to chronological order (oldest to newest in this batch)
+    const messages = visibleMessages.reverse();
+    const nextCursor = messages.length > 0 ? messages[0].createdAt : null;
 
     // Find unread messages sent by targetUser to current user
     const unreadMessages = messages.filter(
@@ -219,6 +241,8 @@ export const getMessages = async (
     res.json({
       status: 'success',
       messages,
+      hasMore,
+      nextCursor,
     });
   } catch (error) {
     console.error('Get messages error:', error);
@@ -320,9 +344,22 @@ export const sendMessage = async (
       content = 'Shared an echo';
     } else if (!content && messageType === 'reel') {
       content = 'Shared a reel';
+    } else if (!content && messageType === 'call') {
+      const dur = req.body.callLog?.duration || 0;
+      const status = req.body.callLog?.status || 'completed';
+      if (status === 'missed') content = 'Missed voice call';
+      else if (status === 'declined') content = 'Declined voice call';
+      else if (status === 'busy') content = 'Line busy';
+      else if (status === 'cancelled') content = 'Cancelled voice call';
+      else {
+        const mins = Math.floor(dur / 60);
+        const secs = dur % 60;
+        const durStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+        content = `Voice call • ${durStr}`;
+      }
     }
 
-    if (!content && !req.body.mediaUrl && !req.body.poll && !req.body.story) {
+    if (!content && !req.body.mediaUrl && !req.body.poll && !req.body.story && !req.body.callLog) {
       res.status(400).json({ status: 'error', message: 'Message content or attachment is required' });
       return;
     }
@@ -418,22 +455,33 @@ export const sendMessage = async (
       };
     }
 
+    let finalMediaUrl = req.body.mediaUrl || null;
+    if (finalMediaUrl && typeof finalMediaUrl === 'string' && finalMediaUrl.startsWith('data:')) {
+      finalMediaUrl = await supabaseStorage.uploadBase64(currentUserId, finalMediaUrl, 'chat');
+    }
+
+    let finalAudioUrl = req.body.audioUrl || null;
+    if (finalAudioUrl && typeof finalAudioUrl === 'string' && finalAudioUrl.startsWith('data:')) {
+      finalAudioUrl = await supabaseStorage.uploadBase64(currentUserId, finalAudioUrl, 'chat');
+    }
+
     const messageRepository = AppDataSource.getRepository(Message);
     const message = messageRepository.create({
       senderId: currentUserId,
       receiverId: targetUserId,
       content,
       messageType,
-      mediaUrl: req.body.mediaUrl || null,
+      mediaUrl: finalMediaUrl,
       fileName: req.body.fileName || null,
       fileSize: req.body.fileSize || null,
       poll: formattedPoll,
-      audioUrl: req.body.audioUrl || null,
+      audioUrl: finalAudioUrl,
       audioDuration: req.body.audioDuration ? Number(req.body.audioDuration) : undefined,
       isRead: false,
       status: initialStatus,
       replyTo: req.body.replyTo || null,
       story: req.body.story || null,
+      callLog: req.body.callLog || null,
       isForwarded: Boolean(req.body.isForwarded),
     });
 
@@ -469,6 +517,7 @@ export const editMessage = async (
       ? req.params.messageId[0]
       : req.params.messageId;
     const messageId = (rawMessageId || '').trim();
+
     const messageRepository = AppDataSource.getRepository(Message);
     const message = await messageRepository.findOne({ where: { id: messageId } });
 
@@ -482,10 +531,11 @@ export const editMessage = async (
       return;
     }
 
-    // Disallow editing for posts, reels, story replies, polls, voice notes, documents, system messages
+    // Disallow editing for posts, reels, calls, story replies, polls, voice notes, documents, system messages
     const isSpecialNonEditable =
       message.messageType === 'post' ||
       message.messageType === 'reel' ||
+      message.messageType === 'call' ||
       message.messageType === 'story_reply' ||
       message.messageType === 'poll' ||
       message.messageType === 'system' ||
@@ -621,6 +671,13 @@ export const deleteMessage = async (
           message: 'Delete for everyone is only available within 24 hours of sending',
         });
         return;
+      }
+
+      if (message.mediaUrl) {
+        await supabaseStorage.deleteFileByUrl(currentUserId, message.mediaUrl);
+      }
+      if (message.audioUrl) {
+        await supabaseStorage.deleteFileByUrl(currentUserId, message.audioUrl);
       }
 
       message.isDeletedForEveryone = true;
@@ -1120,7 +1177,11 @@ export const getConversationMedia = async (
         '((m.senderId = :currentUserId AND m.receiverId = :targetUserId) OR (m.senderId = :targetUserId AND m.receiverId = :currentUserId))',
         { currentUserId, targetUserId }
       )
-      .andWhere('m.isDeletedForEveryone = :isDel', { isDel: false });
+      .andWhere('m.isDeletedForEveryone = :isDel', { isDel: false })
+      .andWhere(
+        '(m.mediaUrl IS NOT NULL OR m.fileName IS NOT NULL OR m.audioUrl IS NOT NULL OR m.content LIKE :httpLike OR m.messageType != :textType)',
+        { httpLike: '%http%', textType: 'text' }
+      );
 
     const rawAll = await baseQb.orderBy('m.createdAt', 'DESC').getMany();
 
@@ -1128,13 +1189,28 @@ export const getConversationMedia = async (
       (m) => !(m.deletedFor && m.deletedFor.includes(currentUserId))
     );
 
+    const isSharedContent = (m: Message) =>
+      m.messageType === 'reel' ||
+      m.messageType === 'post' ||
+      m.messageType === 'story_reply' ||
+      (m.messageType as string) === 'story' ||
+      /\/reel(?:s)?\/[a-zA-Z0-9_-]+/i.test(m.content || '') ||
+      /\/post(?:s)?\/[a-zA-Z0-9_-]+/i.test(m.content || '') ||
+      /\/stor(?:y|ies)\/[a-zA-Z0-9_-]+/i.test(m.content || '');
+
     const isPhoto = (m: Message) =>
-      m.messageType === 'image' || (!!m.mediaUrl && !['video', 'document', 'audio', 'voice', 'reel', 'post'].includes(m.messageType));
-    const isVideo = (m: Message) => m.messageType === 'video';
-    const isDoc = (m: Message) => m.messageType === 'document' || (!!m.fileName && !isPhoto(m) && !isVideo(m));
-    const isAudio = (m: Message) => m.messageType === 'audio' || m.messageType === 'voice' || !!m.audioUrl;
+      !isSharedContent(m) &&
+      m.messageType !== 'call' &&
+      (m.messageType === 'image' ||
+        (!!m.mediaUrl &&
+          !['video', 'document', 'audio', 'voice', 'reel', 'post', 'story', 'story_reply', 'call'].includes(m.messageType as string)));
+    const isVideo = (m: Message) => !isSharedContent(m) && m.messageType === 'video';
+    const isDoc = (m: Message) =>
+      !isSharedContent(m) && m.messageType !== 'call' && (m.messageType === 'document' || (!!m.fileName && !isPhoto(m) && !isVideo(m)));
+    const isAudio = (m: Message) =>
+      !isSharedContent(m) && m.messageType !== 'call' && (m.messageType === 'audio' || m.messageType === 'voice' || !!m.audioUrl);
     const isLink = (m: Message) =>
-      Boolean(m.content && /https?:\/\/[^\s]+/i.test(m.content));
+      isSharedContent(m) || Boolean(m.content && /https?:\/\/[^\s]+/i.test(m.content));
 
     const counts = {
       all: visible.filter((m) => isPhoto(m) || isVideo(m) || isDoc(m) || isAudio(m) || isLink(m)).length,
