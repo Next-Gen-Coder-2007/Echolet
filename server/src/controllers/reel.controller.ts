@@ -11,6 +11,7 @@ import { Follow } from '../entities/Follow';
 import { Notification } from '../entities/Notification';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { emitNotification } from '../socket';
+import { supabaseStorage } from '../services/supabaseStorage.service';
 
 const getParamString = (param: string | string[] | undefined): string => {
   if (Array.isArray(param)) return (param[0] || '').trim();
@@ -103,10 +104,20 @@ export const createReel = async (
       return;
     }
 
+    let finalVideoUrl = videoUrl.trim();
+    if (finalVideoUrl.startsWith('data:')) {
+      finalVideoUrl = await supabaseStorage.uploadBase64(currentUserId, finalVideoUrl, 'reels');
+    }
+
+    let finalThumbnailUrl = thumbnailUrl ? thumbnailUrl.trim() : null;
+    if (finalThumbnailUrl && finalThumbnailUrl.startsWith('data:')) {
+      finalThumbnailUrl = await supabaseStorage.uploadBase64(currentUserId, finalThumbnailUrl, 'reels');
+    }
+
     const newReel = new Reel();
     newReel.userId = currentUserId;
-    newReel.videoUrl = videoUrl.trim();
-    newReel.thumbnailUrl = thumbnailUrl ? thumbnailUrl.trim() : null;
+    newReel.videoUrl = finalVideoUrl;
+    newReel.thumbnailUrl = finalThumbnailUrl;
     newReel.caption = (caption || '').trim();
     newReel.audioTitle = audioTitle?.trim() || `Original Audio · @${currentUser.username}`;
     newReel.duration = duration ? Number(duration) : null;
@@ -693,6 +704,13 @@ export const deleteReel = async (
         message: 'You are not authorized to delete this reel',
       });
       return;
+    }
+
+    if (reel.videoUrl) {
+      await supabaseStorage.deleteFileByUrl(currentUserId, reel.videoUrl);
+    }
+    if (reel.thumbnailUrl) {
+      await supabaseStorage.deleteFileByUrl(currentUserId, reel.thumbnailUrl);
     }
 
     await reelRepo.remove(reel);

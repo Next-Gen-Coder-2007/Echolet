@@ -6,6 +6,7 @@ import { Follow } from '../entities/Follow';
 import { Notification } from '../entities/Notification';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { emitNewStory, emitStoryDeleted, emitStoryViewed, emitStoryLiked, emitNotification } from '../socket';
+import { supabaseStorage } from '../services/supabaseStorage.service';
 
 export interface UserStoryGroup {
   userId: string;
@@ -202,9 +203,14 @@ export const createStory = async (req: AuthenticatedRequest, res: Response): Pro
     const resolvedMediaType: 'image' | 'video' | 'text' =
       mediaType === 'text' ? 'text' : mediaType === 'video' ? 'video' : 'image';
 
+    let finalMediaUrl = mediaUrl || null;
+    if (mediaUrl && typeof mediaUrl === 'string' && mediaUrl.startsWith('data:')) {
+      finalMediaUrl = await supabaseStorage.uploadBase64(user.id, mediaUrl, 'stories');
+    }
+
     const story = storyRepo.create({
       userId: user.id,
-      mediaUrl: mediaUrl || null,
+      mediaUrl: finalMediaUrl,
       mediaType: resolvedMediaType,
       duration: duration ? Math.min(60, Number(duration)) : null,
       content: content ? content.trim() : null,
@@ -352,6 +358,10 @@ export const deleteStory = async (req: AuthenticatedRequest, res: Response): Pro
         message: 'You are not authorized to delete this story',
       });
       return;
+    }
+
+    if (story.mediaUrl) {
+      await supabaseStorage.deleteFileByUrl(user.id, story.mediaUrl);
     }
 
     await storyRepo.remove(story);
