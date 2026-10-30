@@ -13,7 +13,8 @@ export type NotificationType =
   | 'follow_request'
   | 'follow_accept'
   | 'like'
-  | 'comment';
+  | 'comment'
+  | 'missed_call';
 
 @Entity('notifications')
 export class Notification {
@@ -30,7 +31,7 @@ export class Notification {
   type: NotificationType;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  entityType?: 'post' | 'reel' | 'comment' | 'user' | 'follow_request' | 'story';
+  entityType?: 'post' | 'reel' | 'comment' | 'user' | 'follow_request' | 'story' | 'call';
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   entityId?: string;

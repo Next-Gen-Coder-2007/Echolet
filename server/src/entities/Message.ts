@@ -43,7 +43,8 @@ export class Message {
     | 'reel'
     | 'post'
     | 'story_reply'
-    | 'system';
+    | 'system'
+    | 'call';
 
   @Column({ type: 'text', nullable: true })
   mediaUrl?: string;
@@ -59,6 +60,13 @@ export class Message {
     question: string;
     options: { id: string; text: string; voterIds: string[] }[];
     expiresAt?: string | null;
+  } | null;
+
+  @Column({ type: 'simple-json', nullable: true })
+  callLog?: {
+    duration: number;
+    status: 'completed' | 'missed' | 'declined' | 'busy' | 'cancelled';
+    callType?: 'voice' | 'video';
   } | null;
 
   @Column({ type: 'text', nullable: true })
