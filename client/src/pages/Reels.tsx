@@ -932,7 +932,7 @@ export default function Reels() {
 
           {/* Comments Panel: Aligned on Desktop beside the video, Bottom Sheet on Mobile */}
           {isCommentsOpen && currentReel && (
-            <div className="fixed inset-0 z-50 md:relative md:inset-auto md:z-auto h-full md:max-h-[82vh] md:w-[340px] sm:md:w-[370px] lg:md:w-[390px] flex flex-col shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="md:relative md:inset-auto md:z-auto md:h-full md:max-h-[82vh] md:w-[340px] sm:md:w-[370px] lg:md:w-[390px] md:flex md:flex-col shrink-0">
               <ReelCommentsSidePanel
                 key={currentReel.id}
                 isOpen={isCommentsOpen}

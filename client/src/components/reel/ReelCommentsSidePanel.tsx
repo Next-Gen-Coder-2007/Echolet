@@ -311,16 +311,27 @@ export default function ReelCommentsSidePanel({
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Mobile Backdrop - Semi-transparent dark overlay */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 md:hidden animate-in fade-in duration-200"
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[9998] md:hidden animate-in fade-in duration-200"
       />
 
-      {/* Main Comments Container: Clean Echolet Theme Card docked side-by-side on desktop */}
-      <div className="fixed md:relative inset-y-0 right-0 z-50 md:z-20 w-full max-w-[380px] sm:max-w-[400px] h-full bg-white border-l md:border border-slate-200/90 md:rounded-3xl shadow-sm flex flex-col overflow-hidden text-slate-800 select-none animate-in slide-in-from-right md:slide-in-from-right-4 duration-200">
+      {/* Main Comments Container:
+          - Mobile (< md): Half-height bottom sheet (~58vh) with rounded-t-[32px] curve borders popping from bottom
+          - Desktop (>= md): Docked side-by-side card with the video */}
+      <div className="fixed bottom-0 inset-x-0 z-[9999] h-[58vh] max-h-[72vh] rounded-t-[32px] border-t border-slate-200/90 shadow-[0_-12px_40px_rgba(0,0,0,0.28)] bg-white flex flex-col overflow-hidden text-slate-800 select-none animate-in slide-in-from-bottom duration-300 ease-out md:static md:z-20 md:w-full md:max-w-[380px] sm:md:max-w-[400px] md:h-full md:rounded-3xl md:border md:border-slate-200/90 md:shadow-sm md:animate-in md:slide-in-from-right-4 md:duration-200">
+        {/* Mobile Drag / Grabber Indicator Pill */}
+        <div
+          onClick={onClose}
+          className="pt-3 pb-1 flex justify-center md:hidden shrink-0 cursor-pointer"
+          title="Tap or drag to close"
+        >
+          <div className="w-12 h-1.5 bg-slate-300 hover:bg-slate-400 rounded-full transition-colors" />
+        </div>
+
         {/* Header (Comments count + Sort + Close) */}
-        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white/95 backdrop-blur-md">
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white/95 backdrop-blur-md">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-extrabold text-slate-900 tracking-tight">
               Comments
@@ -697,7 +708,7 @@ export default function ReelCommentsSidePanel({
         </div>
 
         {/* Bottom Sticky Input Bar */}
-        <div className="p-3.5 border-t border-slate-100 bg-white/95 backdrop-blur-md shrink-0">
+        <div className="p-3.5 pb-[max(14px,env(safe-area-inset-bottom))] border-t border-slate-100 bg-white/95 backdrop-blur-md shrink-0">
           {/* Replying banner */}
           {replyingTo && (
             <div className="flex items-center justify-between bg-purple-50 text-purple-700 px-3 py-1.5 rounded-xl text-xs mb-2 border border-purple-200/60">

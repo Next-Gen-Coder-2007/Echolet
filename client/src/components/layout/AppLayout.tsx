@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomBar from './BottomBar';
-import MobileTopBar from './MobileTopBar';
 import authService, { type User } from '../../services/authService';
 import messageService from '../../services/messageService';
 import notificationService from '../../services/notificationService';
@@ -22,6 +21,8 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
   const [loading, setLoading] = useState(initialUser === undefined);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
+
+  const isReels = location.pathname.startsWith('/reels');
 
   const fetchUnreadCount = useCallback(async () => {
     try {
@@ -158,13 +159,6 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
   return (
     <CallProvider currentUser={user}>
       <div className="min-h-screen bg-[#f8fafc] relative flex flex-col">
-        {/* Mobile Top Header (hidden on desktop) */}
-        <MobileTopBar
-          user={user}
-          unreadNotificationsCount={unreadNotificationsCount}
-          onLogout={handleLogout}
-        />
-
         <div className="flex-1 flex relative">
           {/* Desktop Left Sidebar (hidden on mobile) */}
           <Sidebar
@@ -176,7 +170,13 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
             onLogout={handleLogout}
           />
 
-          <main className="flex-1 ml-0 md:ml-24 lg:ml-28 px-2.5 sm:px-4 md:px-6 lg:px-8 py-3 md:py-6 pb-24 md:pb-6 min-h-screen flex flex-col min-w-0">
+          <main
+            className={`flex-1 ml-0 md:ml-24 lg:ml-28 ${
+              isReels
+                ? 'p-0 pb-0'
+                : 'px-2.5 sm:px-4 md:px-6 lg:px-8 py-3 md:py-6 pb-24 md:pb-6'
+            } min-h-screen flex flex-col min-w-0`}
+          >
             <div className="w-full flex-1 flex flex-col min-w-0">
               {children || (
                 <Outlet
@@ -192,14 +192,16 @@ export default function AppLayout({ children, initialUser }: AppLayoutProps) {
           </main>
         </div>
 
-        {/* Mobile Bottom Navigation Bar (hidden on desktop) */}
-        <BottomBar
-          avatarUrl={user?.avatarUrl}
-          username={user?.username}
-          userInitials={userInitials}
-          unreadMessagesCount={unreadMessagesCount}
-          unreadNotificationsCount={unreadNotificationsCount}
-        />
+        {/* Mobile Bottom Navigation Bar (hidden on desktop and hidden on reels) */}
+        {!isReels && (
+          <BottomBar
+            avatarUrl={user?.avatarUrl}
+            username={user?.username}
+            userInitials={userInitials}
+            unreadMessagesCount={unreadMessagesCount}
+            unreadNotificationsCount={unreadNotificationsCount}
+          />
+        )}
 
         {/* Global WebRTC Voice Call Modal / Floating Minimized Widget */}
         <VoiceCallModal />

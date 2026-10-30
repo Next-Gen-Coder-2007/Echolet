@@ -3,9 +3,9 @@ import {
   HiOutlineHome,
   HiHome,
   HiOutlineMagnifyingGlass,
+  HiMagnifyingGlass,
   HiOutlineChatBubbleOvalLeftEllipsis,
   HiChatBubbleOvalLeftEllipsis,
-  HiOutlineFilm,
   HiFilm,
 } from 'react-icons/hi2';
 import Avatar from '../common/Avatar';
@@ -28,7 +28,8 @@ export default function BottomBar({
   const location = useLocation();
   const pathname = location.pathname;
 
-  // On any active message chat on mobile (direct, group, or global), hide bottom bar for full keyboard & chat space
+  // On any active message chat or in the reels section, hide bottom bar
+  const isReels = pathname.startsWith('/reels');
   const isInActiveChat =
     (pathname.startsWith('/messages/') && pathname !== '/messages') ||
     (pathname === '/messages' &&
@@ -41,13 +42,13 @@ export default function BottomBar({
         location.search.includes('room=') ||
         location.search.includes('type=global')
       ));
-  if (isInActiveChat) {
+
+  if (isInActiveChat || isReels) {
     return null;
   }
 
   const isHome = pathname === '/';
   const isSearch = pathname.startsWith('/search');
-  const isReels = pathname.startsWith('/reels');
   const isMessages = pathname === '/messages';
   const isProfile =
     pathname.startsWith('/profile') ||
@@ -68,15 +69,13 @@ export default function BottomBar({
       to: '/search',
       isActive: isSearch,
       iconOutline: HiOutlineMagnifyingGlass,
-      iconFilled: HiOutlineMagnifyingGlass,
+      iconFilled: HiMagnifyingGlass,
     },
     {
       id: 'reels',
       label: 'Reels',
       to: '/reels',
       isActive: isReels,
-      iconOutline: HiOutlineFilm,
-      iconFilled: HiFilm,
     },
     {
       id: 'messages',
@@ -99,11 +98,41 @@ export default function BottomBar({
   return (
     <nav
       aria-label="Mobile Navigation Bar"
-      className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/90 backdrop-blur-xl border-t border-slate-200/90 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom,0px)]"
+      className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-white/95 backdrop-blur-xl border-t border-slate-200/90 shadow-[0_-2px_16px_rgba(0,0,0,0.04)] pb-[env(safe-area-inset-bottom,0px)]"
     >
-      <div className="max-w-md mx-auto flex items-center justify-around h-16 px-2">
+      <div className="max-w-md mx-auto grid grid-cols-5 items-center h-16 px-1">
         {navItems.map((item) => {
           const { id, label, to, isActive } = item;
+
+          // REELS: Feature tab with official brand gradient container and larger icon
+          if (id === 'reels') {
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => navigate(to)}
+                aria-label={label}
+                className="flex flex-col items-center justify-center py-1 cursor-pointer group active:scale-95 transition-transform"
+              >
+                <div
+                  className={`w-10 h-10 rounded-xl bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] flex items-center justify-center shadow-md shadow-purple-500/20 text-white transition-all duration-200 ${
+                    isActive
+                      ? 'scale-105 ring-2 ring-purple-400'
+                      : 'group-hover:scale-105'
+                  }`}
+                >
+                  <HiFilm className="w-5.5 h-5.5 text-white drop-shadow-xs" />
+                </div>
+                <span
+                  className={`text-[10px] tracking-tight mt-0.5 font-bold transition-colors ${
+                    isActive ? 'text-[#7928ca]' : 'text-slate-700'
+                  }`}
+                >
+                  {label}
+                </span>
+              </button>
+            );
+          }
 
           if (item.isAvatar) {
             return (
@@ -112,12 +141,12 @@ export default function BottomBar({
                 type="button"
                 onClick={() => navigate(to)}
                 aria-label={label}
-                className="relative flex flex-col items-center justify-center w-14 h-14 cursor-pointer group active:scale-90 transition-transform duration-200"
+                className="flex flex-col items-center justify-center py-1 cursor-pointer group active:scale-95 transition-transform"
               >
                 <div
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full p-[1.5px] transition-all duration-300 ${
+                  className={`w-7 h-7 rounded-full p-[1.5px] transition-all duration-200 ${
                     isActive
-                      ? 'bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] shadow-sm shadow-purple-500/30 scale-105'
+                      ? 'bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] ring-1 ring-purple-300'
                       : 'border border-slate-300 group-hover:border-slate-400'
                   }`}
                 >
@@ -130,20 +159,13 @@ export default function BottomBar({
                     />
                   </div>
                 </div>
-
                 <span
-                  className={`text-[10px] font-bold tracking-tight mt-0.5 transition-colors ${
-                    isActive
-                      ? 'bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] bg-clip-text text-transparent'
-                      : 'text-slate-400'
+                  className={`text-[10px] tracking-tight mt-1 transition-colors ${
+                    isActive ? 'font-bold text-[#7928ca]' : 'font-medium text-slate-500'
                   }`}
                 >
                   {label}
                 </span>
-
-                {isActive && (
-                  <span className="absolute bottom-1 w-1 h-1 rounded-full bg-[#7928ca]" />
-                )}
               </button>
             );
           }
@@ -157,40 +179,30 @@ export default function BottomBar({
               type="button"
               onClick={() => navigate(to)}
               aria-label={label}
-              className="relative flex flex-col items-center justify-center w-14 h-14 cursor-pointer group active:scale-90 transition-transform duration-200"
+              className="flex flex-col items-center justify-center py-1 cursor-pointer group active:scale-95 transition-transform"
             >
-              <div className="relative">
+              <div className="relative flex items-center justify-center">
                 {isActive ? (
-                  <div className="text-purple-600 transition-all duration-200 scale-110">
-                    <IconFilled className="w-6 h-6 stroke-[2.2]" />
-                  </div>
+                  <IconFilled className="w-6 h-6 text-[#7928ca] transition-all duration-200 scale-105" />
                 ) : (
-                  <div className="text-slate-500 group-hover:text-slate-800 transition-colors">
-                    <IconOutline className="w-6 h-6 stroke-[1.8]" />
-                  </div>
+                  <IconOutline className="w-6 h-6 text-slate-500 group-hover:text-slate-800 transition-colors" />
                 )}
 
                 {/* Badge for Messages */}
                 {Boolean(item.badge && item.badge > 0) && (
-                  <span className="absolute -top-1.5 -right-2 min-w-[17px] h-[17px] px-1 bg-rose-600 text-white text-[9px] font-extrabold rounded-full flex items-center justify-center ring-2 ring-white shadow-xs pointer-events-none animate-pulse">
+                  <span className="absolute -top-1 -right-2 min-w-[16px] h-[16px] px-1 bg-rose-500 text-white text-[9px] font-extrabold rounded-full flex items-center justify-center ring-2 ring-white shadow-xs pointer-events-none">
                     {(item.badge || 0) > 99 ? '99+' : item.badge}
                   </span>
                 )}
               </div>
 
               <span
-                className={`text-[10px] font-bold tracking-tight mt-0.5 transition-colors ${
-                  isActive
-                    ? 'bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] bg-clip-text text-transparent'
-                    : 'text-slate-400'
+                className={`text-[10px] tracking-tight mt-1 transition-colors ${
+                  isActive ? 'font-bold text-[#7928ca]' : 'font-medium text-slate-500'
                 }`}
               >
                 {label}
               </span>
-
-              {isActive && (
-                <span className="absolute bottom-1 w-1 h-1 rounded-full bg-[#7928ca]" />
-              )}
             </button>
           );
         })}

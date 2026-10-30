@@ -92,7 +92,7 @@ export default function Modal({
   closeOnBackdropClick = true,
   closeOnEscape = true,
   preventScroll = true,
-  zIndex = 50,
+  zIndex = 9999,
   style,
 }: ModalProps) {
   const handleKeyDown = useCallback(
@@ -151,7 +151,7 @@ export default function Modal({
         <button
           type="button"
           onClick={onClose}
-          className={`fixed top-4 right-4 z-50 p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white/90 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95 ${closeButtonClassName}`}
+          className={`fixed top-4 right-4 z-[10000] p-2.5 rounded-full bg-black/60 hover:bg-black/90 text-white/90 hover:text-white backdrop-blur-md transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95 ${closeButtonClassName}`}
           title="Close (Esc)"
           aria-label="Close modal"
         >

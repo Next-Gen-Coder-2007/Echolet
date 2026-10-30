@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React from 'react';
 import Avatar from '../common/Avatar';
 import { useVoiceCall } from '../../context/CallContext';
@@ -46,11 +47,11 @@ export const VoiceCallModal: React.FC = () => {
   // 1. MINIMIZED FLOATING PILL (Docked bottom-right during active or ringing call)
   // =========================================================================
   if (isMinimized && callState !== 'incoming') {
-    return (
+    return createPortal(
       <aside
         id="voice-call-minimized-pill"
         aria-label="Active voice call bar"
-        className="fixed bottom-6 right-6 z-50 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-2xl rounded-2xl p-3 flex items-center gap-3.5 animate-in slide-in-from-bottom-4 duration-200 select-none"
+        className="fixed bottom-6 right-6 z-[9999] bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-2xl rounded-2xl p-3 flex items-center gap-3.5 animate-in slide-in-from-bottom-4 duration-200 select-none"
       >
         <div className="relative">
           <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
@@ -139,7 +140,8 @@ export const VoiceCallModal: React.FC = () => {
             <HiOutlinePhoneXMark className="w-4 h-4" />
           </button>
         </div>
-      </aside>
+      </aside>,
+      document.body
     );
   }
 
@@ -147,10 +149,10 @@ export const VoiceCallModal: React.FC = () => {
   // 2. INCOMING CALL MODAL (Ringing Alert)
   // =========================================================================
   if (callState === 'incoming') {
-    return (
+    return createPortal(
       <div
         id="incoming-voice-call-overlay"
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200 select-none"
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200 select-none"
       >
         <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-100 p-7 text-center relative overflow-hidden animate-in zoom-in-95 duration-200">
           {/* Subtle luminous glow background */}
@@ -216,17 +218,18 @@ export const VoiceCallModal: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
   // =========================================================================
   // 3. FULL CALL STUDIO DIALOG (Calling, Connected, Ended)
   // =========================================================================
-  return (
+  return createPortal(
     <div
       id="voice-call-studio-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md animate-in fade-in duration-200 select-none"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-md animate-in fade-in duration-200 select-none"
     >
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 flex flex-col items-center text-center relative overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Top Controls: Minimize button */}
@@ -393,7 +396,8 @@ export const VoiceCallModal: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

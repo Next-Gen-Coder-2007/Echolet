@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
 import Avatar from '../common/Avatar';
 import {
@@ -532,12 +533,12 @@ export default function ShareReelModal({
     }
   };
 
-  return (
+  const modalContent = (
     <div
       onClick={onClose}
       onWheel={(e) => e.stopPropagation()}
       data-lenis-prevent
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 touch-pan-y"
+      className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 touch-pan-y"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -1079,4 +1080,6 @@ export default function ShareReelModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

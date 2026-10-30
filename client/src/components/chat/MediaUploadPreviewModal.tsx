@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   HiXMark,
@@ -567,8 +568,8 @@ export const MediaUploadPreviewModal: React.FC<MediaUploadPreviewModalProps> = (
 
   const isModified = currentImageUrl !== previewUrl;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md p-3 sm:p-5 animate-in fade-in duration-200">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-md p-3 sm:p-5 animate-in fade-in duration-200">
       {/* Modal Card - Pure White Theme */}
       <div className="w-full max-w-2xl max-h-[94vh] flex flex-col bg-white text-slate-900 rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden">
         {/* Header */}
@@ -1128,10 +1129,9 @@ export const MediaUploadPreviewModal: React.FC<MediaUploadPreviewModalProps> = (
         </form>
       </div>
     </div>
-
-
-
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default MediaUploadPreviewModal;
