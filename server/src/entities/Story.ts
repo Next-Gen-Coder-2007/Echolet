@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { User } from './User';
+import { getDateColumnType } from '../config/columnTypes';
 
 export interface StoryViewerItem {
   userId: string;
@@ -67,9 +68,7 @@ export class Story {
   @Column({ type: 'simple-json', nullable: true })
   likes?: StoryLikeItem[] | null;
 
-  @Column({
-    type: process.env.DATABASE_URL?.trim().startsWith('postgres') ? 'timestamp' : 'datetime',
-  })
+  @Column({ type: getDateColumnType() })
   expiresAt: Date;
 
   @CreateDateColumn()

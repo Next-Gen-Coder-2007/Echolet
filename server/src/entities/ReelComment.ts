@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { User } from './User';
 import { Reel } from './Reel';
+import { getDateColumnType } from '../config/columnTypes';
 import { ReelCommentReaction } from './ReelCommentReaction';
 
 @Entity('reel_comments')
@@ -37,10 +38,7 @@ export class ReelComment {
   @Column({ type: 'boolean', default: false })
   isPinned: boolean;
 
-  @Column({
-    type: process.env.DATABASE_URL?.trim().startsWith('postgres') ? 'timestamp' : 'datetime',
-    nullable: true,
-  })
+  @Column({ type: getDateColumnType(), nullable: true })
   pinnedAt?: Date | null;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
