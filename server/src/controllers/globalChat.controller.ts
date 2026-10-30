@@ -9,6 +9,7 @@ import {
   emitGlobalReactionUpdated,
   getGlobalOnlineCount,
 } from '../socket';
+import { supabaseStorage } from '../services/supabaseStorage.service';
 
 // Rate limiting and spam protection state (in-memory)
 interface UserRateRecord {
@@ -217,17 +218,27 @@ export const sendGlobalMessage = async (
       };
     }
 
+    let finalMediaUrl = mediaUrl || undefined;
+    if (finalMediaUrl && typeof finalMediaUrl === 'string' && finalMediaUrl.startsWith('data:')) {
+      finalMediaUrl = await supabaseStorage.uploadBase64(userId, finalMediaUrl, 'chat');
+    }
+
+    let finalAudioUrl = audioUrl || undefined;
+    if (finalAudioUrl && typeof finalAudioUrl === 'string' && finalAudioUrl.startsWith('data:')) {
+      finalAudioUrl = await supabaseStorage.uploadBase64(userId, finalAudioUrl, 'chat');
+    }
+
     const messageRepo = AppDataSource.getRepository(GlobalMessage);
     const newMsg = messageRepo.create({
       senderId: userId,
       sender: req.user,
       content: trimmed,
       messageType: messageType || 'text',
-      mediaUrl: mediaUrl || undefined,
+      mediaUrl: finalMediaUrl,
       fileName: fileName || undefined,
       fileSize: fileSize || undefined,
       poll: formattedPoll,
-      audioUrl: audioUrl || undefined,
+      audioUrl: finalAudioUrl,
       audioDuration: audioDuration ? Number(audioDuration) : undefined,
       replyTo: replyTo && replyTo.id ? replyTo : undefined,
       reactions: {},
@@ -346,6 +357,13 @@ export const deleteGlobalMessage = async (
     if (msg.senderId !== userId) {
       res.status(403).json({ status: 'error', message: 'You can only delete your own messages' });
       return;
+    }
+
+    if (msg.mediaUrl) {
+      await supabaseStorage.deleteFileByUrl(userId, msg.mediaUrl);
+    }
+    if (msg.audioUrl) {
+      await supabaseStorage.deleteFileByUrl(userId, msg.audioUrl);
     }
 
     // Soft delete to maintain thread history
