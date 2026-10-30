@@ -22,6 +22,7 @@ import {
   addUsersToGroupSocketRoom,
   removeUsersFromGroupSocketRoom,
 } from '../socket';
+import { supabaseStorage } from '../services/supabaseStorage.service';
 
 const getParam = (param: string | string[] | undefined): string => {
   if (Array.isArray(param)) return (param[0] || '').trim();
@@ -51,11 +52,16 @@ export const createGroup = async (
     const messageRepository = AppDataSource.getRepository(GroupMessage);
     const userRepository = AppDataSource.getRepository(User);
 
+    let finalAvatarUrl = avatarUrl?.trim() || undefined;
+    if (finalAvatarUrl && finalAvatarUrl.startsWith('data:')) {
+      finalAvatarUrl = await supabaseStorage.uploadBase64(currentUserId, finalAvatarUrl, 'groups');
+    }
+
     // 1. Create Group
     const newGroup = groupRepository.create({
       name: name.trim(),
       description: description?.trim() || undefined,
-      avatarUrl: avatarUrl?.trim() || undefined,
+      avatarUrl: finalAvatarUrl,
       creatorId: currentUserId,
     });
     const savedGroup = await groupRepository.save(newGroup);
@@ -382,7 +388,25 @@ export const updateGroup = async (
 
     if (name && typeof name === 'string') group.name = name.trim();
     if (description !== undefined) group.description = description ? description.trim() : undefined;
-    if (avatarUrl !== undefined) group.avatarUrl = avatarUrl ? avatarUrl.trim() : undefined;
+    if (avatarUrl !== undefined) {
+      if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.startsWith('data:')) {
+        const uploadedUrl = await supabaseStorage.uploadBase64(currentUserId, avatarUrl, 'groups');
+        if (group.avatarUrl && group.avatarUrl !== uploadedUrl) {
+          await supabaseStorage.deleteFileByUrl(currentUserId, group.avatarUrl);
+        }
+        group.avatarUrl = uploadedUrl;
+      } else if (!avatarUrl || avatarUrl === '') {
+        if (group.avatarUrl) {
+          await supabaseStorage.deleteFileByUrl(currentUserId, group.avatarUrl);
+        }
+        group.avatarUrl = undefined;
+      } else {
+        if (group.avatarUrl && group.avatarUrl !== avatarUrl) {
+          await supabaseStorage.deleteFileByUrl(currentUserId, group.avatarUrl);
+        }
+        group.avatarUrl = avatarUrl.trim();
+      }
+    }
 
     const updatedGroup = await groupRepository.save(group);
 
@@ -437,21 +461,41 @@ export const getGroupMessages = async (
       return;
     }
 
-    const rawMessages = await messageRepository
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 30));
+    const before = (req.query.before as string)?.trim();
+
+    let qb = messageRepository
       .createQueryBuilder('m')
       .leftJoinAndSelect('m.sender', 's')
       .where('m.groupId = :groupId', { groupId })
-      .orderBy('m.createdAt', 'ASC')
+      .andWhere('m.isDeletedForEveryone = :isDel', { isDel: false });
+
+    if (before) {
+      const beforeDate = new Date(before);
+      if (!isNaN(beforeDate.getTime())) {
+        qb = qb.andWhere('m.createdAt < :beforeDate', { beforeDate });
+      }
+    }
+
+    const rawMessages = await qb
+      .orderBy('m.createdAt', 'DESC')
+      .take(limit + 1)
       .getMany();
 
-    const visibleMessages = rawMessages.filter(
+    const hasMore = rawMessages.length > limit;
+    const pageRaw = hasMore ? rawMessages.slice(0, limit) : rawMessages;
+
+    const visibleMessages = pageRaw.filter(
       (msg) => !(msg.deletedFor && msg.deletedFor.includes(currentUserId))
     );
 
     // Update lastReadAt
     await memberRepository.update(membership.id, { lastReadAt: new Date() });
 
-    const messages = visibleMessages.map((msg) => ({
+    const ordered = visibleMessages.reverse();
+    const nextCursor = ordered.length > 0 ? ordered[0].createdAt : null;
+
+    const messages = ordered.map((msg) => ({
       id: msg.id,
       groupId: msg.groupId,
       senderId: msg.senderId,
@@ -487,6 +531,8 @@ export const getGroupMessages = async (
     res.json({
       status: 'success',
       messages,
+      hasMore,
+      nextCursor,
     });
   } catch (error) {
     console.error('Get group messages error:', error);
@@ -581,16 +627,26 @@ export const sendGroupMessage = async (
       };
     }
 
+    let finalMediaUrl = req.body.mediaUrl || null;
+    if (finalMediaUrl && typeof finalMediaUrl === 'string' && finalMediaUrl.startsWith('data:')) {
+      finalMediaUrl = await supabaseStorage.uploadBase64(currentUserId, finalMediaUrl, 'chat');
+    }
+
+    let finalAudioUrl = req.body.audioUrl || null;
+    if (finalAudioUrl && typeof finalAudioUrl === 'string' && finalAudioUrl.startsWith('data:')) {
+      finalAudioUrl = await supabaseStorage.uploadBase64(currentUserId, finalAudioUrl, 'chat');
+    }
+
     const newMsg = messageRepository.create({
       groupId,
       senderId: currentUserId,
       content,
       messageType,
-      mediaUrl: req.body.mediaUrl || null,
+      mediaUrl: finalMediaUrl,
       fileName: req.body.fileName || null,
       fileSize: req.body.fileSize || null,
       poll: formattedPoll,
-      audioUrl: req.body.audioUrl || null,
+      audioUrl: finalAudioUrl,
       audioDuration: req.body.audioDuration ? Number(req.body.audioDuration) : undefined,
       replyTo: req.body.replyTo || undefined,
     });
@@ -750,6 +806,13 @@ export const deleteGroupMessage = async (
           message: 'Only the sender or a group admin can delete for everyone',
         });
         return;
+      }
+
+      if (message.mediaUrl) {
+        await supabaseStorage.deleteFileByUrl(message.senderId || currentUserId, message.mediaUrl, true);
+      }
+      if (message.audioUrl) {
+        await supabaseStorage.deleteFileByUrl(message.senderId || currentUserId, message.audioUrl, true);
       }
 
       message.isDeletedForEveryone = true;
@@ -1513,6 +1576,10 @@ export const getGroupMedia = async (
       .leftJoinAndSelect('m.sender', 's')
       .where('m.groupId = :groupId', { groupId })
       .andWhere('m.isDeletedForEveryone = :isDel', { isDel: false })
+      .andWhere(
+        '(m.mediaUrl IS NOT NULL OR m.fileName IS NOT NULL OR m.audioUrl IS NOT NULL OR m.content LIKE :httpLike OR m.messageType != :textType)',
+        { httpLike: '%http%', textType: 'text' }
+      )
       .orderBy('m.createdAt', 'DESC')
       .getMany();
 
@@ -1520,13 +1587,27 @@ export const getGroupMedia = async (
       (m) => !(m.deletedFor && m.deletedFor.includes(currentUserId))
     );
 
+    const isSharedContent = (m: GroupMessage) =>
+      m.messageType === 'reel' ||
+      m.messageType === 'post' ||
+      (m.messageType as string) === 'story' ||
+      (m.messageType as string) === 'story_reply' ||
+      /\/reel(?:s)?\/[a-zA-Z0-9_-]+/i.test(m.content || '') ||
+      /\/post(?:s)?\/[a-zA-Z0-9_-]+/i.test(m.content || '') ||
+      /\/stor(?:y|ies)\/[a-zA-Z0-9_-]+/i.test(m.content || '');
+
     const isPhoto = (m: GroupMessage) =>
-      m.messageType === 'image' || (!!m.mediaUrl && !['video', 'document', 'audio', 'voice', 'reel', 'post'].includes(m.messageType));
-    const isVideo = (m: GroupMessage) => m.messageType === 'video';
-    const isDoc = (m: GroupMessage) => m.messageType === 'document' || (!!m.fileName && !isPhoto(m) && !isVideo(m));
-    const isAudio = (m: GroupMessage) => m.messageType === 'audio' || m.messageType === 'voice' || !!m.audioUrl;
+      !isSharedContent(m) &&
+      (m.messageType === 'image' ||
+        (!!m.mediaUrl &&
+          !['video', 'document', 'audio', 'voice', 'reel', 'post', 'story', 'story_reply'].includes(m.messageType as string)));
+    const isVideo = (m: GroupMessage) => !isSharedContent(m) && m.messageType === 'video';
+    const isDoc = (m: GroupMessage) =>
+      !isSharedContent(m) && (m.messageType === 'document' || (!!m.fileName && !isPhoto(m) && !isVideo(m)));
+    const isAudio = (m: GroupMessage) =>
+      !isSharedContent(m) && (m.messageType === 'audio' || m.messageType === 'voice' || !!m.audioUrl);
     const isLink = (m: GroupMessage) =>
-      Boolean(m.content && /https?:\/\/[^\s]+/i.test(m.content));
+      isSharedContent(m) || Boolean(m.content && /https?:\/\/[^\s]+/i.test(m.content));
 
     const counts = {
       all: visible.filter((m) => isPhoto(m) || isVideo(m) || isDoc(m) || isAudio(m) || isLink(m)).length,
