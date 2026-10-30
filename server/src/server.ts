@@ -1,11 +1,9 @@
+import 'dotenv/config';
 import 'reflect-metadata';
 import http from 'http';
-import dotenv from 'dotenv';
 import app, { allowedOrigins } from './app';
 import { connectDatabase } from './config/database';
 import { initSocket } from './socket';
-
-dotenv.config();
 
 const port = process.env.PORT || 3000;
 

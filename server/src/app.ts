@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import 'reflect-metadata';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import dotenv from 'dotenv';
 import { connectDatabase } from './config/database';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
@@ -15,8 +15,7 @@ import searchRoutes from './routes/search.routes';
 import storyRoutes from './routes/story.routes';
 import collectionRoutes from './routes/collection.routes';
 import notificationRoutes from './routes/notification.routes';
-
-dotenv.config();
+import uploadRoutes from './routes/upload.routes';
 
 const app = express();
 
@@ -166,6 +165,7 @@ const mountRoutes = (prefix: string) => {
   app.use(`${prefix}/stories`, storyRoutes);
   app.use(`${prefix}/collections`, collectionRoutes);
   app.use(`${prefix}/notifications`, notificationRoutes);
+  app.use(`${prefix}/upload`, uploadRoutes);
 };
 
 mountRoutes('/api');
