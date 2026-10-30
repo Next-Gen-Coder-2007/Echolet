@@ -11,6 +11,7 @@ import {
   emitFollowRequestUpdated,
   emitNotification,
 } from '../socket';
+import { supabaseStorage } from '../services/supabaseStorage.service';
 
 export const searchUsers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -1234,11 +1235,43 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response): P
     }
 
     if (avatarUrl !== undefined) {
-      user.avatarUrl = avatarUrl;
+      if (avatarUrl && typeof avatarUrl === 'string' && avatarUrl.startsWith('data:')) {
+        const uploadedUrl = await supabaseStorage.uploadBase64(currentUserId, avatarUrl, 'avatars');
+        if (user.avatarUrl && user.avatarUrl !== uploadedUrl) {
+          await supabaseStorage.deleteFileByUrl(currentUserId, user.avatarUrl);
+        }
+        user.avatarUrl = uploadedUrl;
+      } else if (!avatarUrl || avatarUrl === '') {
+        if (user.avatarUrl) {
+          await supabaseStorage.deleteFileByUrl(currentUserId, user.avatarUrl);
+        }
+        user.avatarUrl = undefined;
+      } else {
+        if (user.avatarUrl && user.avatarUrl !== avatarUrl) {
+          await supabaseStorage.deleteFileByUrl(currentUserId, user.avatarUrl);
+        }
+        user.avatarUrl = avatarUrl;
+      }
     }
 
     if (bannerUrl !== undefined) {
-      user.bannerUrl = bannerUrl;
+      if (bannerUrl && typeof bannerUrl === 'string' && bannerUrl.startsWith('data:')) {
+        const uploadedUrl = await supabaseStorage.uploadBase64(currentUserId, bannerUrl, 'banners');
+        if (user.bannerUrl && user.bannerUrl !== uploadedUrl) {
+          await supabaseStorage.deleteFileByUrl(currentUserId, user.bannerUrl);
+        }
+        user.bannerUrl = uploadedUrl;
+      } else if (!bannerUrl || bannerUrl === '') {
+        if (user.bannerUrl) {
+          await supabaseStorage.deleteFileByUrl(currentUserId, user.bannerUrl);
+        }
+        user.bannerUrl = undefined;
+      } else {
+        if (user.bannerUrl && user.bannerUrl !== bannerUrl) {
+          await supabaseStorage.deleteFileByUrl(currentUserId, user.bannerUrl);
+        }
+        user.bannerUrl = bannerUrl;
+      }
     }
 
     if (isPrivate !== undefined) {
