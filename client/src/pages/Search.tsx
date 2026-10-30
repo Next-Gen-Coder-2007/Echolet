@@ -17,9 +17,9 @@ import userService, { type UserProfileResponse } from '../services/userService';
 import type { Post } from '../services/postService';
 import type { Reel } from '../services/reelService';
 import type { User } from '../services/authService';
-import PostCard from '../components/PostCard';
-import Avatar from '../components/Avatar';
-import Modal from '../components/Modal';
+import PostCard from '../components/post/PostCard';
+import Avatar from '../components/common/Avatar';
+import Modal from '../components/common/Modal';
 import { useMessage } from '../context/MessageContext';
 
 type SearchTab = 'all' | 'accounts' | 'posts' | 'reels';
@@ -314,7 +314,7 @@ export default function Search() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-4">
                     {(activeTab === 'all' ? reels.slice(0, 4) : reels).map((reel) => {
                       return (
                         <div
@@ -452,7 +452,7 @@ export default function Search() {
         closeButtonPosition="outside"
       >
         {selectedReelPreview && (
-          <div className="relative w-full aspect-[9/16] bg-black rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col justify-end">
+          <div className="relative w-full aspect-[9/16] max-h-[82vh] bg-black rounded-3xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col justify-end mx-auto">
             <video
               src={selectedReelPreview.videoUrl}
               autoPlay

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Logo from '../components/Logo';
+import Logo from '../components/common/Logo';
 import registerImg from '../assets/register.png';
 import authService from '../services/authService';
-import GoogleLoginButton from '../components/GoogleLoginButton';
+import GoogleLoginButton from '../components/common/GoogleLoginButton';
 import { useMessage } from '../context/MessageContext';
 
 export default function Register() {

@@ -10,15 +10,17 @@ import {
   HiOutlineClock,
   HiOutlineCheck,
   HiOutlineUserPlus,
+  HiOutlineCog6Tooth,
+  HiOutlineBell,
 } from 'react-icons/hi2';
 import userService, { type UserProfileResponse } from '../services/userService';
 import postService, { type Post } from '../services/postService';
 import reelService, { type Reel } from '../services/reelService';
 import getSocket from '../services/socket';
-import PostCard from '../components/PostCard';
-import ReelGridCard from '../components/ReelGridCard';
-import FollowListModal from '../components/FollowListModal';
-import Avatar from '../components/Avatar';
+import PostCard from '../components/post/PostCard';
+import ReelGridCard from '../components/reel/ReelGridCard';
+import FollowListModal from '../components/common/FollowListModal';
+import Avatar from '../components/common/Avatar';
 import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
 
@@ -380,29 +382,50 @@ export default function UserProfile() {
   return (
     <div className="w-full flex-1">
       {/* Top Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          onClick={() => navigate(-1)}
-          aria-label="Back"
-          className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-slate-900 shadow-xs cursor-pointer"
-        >
-          <HiOutlineArrowLeft className="w-5 h-5 stroke-[2]" />
-        </button>
-        <div className="flex items-center gap-2">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                {profileUser.fullName}
-              </h1>
-              {profileUser.isPrivate && (
-                <span title="Private Account" className="p-1 rounded-full bg-slate-100 text-slate-600">
-                  <HiOutlineLockClosed className="w-3.5 h-3.5 stroke-[2]" />
-                </span>
-              )}
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="Back"
+            className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-slate-900 shadow-xs cursor-pointer shrink-0"
+          >
+            <HiOutlineArrowLeft className="w-5 h-5 stroke-[2]" />
+          </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight leading-tight truncate">
+                  {profileUser.fullName}
+                </h1>
+                {profileUser.isPrivate && (
+                  <span title="Private Account" className="p-1 rounded-full bg-slate-100 text-slate-600 shrink-0">
+                    <HiOutlineLockClosed className="w-3.5 h-3.5 stroke-[2]" />
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 truncate">@{profileUser.username}</p>
             </div>
-            <p className="text-xs text-slate-400">@{profileUser.username}</p>
           </div>
         </div>
+
+        {isSelf && (
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => navigate('/notifications')}
+              className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-slate-900 shadow-xs cursor-pointer"
+              title="Notifications"
+            >
+              <HiOutlineBell className="w-5 h-5 stroke-[1.8]" />
+            </button>
+            <button
+              onClick={() => navigate('/settings')}
+              className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-slate-900 shadow-xs cursor-pointer"
+              title="Settings"
+            >
+              <HiOutlineCog6Tooth className="w-5 h-5 stroke-[1.8]" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Incoming Follow Request Notification Alert */}
@@ -471,18 +494,18 @@ export default function UserProfile() {
             </div>
 
             {isSelf ? (
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => navigate('/settings/profile')}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 shadow-2xs cursor-pointer transition-all active:scale-95"
+                  className="flex-1 sm:flex-initial justify-center flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 shadow-2xs cursor-pointer transition-all active:scale-95"
                 >
                   <HiOutlinePencilSquare className="w-4 h-4 text-purple-600" />
                   <span>Edit Profile</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
                 {(() => {
                   const canMessageAndCall =
                     isSelf ||
@@ -503,7 +526,7 @@ export default function UserProfile() {
                         }
                         navigate(`/messages/${profileUser.username}`);
                       }}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border shadow-2xs transition-all ${
+                      className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border shadow-2xs transition-all ${
                         canMessageAndCall
                           ? 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 cursor-pointer active:scale-98'
                           : 'border-slate-200 bg-slate-100/70 text-slate-400 cursor-not-allowed'
@@ -528,7 +551,7 @@ export default function UserProfile() {
                 <button
                   onClick={handleToggleFollow}
                   disabled={isFollowSubmitting}
-                  className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-50 flex items-center gap-1.5 ${
+                  className={`flex-1 sm:flex-initial justify-center px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-50 flex items-center gap-1.5 ${
                     isFollowing
                       ? 'bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600 border border-transparent hover:border-rose-200'
                       : isRequested
@@ -586,21 +609,21 @@ export default function UserProfile() {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 mb-6">
-            <div className="flex items-center gap-1.5">
-              <HiOutlineCalendar className="w-4 h-4 text-slate-400" />
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-slate-500 mb-6">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <HiOutlineCalendar className="w-4 h-4 text-slate-400 shrink-0" />
               <span>Joined {joinedDate}</span>
             </div>
 
             {profileUser.email && (
-              <div className="flex items-center gap-1.5">
-                <HiOutlineEnvelope className="w-4 h-4 text-slate-400" />
-                <span>{profileUser.email}</span>
+              <div className="flex items-center gap-1.5 min-w-0 max-w-full">
+                <HiOutlineEnvelope className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="truncate">{profileUser.email}</span>
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-6 pt-4 border-t border-slate-100 text-xs">
+          <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6 pt-4 border-t border-slate-100 text-xs">
             <button
               type="button"
               onClick={() => handleOpenFollowModal('followers')}

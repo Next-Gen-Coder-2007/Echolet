@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useOutletContext, Link, useParams } from 'react-router-dom';
+import { useOutletContext, Link, useParams, useNavigate } from 'react-router-dom';
 import {
+  HiOutlineArrowLeft,
   HiOutlineFilm,
   HiOutlinePlus,
   HiOutlineHeart,
@@ -17,13 +18,13 @@ import {
   HiOutlineChevronUp,
   HiOutlineChevronDown,
 } from 'react-icons/hi2';
-import CreateReelModal from '../components/CreateReelModal';
-import ReelCommentsSidePanel from '../components/ReelCommentsSidePanel';
-import ShareReelModal from '../components/ShareReelModal';
+import CreateReelModal from '../components/reel/CreateReelModal';
+import ReelCommentsSidePanel from '../components/reel/ReelCommentsSidePanel';
+import ShareReelModal from '../components/reel/ShareReelModal';
 import reelService, { type Reel } from '../services/reelService';
 import { useMessage } from '../context/MessageContext';
 import type { User } from '../services/authService';
-import Avatar from '../components/Avatar';
+import Avatar from '../components/common/Avatar';
 
 function formatShortCount(num: number | undefined): string {
   if (!num || num <= 0) return '0';
@@ -33,6 +34,7 @@ function formatShortCount(num: number | undefined): string {
 }
 
 export default function Reels() {
+  const navigate = useNavigate();
   const { reelId } = useParams<{ reelId?: string }>();
   const outletContext = useOutletContext<{ user?: User | null }>();
   const currentUser = outletContext?.user;
@@ -253,12 +255,19 @@ export default function Reels() {
     touchStartY.current = e.touches[0].clientY;
   };
 
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (isCommentsOpen || shareModalReel || isModalOpen) return;
+    if (touchStartY.current !== null && e.cancelable) {
+      e.preventDefault();
+    }
+  };
+
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartY.current === null) return;
     const diff = touchStartY.current - e.changedTouches[0].clientY;
     touchStartY.current = null;
 
-    if (Math.abs(diff) > 40) {
+    if (Math.abs(diff) > 35) {
       if (diff > 0) {
         goToReel(activeReelIndex + 1);
       } else {
@@ -447,9 +456,9 @@ export default function Reels() {
   const currentReel = reels[activeReelIndex];
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col items-center select-none">
-      {/* Top Header Bar spanning the unified widescreen container */}
-      <div className="w-full max-w-6xl flex items-center justify-between py-2 px-3 sm:px-6 mb-2 shrink-0">
+    <div className="w-full flex-1 min-h-0 flex flex-col items-center select-none h-full relative">
+      {/* Top Header Bar (Desktop only) */}
+      <div className="hidden md:flex w-full max-w-6xl items-center justify-between py-2 px-6 mb-2 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] flex items-center justify-center shadow-xs">
             <HiOutlineFilm className="w-4 h-4 text-white stroke-[2.2]" />
@@ -508,14 +517,58 @@ export default function Reels() {
       ) : (
         <div
           ref={stageRef}
-          className="flex-1 min-h-0 relative flex items-center justify-center gap-3.5 sm:gap-5 lg:gap-6 w-full max-w-6xl pb-2 px-2 sm:px-4"
+          className="flex-1 min-h-0 relative flex items-center justify-center gap-3.5 sm:gap-5 lg:gap-6 w-full max-w-6xl pb-0 md:pb-2 px-0 md:px-4 h-full"
         >
-          {/* Main Reel Card Player Window - 9:16 aspect ratio */}
+          {/* Mobile Floating Overlay Header on Top of Video (<md) */}
+          <div className="md:hidden absolute top-0 inset-x-0 z-30 flex items-center justify-between p-3.5 bg-gradient-to-b from-black/80 via-black/35 to-transparent pointer-events-none">
+            <div className="flex items-center gap-2 pointer-events-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.history.length > 1) navigate(-1);
+                  else navigate('/');
+                }}
+                className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white flex items-center justify-center shadow-md active:scale-90 cursor-pointer"
+                title="Go back"
+              >
+                <HiOutlineArrowLeft className="w-4 h-4 text-white" />
+              </button>
+              <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080] p-[1.5px] flex items-center justify-center shadow-md">
+                <div className="w-full h-full bg-black/60 rounded-[9px] flex items-center justify-center text-white">
+                  <HiOutlineFilm className="w-3.5 h-3.5 text-white" />
+                </div>
+              </div>
+              <span className="font-black text-base text-white tracking-tight drop-shadow-md">
+                Reels
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 pointer-events-auto">
+              <button
+                onClick={() => fetchInitialReels(true)}
+                disabled={refreshing}
+                className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white flex items-center justify-center shadow-md active:scale-90 cursor-pointer"
+                title="Refresh reels"
+              >
+                <HiOutlineArrowPath className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-purple-400' : ''}`} />
+              </button>
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="px-3 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] text-white shadow-md hover:opacity-95 flex items-center gap-1 active:scale-95 cursor-pointer"
+              >
+                <HiOutlinePlus className="w-3 h-3 stroke-[3]" />
+                <span>Create</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Main Reel Card Player Window - Edge-to-edge on mobile, 9:16 card on desktop */}
           <div
             ref={containerRef}
             onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            className="relative h-full max-h-[72vh] xs:max-h-[76vh] md:max-h-[82vh] aspect-[9/16] rounded-3xl bg-black border border-slate-200/90 shadow-2xl overflow-hidden select-none shrink-0"
+            className="relative w-full md:w-auto h-full max-h-full md:max-h-[82vh] md:aspect-[9/16] rounded-none md:rounded-3xl bg-black border-0 md:border border-slate-200/90 shadow-none md:shadow-2xl overflow-hidden select-none shrink-0 touch-none overscroll-none"
           >
             {/* 60fps GPU-Accelerated Sliding Track */}
             <div
@@ -547,9 +600,7 @@ export default function Reels() {
                       muted={isGlobalMuted}
                       onTimeUpdate={(e) => handleVideoTimeUpdate(reel.id, e)}
                       onClick={() => togglePlayPause(reel.id)}
-                      className={`w-full h-full cursor-pointer bg-black ${
-                        reel.displayMode === 'contain' ? 'object-contain' : 'object-cover'
-                      }`}
+                      className="w-full h-full cursor-pointer bg-black object-cover"
                     />
 
                     {/* Contrast Gradient Overlays */}
@@ -569,7 +620,7 @@ export default function Reels() {
                     )}
 
                     {/* Top Left Controls: Sound & Playback Toggles */}
-                    <div className="absolute top-4 left-4 z-20 flex items-center gap-2 pointer-events-auto">
+                    <div className="absolute top-14 md:top-4 left-3.5 md:left-4 z-20 flex items-center gap-2 pointer-events-auto">
                       <button
                         onClick={() => togglePlayPause(reel.id)}
                         className="w-9 h-9 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-md border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer shadow-md active:scale-90"
@@ -752,6 +803,24 @@ export default function Reels() {
                         <span className="text-[11px] font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
                           Share
                         </span>
+                      </div>
+
+                      {/* Rotating Vinyl Disc (TikTok/Reels Style) */}
+                      <div className="pt-1">
+                        <div
+                          className={`w-10 h-10 rounded-full p-[2px] bg-gradient-to-tr from-slate-900 to-slate-700 shadow-xl border border-white/20 flex items-center justify-center ${
+                            isPaused ? '' : 'animate-spin [animation-duration:5s]'
+                          }`}
+                        >
+                          <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden">
+                            <Avatar
+                              src={reel.user?.avatarUrl}
+                              name={reel.user?.fullName || reel.user?.username}
+                              size="w-full h-full"
+                              textClassName="text-[8px] font-bold"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
 

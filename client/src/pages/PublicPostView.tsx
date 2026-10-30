@@ -15,8 +15,8 @@ import {
   HiOutlineClock,
 } from 'react-icons/hi2';
 import postService, { type Post, type PostComment } from '../services/postService';
-import MediaViewerModal from '../components/MediaViewerModal';
-import Avatar from '../components/Avatar';
+import MediaViewerModal from '../components/chat/MediaViewerModal';
+import Avatar from '../components/common/Avatar';
 
 /**
  * Recursive read-only comment component for public post view

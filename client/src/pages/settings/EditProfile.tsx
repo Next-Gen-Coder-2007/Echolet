@@ -10,8 +10,9 @@ import {
 } from 'react-icons/hi2';
 import { useMessage } from '../../context/MessageContext';
 import userService from '../../services/userService';
+import uploadService from '../../services/uploadService';
 import type { User } from '../../services/authService';
-import Avatar from '../../components/Avatar';
+import Avatar from '../../components/common/Avatar';
 
 interface OutletContextType {
   user?: User | null;
@@ -102,8 +103,13 @@ export default function EditProfile() {
 
     try {
       setIsProcessingAvatar(true);
-      const optimized = await optimizeImageFile(file, 600, 600, 0.9);
-      setAvatarUrl(optimized);
+      try {
+        const result = await uploadService.uploadFile(file, 'avatars');
+        setAvatarUrl(result.url);
+      } catch {
+        const optimized = await optimizeImageFile(file, 600, 600, 0.9);
+        setAvatarUrl(optimized);
+      }
     } catch {
       showError('Failed to process avatar image');
     } finally {
@@ -128,8 +134,13 @@ export default function EditProfile() {
 
     try {
       setIsProcessingBanner(true);
-      const optimized = await optimizeImageFile(file, 1600, 650, 0.88);
-      setBannerUrl(optimized);
+      try {
+        const result = await uploadService.uploadFile(file, 'banners');
+        setBannerUrl(result.url);
+      } catch {
+        const optimized = await optimizeImageFile(file, 1600, 650, 0.88);
+        setBannerUrl(optimized);
+      }
     } catch {
       showError('Failed to process banner image');
     } finally {
@@ -188,7 +199,7 @@ export default function EditProfile() {
   return (
     <div className="w-full pb-8 animate-fade-in">
       {/* Header bar */}
-      <div className="flex items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
             Edit Profile
@@ -198,7 +209,7 @@ export default function EditProfile() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end sm:self-auto">
           <button
             type="button"
             onClick={handleCancel}
@@ -242,8 +253,8 @@ export default function EditProfile() {
               <div className="w-full h-full bg-gradient-to-r from-[#00b4d8] via-[#7928ca] to-[#ff0080] flex items-center justify-center opacity-90" />
             )}
 
-            {/* Banner controls overlay */}
-            <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3 backdrop-blur-[2px]">
+            {/* Banner controls overlay - visible on hover on desktop, or persistent edit button on mobile */}
+            <div className="absolute inset-0 bg-black/35 opacity-0 md:group-hover:opacity-100 transition-opacity hidden md:flex items-center justify-center gap-3 backdrop-blur-[2px]">
               <button
                 type="button"
                 onClick={() => bannerInputRef.current?.click()}
@@ -262,6 +273,29 @@ export default function EditProfile() {
                   title="Remove custom banner"
                 >
                   <HiOutlineTrash className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Banner Edit Buttons (always accessible on touch devices) */}
+            <div className="absolute bottom-3 right-3 flex md:hidden items-center gap-2 z-10">
+              <button
+                type="button"
+                onClick={() => bannerInputRef.current?.click()}
+                disabled={isProcessingBanner}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/95 text-slate-900 shadow-md backdrop-blur-md active:scale-95"
+              >
+                <HiOutlinePhoto className="w-4 h-4 text-purple-600" />
+                <span>{bannerUrl ? 'Change' : 'Banner'}</span>
+              </button>
+              {bannerUrl && (
+                <button
+                  type="button"
+                  onClick={handleRemoveBanner}
+                  className="p-1.5 rounded-xl bg-black/60 text-white active:scale-95 backdrop-blur-md"
+                  title="Remove banner"
+                >
+                  <HiOutlineTrash className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
@@ -292,10 +326,10 @@ export default function EditProfile() {
           </div>
 
           {/* Profile Avatar section overlapping banner */}
-          <div className="px-6 pb-6 pt-0 relative">
+          <div className="px-4 sm:px-6 pb-6 pt-0 relative">
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-16 sm:-mt-20 mb-6">
               {/* Avatar circle */}
-              <div className="relative group/avatar">
+              <div className="relative group/avatar inline-block">
                 <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full p-[3px] bg-white shadow-xl">
                   <div className="w-full h-full rounded-full p-[2.5px] bg-gradient-to-tr from-[#00b4d8] via-[#7928ca] to-[#ff0080]">
                     <div className="w-full h-full rounded-full bg-slate-100 flex items-center justify-center overflow-hidden relative">
@@ -306,12 +340,12 @@ export default function EditProfile() {
                         textClassName="text-2xl sm:text-3xl font-extrabold"
                       />
 
-                      {/* Avatar hover overlay */}
+                      {/* Avatar hover overlay (desktop) */}
                       <button
                         type="button"
                         onClick={() => avatarInputRef.current?.click()}
                         disabled={isProcessingAvatar}
-                        className="absolute inset-0 bg-black/45 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer"
+                        className="absolute inset-0 bg-black/45 opacity-0 md:group-hover/avatar:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center text-white cursor-pointer"
                         title="Upload avatar image"
                       >
                         <HiOutlineCamera className="w-6 h-6 mb-0.5 text-white" />
@@ -327,7 +361,16 @@ export default function EditProfile() {
                   </div>
                 </div>
 
-                {/* Hidden file input for Avatar */}
+                {/* Persistent camera badge button (especially critical on mobile touchscreens) */}
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={isProcessingAvatar}
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg border-2 border-white cursor-pointer hover:bg-slate-800 active:scale-95 transition-all z-20"
+                  title="Change avatar photo"
+                >
+                  <HiOutlineCamera className="w-4 h-4 text-white" />
+                </button>
                 <input
                   ref={avatarInputRef}
                   type="file"

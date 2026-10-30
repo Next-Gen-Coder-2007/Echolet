@@ -48,31 +48,31 @@ export default function AccountSettings() {
 
       {/* Account Info Details */}
       <div className="bg-slate-50/80 rounded-2xl p-4 sm:p-5 border border-slate-100 space-y-4">
-        <div className="flex justify-between items-center text-xs sm:text-sm">
-          <span className="text-slate-500 font-medium">Display Name</span>
-          <span className="font-semibold text-slate-900">{user?.fullName || 'Not provided'}</span>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs sm:text-sm gap-1">
+          <span className="text-slate-500 font-medium shrink-0">Display Name</span>
+          <span className="font-semibold text-slate-900 truncate">{user?.fullName || 'Not provided'}</span>
         </div>
-        <div className="flex justify-between items-center text-xs sm:text-sm">
-          <span className="text-slate-500 font-medium">Username</span>
-          <span className="font-semibold text-purple-600">@{user?.username}</span>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs sm:text-sm gap-1">
+          <span className="text-slate-500 font-medium shrink-0">Username</span>
+          <span className="font-semibold text-purple-600 truncate">@{user?.username}</span>
         </div>
-        <div className="flex justify-between items-center text-xs sm:text-sm">
-          <span className="text-slate-500 font-medium">Email Address</span>
-          <span className="font-semibold text-slate-900 flex items-center gap-1.5">
-            <HiOutlineEnvelope className="w-4 h-4 text-slate-400" />
-            {user?.email || 'Hidden'}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs sm:text-sm gap-1">
+          <span className="text-slate-500 font-medium shrink-0">Email Address</span>
+          <span className="font-semibold text-slate-900 flex items-center gap-1.5 truncate">
+            <HiOutlineEnvelope className="w-4 h-4 text-slate-400 shrink-0" />
+            <span className="truncate">{user?.email || 'Hidden'}</span>
           </span>
         </div>
-        <div className="flex justify-between items-center text-xs sm:text-sm">
-          <span className="text-slate-500 font-medium">Member Since</span>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-xs sm:text-sm gap-1">
+          <span className="text-slate-500 font-medium shrink-0">Member Since</span>
           <span className="font-semibold text-slate-900 flex items-center gap-1.5">
-            <HiOutlineCalendar className="w-4 h-4 text-slate-400" />
+            <HiOutlineCalendar className="w-4 h-4 text-slate-400 shrink-0" />
             {joinedDate}
           </span>
         </div>
-        <div className="flex justify-between items-start text-xs sm:text-sm pt-1">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start text-xs sm:text-sm pt-1 gap-1">
           <span className="text-slate-500 font-medium shrink-0">Bio</span>
-          <span className="font-normal text-slate-700 italic max-w-sm text-right">
+          <span className="font-normal text-slate-700 italic max-w-sm sm:text-right break-words">
             {user?.bio || 'No bio set'}
           </span>
         </div>

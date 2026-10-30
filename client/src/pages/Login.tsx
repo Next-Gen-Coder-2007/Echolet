@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import Logo from '../components/Logo';
+import Logo from '../components/common/Logo';
 import authImg from '../assets/auth.png';
 import authService from '../services/authService';
-import GoogleLoginButton from '../components/GoogleLoginButton';
+import GoogleLoginButton from '../components/common/GoogleLoginButton';
 import { useMessage } from '../context/MessageContext';
 
 export default function Login() {

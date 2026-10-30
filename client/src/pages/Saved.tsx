@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOutletContext, Link } from 'react-router-dom';
+import { useOutletContext, Link, useNavigate } from 'react-router-dom';
 import {
   HiOutlineBookmark,
   HiOutlineArrowLeft,
@@ -15,14 +15,15 @@ import {
 import postService, { type Post } from '../services/postService';
 import reelService, { type Reel } from '../services/reelService';
 import collectionService, { type BookmarkCollection } from '../services/collectionService';
-import PostCard from '../components/PostCard';
-import ReelGridCard from '../components/ReelGridCard';
-import BookmarkCollectionModal from '../components/BookmarkCollectionModal';
-import SaveToCollectionModal from '../components/SaveToCollectionModal';
+import PostCard from '../components/post/PostCard';
+import ReelGridCard from '../components/reel/ReelGridCard';
+import BookmarkCollectionModal from '../components/post/BookmarkCollectionModal';
+import SaveToCollectionModal from '../components/post/SaveToCollectionModal';
 import type { User } from '../services/authService';
 import { useMessage } from '../context/MessageContext';
 
 export default function Saved() {
+  const navigate = useNavigate();
   const outletContext = useOutletContext<{ user?: User | null }>();
   const currentUser = outletContext?.user;
   const { showSuccess, showError } = useMessage();
@@ -251,14 +252,22 @@ export default function Saved() {
   return (
     <div className="w-full flex-1 select-none pb-14">
       {/* Top Header Bar */}
-      <div className="sticky top-14 md:top-6 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 transition-all">
+      <div className="sticky top-2 md:top-6 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 transition-all">
         <div className="flex items-center gap-3 min-w-0">
-          <Link
-            to="/"
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) {
+                navigate(-1);
+              } else {
+                navigate('/settings');
+              }
+            }}
             className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer shrink-0"
+            title="Go Back"
           >
             <HiOutlineArrowLeft className="w-5 h-5" />
-          </Link>
+          </button>
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 shadow-2xs">
               <HiOutlineBookmark className="w-4 h-4 stroke-[2]" />

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import useLenis from './hooks/useLenis';
 import { MessageProvider } from './context/MessageContext';
-import AppLayout from './components/AppLayout';
+import AppLayout from './components/layout/AppLayout';
 import Home from './pages/Home';
 import Search from './pages/Search';
 import Reels from './pages/Reels';

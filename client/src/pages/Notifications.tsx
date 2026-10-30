@@ -9,14 +9,15 @@ import {
   HiOutlineClock,
   HiOutlineTrash,
   HiOutlineCheckCircle,
+  HiPhoneXMark,
 } from 'react-icons/hi2';
 import notificationService, { type NotificationItem } from '../services/notificationService';
 import userService from '../services/userService';
 import storyService, { type UserStoryGroup } from '../services/storyService';
 import getSocket from '../services/socket';
 import { useMessage } from '../context/MessageContext';
-import Avatar from '../components/Avatar';
-import StoryViewerModal from '../components/StoryViewerModal';
+import Avatar from '../components/common/Avatar';
+import StoryViewerModal from '../components/story/StoryViewerModal';
 import type { User } from '../services/authService';
 
 const formatTimeAgo = (dateStr: string): string => {
@@ -172,6 +173,12 @@ export default function Notifications() {
       } else if (item.entityId) {
         navigate(`/post/${item.entityId}`);
       }
+    } else if (item.type === 'missed_call') {
+      if (item.actor?.id) {
+        navigate(`/messages?user=${item.actor.id}`);
+      } else if (item.actor?.username) {
+        navigate(`/messages?username=${item.actor.username}`);
+      }
     } else if (item.actor?.username) {
       navigate(`/profile/${item.actor.username}`);
     }
@@ -286,13 +293,15 @@ export default function Notifications() {
         return <HiOutlineClock className="w-3.5 h-3.5 text-amber-500 stroke-[2.2]" />;
       case 'follow_accept':
         return <HiOutlineCheckCircle className="w-3.5 h-3.5 text-emerald-600 stroke-[2.2]" />;
+      case 'missed_call':
+        return <HiPhoneXMark className="w-3.5 h-3.5 text-rose-500 stroke-[2.2]" />;
     }
   };
 
   return (
     <div className="w-full flex-1 select-none animate-fade-in">
       {/* Header Container */}
-      <div className="sticky top-14 md:top-6 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden mb-4 sm:mb-6 transition-all">
+      <div className="sticky top-2 md:top-6 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden mb-4 sm:mb-6 transition-all">
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
@@ -437,6 +446,9 @@ export default function Notifications() {
                         {item.type === 'follow' && 'started following you'}
                         {item.type === 'follow_request' && 'requested to follow you'}
                         {item.type === 'follow_accept' && 'accepted your follow request'}
+                        {item.type === 'missed_call' && (
+                          <span className="text-rose-500 font-semibold">missed your voice call</span>
+                        )}
                       </span>
                     </div>
 

@@ -7,8 +7,8 @@ import {
   HiOutlineUser,
 } from 'react-icons/hi2';
 import postService, { type Post } from '../services/postService';
-import PostCard from '../components/PostCard';
-import Avatar from '../components/Avatar';
+import PostCard from '../components/post/PostCard';
+import Avatar from '../components/common/Avatar';
 import type { User } from '../services/authService';
 
 export default function PostDetail({ user: propUser }: { user?: User | null } = {}) {
@@ -58,7 +58,7 @@ export default function PostDetail({ user: propUser }: { user?: User | null } = 
         {/* Main Column */}
         <div className="lg:col-span-8">
           {/* Header bar */}
-          <div className="sticky top-14 md:top-4 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-5 flex items-center gap-3 transition-all">
+          <div className="sticky top-2 md:top-4 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-3 sm:p-3.5 mb-5 flex items-center gap-3 transition-all">
             <Link
               to="/"
               className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"

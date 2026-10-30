@@ -5,12 +5,32 @@
     font-family: 'Cosmic Sans', 'Comic Sans MS', 'Comic Neue', 'Comic Sans', cursive, sans-serif;
   }
 
+  html,
   body {
     font-family: 'Cosmic Sans', 'Comic Sans MS', 'Comic Neue', 'Comic Sans', cursive, sans-serif;
     color: #1e293b;
     background-color: #ffffff;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    width: 100%;
+    min-height: 100%;
+    -webkit-overflow-scrolling: touch;
   }
+}
+
+/* Hide scrollbar for Chrome, Safari, Edge, and Opera */
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
 
 .custom-card-shadow {
