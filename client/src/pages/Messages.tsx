@@ -34,9 +34,11 @@ import {
   HiOutlineEnvelopeOpen,
   HiOutlineGlobeAlt,
   HiOutlinePhone,
+  HiPhone,
   HiOutlineLockClosed,
   HiOutlineSquares2X2,
   HiOutlineChartBar,
+  HiOutlineArrowPath,
 } from 'react-icons/hi2';
 import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
 import messageService, {
@@ -52,33 +54,35 @@ import globalChatService, {
   type GlobalMessageItem,
 } from '../services/globalChatService';
 import userService, { type UserProfileResponse } from '../services/userService';
+import uploadService from '../services/uploadService';
 import type { User } from '../services/authService';
 import getSocket, { joinUserRoom } from '../services/socket';
 import { useMessage } from '../context/MessageContext';
 import { useVoiceCall } from '../context/CallContext';
-import CreateGroupModal from '../components/CreateGroupModal';
-import GroupInfoModal from '../components/GroupInfoModal';
-import ConversationDetailsView from '../components/ConversationDetailsView';
-import Avatar from '../components/Avatar';
-import GlobalChatRoom from '../components/GlobalChatRoom';
-import ChatPollWidget from '../components/ChatPollWidget';
-import PollVotersModal from '../components/PollVotersModal';
+import CreateGroupModal from '../components/chat/CreateGroupModal';
+import GroupInfoModal from '../components/chat/GroupInfoModal';
+import ConversationDetailsView from '../components/chat/ConversationDetailsView';
+import Avatar from '../components/common/Avatar';
+import GlobalChatRoom from '../components/chat/GlobalChatRoom';
+import ChatPollWidget from '../components/chat/ChatPollWidget';
+import PollVotersModal from '../components/chat/PollVotersModal';
 import type { PollVotersData } from '../services/postService';
-import ChatMediaAttachment from '../components/ChatMediaAttachment';
-import ChatAttachmentMenu from '../components/ChatAttachmentMenu';
-import CreateChatPollModal from '../components/CreateChatPollModal';
-import ReelMessageCard from '../components/ReelMessageCard';
-import PostMessageCard from '../components/PostMessageCard';
-import StoryMessageCard from '../components/StoryMessageCard';
-import StoryViewerModal from '../components/StoryViewerModal';
-import CreateStoryModal from '../components/CreateStoryModal';
-import MediaUploadPreviewModal from '../components/MediaUploadPreviewModal';
+import ChatMediaAttachment from '../components/chat/ChatMediaAttachment';
+import ChatAttachmentMenu from '../components/chat/ChatAttachmentMenu';
+import CreateChatPollModal from '../components/chat/CreateChatPollModal';
+import ReelMessageCard from '../components/chat/ReelMessageCard';
+import PostMessageCard from '../components/chat/PostMessageCard';
+import StoryMessageCard from '../components/chat/StoryMessageCard';
+import CallMessageCard from '../components/chat/CallMessageCard';
+import StoryViewerModal from '../components/story/StoryViewerModal';
+import CreateStoryModal from '../components/story/CreateStoryModal';
+import MediaUploadPreviewModal from '../components/chat/MediaUploadPreviewModal';
 import storyService, {
   type UserStoryGroup,
 } from '../services/storyService';
-import MessageReactionsBar from '../components/MessageReactionsBar';
-import MessageReactionsPopup from '../components/MessageReactionsPopup';
-import MessageReactionPicker from '../components/MessageReactionPicker';
+import MessageReactionsBar from '../components/chat/MessageReactionsBar';
+import MessageReactionsPopup from '../components/chat/MessageReactionsPopup';
+import MessageReactionPicker from '../components/chat/MessageReactionPicker';
 import type { MessageReactionItem } from '../services/messageService';
 
 // WhatsApp-like dual tick SVG indicator
@@ -327,7 +331,7 @@ const VoiceNotePlayer: React.FC<{
   ];
 
   return (
-    <div className="flex items-center gap-3 py-1.5 px-0.5 min-w-[245px] sm:min-w-[280px]">
+    <div className="flex items-center gap-3 py-1.5 px-0.5 w-full min-w-0 max-w-[280px]">
       <button
         type="button"
         onClick={togglePlay}
@@ -375,7 +379,7 @@ const VoiceNotePlayer: React.FC<{
             style={{ width: `${progressPct}%` }}
             className="absolute inset-y-0 left-0 flex items-center overflow-hidden pointer-events-none z-10"
           >
-            <div className="w-[200px] sm:w-[230px] h-full flex items-center gap-[2.5px] shrink-0">
+            <div className="w-[170px] sm:w-[230px] h-full flex items-center gap-[2.5px] shrink-0">
               {waveformBars.map((h, i) => (
                 <div
                   key={i}
@@ -1109,6 +1113,29 @@ const renderLastMessagePreview = (
     );
   }
 
+  // 1.5 Call Log
+  if (msg.messageType === 'call' || ('callLog' in msg && Boolean(msg.callLog))) {
+    const callLog = 'callLog' in msg ? msg.callLog : null;
+    const isMissed =
+      callLog?.status === 'missed' ||
+      callLog?.status === 'cancelled' ||
+      msg.content?.toLowerCase().includes('missed');
+    return (
+      <span
+        className={`inline-flex items-center gap-1 font-medium ${
+          isMissed ? 'text-rose-500' : 'text-slate-600'
+        }`}
+      >
+        <HiPhone
+          className={`w-3.5 h-3.5 shrink-0 inline ${
+            isMissed ? 'text-rose-500' : 'text-indigo-500'
+          }`}
+        />
+        <span>{msg.content || 'Voice call'}</span>
+      </span>
+    );
+  }
+
   // 2. Shared Reel (strictly check this BEFORE generic mediaUrl!)
   const isReel =
     msg.messageType === 'reel' ||
@@ -1331,6 +1358,10 @@ export default function Messages() {
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [activeUser, setActiveUser] = useState<UserProfileResponse | null>(null);
   const [messages, setMessages] = useState<MessageItem[]>([]);
+  const messagesRef = useRef<MessageItem[]>([]);
+  messagesRef.current = messages;
+  const [hasMoreDirectMessages, setHasMoreDirectMessages] = useState(false);
+  const [loadingOlderDirect, setLoadingOlderDirect] = useState(false);
 
   // Check if messaging/calling is permitted with active direct contact
   const canMessageAndCallActiveUser = useMemo(() => {
@@ -1344,6 +1375,11 @@ export default function Messages() {
   const [activeGroup, setActiveGroup] = useState<GroupItem | null>(null);
   const [isViewingChatDetails, setIsViewingChatDetails] = useState(false);
   const [groupMessages, setGroupMessages] = useState<GroupMessageItem[]>([]);
+  const groupMessagesRef = useRef<GroupMessageItem[]>([]);
+  groupMessagesRef.current = groupMessages;
+  const [hasMoreGroupMessages, setHasMoreGroupMessages] = useState(false);
+  const [loadingOlderGroup, setLoadingOlderGroup] = useState(false);
+  const isLoadingOlderRef = useRef(false);
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isGroupInfoOpen, setIsGroupInfoOpen] = useState(false);
   const [groupTypingUsers, setGroupTypingUsers] = useState<
@@ -1374,6 +1410,44 @@ export default function Messages() {
   // Multi-select & Batch Actions State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
+
+  // Mobile Message Action Sheet (Long-Press on message bubble)
+  const [mobileActionMsg, setMobileActionMsg] = useState<{
+    item: MessageItem | GroupMessageItem;
+    type: 'direct' | 'group';
+  } | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPressTriggeredRef = useRef(false);
+
+  const handleBubbleTouchStart = useCallback(
+    (m: MessageItem | GroupMessageItem, type: 'direct' | 'group') => {
+      if (isSelectionMode || m.isDeletedForEveryone) return;
+      isLongPressTriggeredRef.current = false;
+      if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = setTimeout(() => {
+        isLongPressTriggeredRef.current = true;
+        if (typeof window !== 'undefined' && window.navigator?.vibrate) {
+          window.navigator.vibrate(35);
+        }
+        setMobileActionMsg({ item: m, type });
+      }, 420);
+    },
+    [isSelectionMode]
+  );
+
+  const handleBubbleTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handleBubbleTouchMove = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
 
   // Forwarding State (supports single and multiple)
   const [forwardingMessages, setForwardingMessages] = useState<(MessageItem | GroupMessageItem)[]>([]);
@@ -1686,11 +1760,13 @@ export default function Messages() {
   const fetchMessages = useCallback(
     async (userId: string) => {
       try {
-        const data = await messageService.getMessages(userId);
-        messagesCacheRef.current[userId] = data;
+        const res = await messageService.getMessages(userId, { limit: 30 });
+        const list = res.messages || [];
+        messagesCacheRef.current[userId] = list;
         // Only update state if this user is still the active chat
         if (activeUserRef.current?.id === userId) {
-          setMessages(data);
+          setMessages(list);
+          setHasMoreDirectMessages(Boolean(res.hasMore));
         }
         refreshUnreadCount?.();
       } catch {}
@@ -1700,14 +1776,76 @@ export default function Messages() {
 
   const fetchGroupMessagesList = useCallback(async (groupId: string) => {
     try {
-      const data = await groupService.getGroupMessages(groupId);
-      groupMessagesCacheRef.current[groupId] = data;
+      const res = await groupService.getGroupMessages(groupId, { limit: 30 });
+      const list = res.messages || [];
+      groupMessagesCacheRef.current[groupId] = list;
       // Only update state if this group is still the active chat
       if (activeGroupRef.current?.id === groupId) {
-        setGroupMessages(data);
+        setGroupMessages(list);
+        setHasMoreGroupMessages(Boolean(res.hasMore));
       }
     } catch {}
   }, []);
+
+  const handleLoadOlderDirectMessages = useCallback(async () => {
+    const curUser = activeUserRef.current;
+    if (!curUser || loadingOlderDirect || !hasMoreDirectMessages) return;
+    setLoadingOlderDirect(true);
+    isLoadingOlderRef.current = true;
+    try {
+      const currentList = messagesRef.current;
+      const oldestMsg = currentList[0];
+      const res = await messageService.getMessages(curUser.id, {
+        limit: 30,
+        before: oldestMsg ? oldestMsg.createdAt : undefined,
+      });
+      const older = res.messages || [];
+      if (older.length > 0) {
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const filtered = older.filter((m) => !existingIds.has(m.id));
+          const updated = [...filtered, ...prev];
+          messagesCacheRef.current[curUser.id] = updated;
+          return updated;
+        });
+      }
+      setHasMoreDirectMessages(Boolean(res.hasMore));
+    } catch (err) {
+      console.error('Failed to load older direct messages:', err);
+    } finally {
+      setLoadingOlderDirect(false);
+    }
+  }, [loadingOlderDirect, hasMoreDirectMessages]);
+
+  const handleLoadOlderGroupMessages = useCallback(async () => {
+    const curGroup = activeGroupRef.current;
+    if (!curGroup || loadingOlderGroup || !hasMoreGroupMessages) return;
+    setLoadingOlderGroup(true);
+    isLoadingOlderRef.current = true;
+    try {
+      const currentList = groupMessagesRef.current;
+      const oldestMsg = currentList[0];
+      const res = await groupService.getGroupMessages(curGroup.id, {
+        limit: 30,
+        before: oldestMsg ? oldestMsg.createdAt : undefined,
+      });
+      const older = res.messages || [];
+      if (older.length > 0) {
+        setGroupMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id));
+          const filtered = older.filter((m) => !existingIds.has(m.id));
+          const updated = [...filtered, ...prev];
+          groupMessagesCacheRef.current[curGroup.id] = updated;
+          return updated;
+        });
+      }
+      setHasMoreGroupMessages(Boolean(res.hasMore));
+    } catch (err) {
+      console.error('Failed to load older group messages:', err);
+    } finally {
+      setLoadingOlderGroup(false);
+    }
+  }, [loadingOlderGroup, hasMoreGroupMessages]);
 
   const fetchChatSettings = useCallback(async () => {
     try {
@@ -2017,7 +2155,15 @@ export default function Messages() {
     setIsSendingPendingMedia(true);
     try {
       const { file, type, previewUrl } = pendingMedia;
-      const mediaToSend = editedDataUrl || previewUrl;
+      let mediaToSend = editedDataUrl || previewUrl;
+      try {
+        if (!editedDataUrl && file) {
+          const uploadRes = await uploadService.uploadFile(file, 'chat');
+          mediaToSend = uploadRes.url;
+        }
+      } catch {
+        // Fallback to dataUrl which backend will automatically upload to Supabase Storage
+      }
       if (activeGroup) {
         const sent = await groupService.sendGroupMessage(activeGroup.id, caption, {
           messageType: type,
@@ -2982,6 +3128,10 @@ export default function Messages() {
 
   // Scroll to bottom on new messages (instant jump when switching chats, smooth when chatting)
   useEffect(() => {
+    if (isLoadingOlderRef.current) {
+      isLoadingOlderRef.current = false;
+      return;
+    }
     if (deduplicatedMessages.length > 0 || deduplicatedGroupMessages.length > 0) {
       if (isSwitchingChatRef.current) {
         endRef.current?.scrollIntoView({ behavior: 'auto' });
@@ -3002,6 +3152,7 @@ export default function Messages() {
     setOpenChatMenuId(null);
     setActiveGroup(null);
     setActiveUser(u);
+    setHasMoreDirectMessages(false);
     setIsViewingChatDetails(false);
     setText('');
     setReplyingTo(null);
@@ -3046,6 +3197,7 @@ export default function Messages() {
     setOpenChatMenuId(null);
     setActiveUser(null);
     setActiveGroup(g);
+    setHasMoreGroupMessages(false);
     setIsViewingChatDetails(false);
     setText('');
     setReplyingTo(null);
@@ -3705,8 +3857,10 @@ export default function Messages() {
     const elapsedMs = Date.now() - new Date(m.createdAt).getTime();
     if (elapsedMs > 10 * 60 * 1000) return false;
 
-    // Disallow editing for posts, reels, story replies, polls, voice notes, documents, system messages
+    // Disallow editing for posts, reels, story replies, polls, voice notes, documents, system messages, calls
     if (
+      m.messageType === 'call' ||
+      ('callLog' in m && Boolean((m as any).callLog)) ||
       m.messageType === 'post' ||
       m.messageType === 'reel' ||
       m.messageType === 'story_reply' ||
@@ -3744,10 +3898,10 @@ export default function Messages() {
   const hasActiveChat = Boolean(activeUser || activeGroup || isGlobalActive);
 
   return (
-    <div className="w-full h-[calc(100dvh-10.5rem)] md:h-[calc(100vh-3.5rem)] md:min-h-[580px] flex gap-4 select-none relative">
+    <div className="w-full h-full md:h-[calc(100vh-3.5rem)] md:min-h-[580px] flex md:gap-4 select-none relative">
       {/* Left Pane: Conversations & Groups List */}
       <div
-        className={`w-full md:w-80 lg:w-96 bg-white rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden shrink-0 h-full ${
+        className={`w-full md:w-80 lg:w-96 bg-white rounded-none md:rounded-3xl border-0 md:border border-slate-200 shadow-none md:shadow-sm flex flex-col overflow-hidden shrink-0 h-full ${
           hasActiveChat ? 'hidden md:flex' : 'flex'
         }`}
       >
@@ -4727,7 +4881,7 @@ export default function Messages() {
             <div
               data-lenis-prevent
               onWheel={(e) => e.stopPropagation()}
-              className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 space-y-3 bg-slate-50/20 overscroll-contain"
+              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden w-full p-2.5 sm:p-5 space-y-3 bg-slate-50/20 overscroll-contain"
             >
               {deduplicatedGroupMessages.length === 0 ? (
                 <div className="h-full min-h-[160px] flex flex-col items-center justify-center text-center text-slate-400 text-sm p-6">
@@ -4736,6 +4890,26 @@ export default function Messages() {
                 </div>
               ) : (
                 <>
+                  {hasMoreGroupMessages && (
+                    <div className="flex justify-center py-2">
+                      <button
+                        type="button"
+                        onClick={handleLoadOlderGroupMessages}
+                        disabled={loadingOlderGroup}
+                        className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200/60 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                      >
+                        {loadingOlderGroup ? (
+                          <>
+                            <HiOutlineArrowPath className="w-3.5 h-3.5 animate-spin" />
+                            <span>Loading older messages...</span>
+                          </>
+                        ) : (
+                          <span>Load older messages</span>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
                   {deduplicatedGroupMessages.map((m) => {
                     const isSystem = m.messageType === 'system';
                     const isMe = m.senderId === currentUser?.id;
@@ -4793,7 +4967,7 @@ export default function Messages() {
                         )}
 
                         <div
-                          className={`flex-1 flex items-end gap-2 ${
+                          className={`flex-1 min-w-0 flex items-end gap-1.5 sm:gap-2 ${
                             isMe ? 'justify-end' : 'justify-start'
                           }`}
                         >
@@ -4806,7 +4980,7 @@ export default function Messages() {
 
                           {/* Hover action toolbar for Sender */}
                           {isMe && !m.isDeletedForEveryone && (
-                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity flex items-center gap-1 mb-1 shrink-0 relative`}>
+                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100 flex' : 'hidden md:flex opacity-0 md:group-hover:opacity-100'} transition-opacity items-center gap-1 mb-1 shrink-0 relative`}>
                               {/* Reaction trigger */}
                               <div className="relative">
                                 <button
@@ -4950,7 +5124,7 @@ export default function Messages() {
                           )}
 
                           {isMe && m.isDeletedForEveryone && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                            <div className="hidden md:flex opacity-0 md:group-hover:opacity-100 transition-opacity items-center gap-1 mb-1 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => setDeletingGroupMsg(m)}
@@ -4963,9 +5137,21 @@ export default function Messages() {
                           )}
 
                           {/* Bubble */}
-                          <div className="flex flex-col max-w-[80%] sm:max-w-[70%] relative">
+                          <div
+                            onTouchStart={() => handleBubbleTouchStart(m, 'group')}
+                            onTouchEnd={handleBubbleTouchEnd}
+                            onTouchMove={handleBubbleTouchMove}
+                            className="flex flex-col max-w-[85%] sm:max-w-[70%] min-w-0 relative select-none"
+                          >
                             <div
-                              className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed flex flex-col gap-1 shadow-2xs relative transition-all ${
+                              onClick={(e) => {
+                                if (isLongPressTriggeredRef.current) {
+                                  e.stopPropagation();
+                                  isLongPressTriggeredRef.current = false;
+                                  return;
+                                }
+                              }}
+                              className={`px-3 sm:px-3.5 py-2 rounded-2xl text-sm leading-relaxed flex flex-col gap-1 shadow-2xs relative transition-all break-words min-w-0 ${
                                 isSelected ? 'ring-2 ring-purple-500 shadow-md ring-offset-2' : ''
                               } ${
                                 isMe
@@ -5008,7 +5194,34 @@ export default function Messages() {
                               )}
 
                               {/* Message content: poll, voice, media, or text */}
-                              {!m.isDeletedForEveryone && m.messageType === 'poll' && m.poll ? (
+                              {!m.isDeletedForEveryone && (m.messageType === 'call' || ('callLog' in m && Boolean((m as any).callLog))) ? (
+                                <div>
+                                  <CallMessageCard
+                                    callLog={'callLog' in m ? (m as any).callLog : null}
+                                    content={m.content}
+                                    isMe={isMe}
+                                  />
+                                  <div className="flex items-center gap-1.5 ml-auto justify-end select-none pb-0.5 leading-none mt-1">
+                                    {m.starredBy?.includes(currentUser?.id || '') && (
+                                      <HiStar
+                                        className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
+                                        title="Starred message"
+                                      />
+                                    )}
+                                    {m.isPinned && (
+                                      <span title="Pinned message" className="text-purple-400">
+                                        <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-slate-400">
+                                      {new Date(m.createdAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : !m.isDeletedForEveryone && m.messageType === 'poll' && m.poll ? (
                                 <ChatPollWidget
                                   poll={m.poll}
                                   currentUserId={currentUser?.id}
@@ -5207,7 +5420,7 @@ export default function Messages() {
 
                           {/* Hover action toolbar for incoming group messages */}
                           {!isMe && !m.isDeletedForEveryone && (
-                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity flex items-center gap-1 mb-1 shrink-0 relative`}>
+                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100 flex' : 'hidden md:flex opacity-0 md:group-hover:opacity-100'} transition-opacity items-center gap-1 mb-1 shrink-0 relative`}>
                               {/* Reaction trigger */}
                               <div className="relative">
                                 <button
@@ -5342,7 +5555,7 @@ export default function Messages() {
                           )}
 
                           {!isMe && m.isDeletedForEveryone && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                            <div className="hidden md:flex opacity-0 md:group-hover:opacity-100 transition-opacity items-center gap-1 mb-1 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => setDeletingGroupMsg(m)}
@@ -5715,7 +5928,7 @@ export default function Messages() {
             <div
               data-lenis-prevent
               onWheel={(e) => e.stopPropagation()}
-              className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-5 space-y-3 bg-slate-50/20 overscroll-contain"
+              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden w-full p-2.5 sm:p-5 space-y-3 bg-slate-50/20 overscroll-contain"
             >
               {deduplicatedMessages.length === 0 ? (
                 <div className="h-full min-h-[160px] flex flex-col items-center justify-center text-center text-slate-400 text-sm p-6">
@@ -5723,6 +5936,26 @@ export default function Messages() {
                 </div>
               ) : (
                 <>
+                  {hasMoreDirectMessages && (
+                    <div className="flex justify-center py-2">
+                      <button
+                        type="button"
+                        onClick={handleLoadOlderDirectMessages}
+                        disabled={loadingOlderDirect}
+                        className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200/60 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                      >
+                        {loadingOlderDirect ? (
+                          <>
+                            <HiOutlineArrowPath className="w-3.5 h-3.5 animate-spin" />
+                            <span>Loading older messages...</span>
+                          </>
+                        ) : (
+                          <span>Load older messages</span>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
                   {deduplicatedMessages.map((m) => {
                     const isMe = m.senderId === currentUser?.id;
                     const isText = (!m.messageType || m.messageType === 'text') && !m.audioUrl && !m.mediaUrl && !m.poll;
@@ -5768,7 +6001,7 @@ export default function Messages() {
                         )}
 
                         <div
-                          className={`flex-1 flex items-end gap-2 ${
+                          className={`flex-1 min-w-0 flex items-end gap-1.5 sm:gap-2 ${
                             isMe ? 'justify-end' : 'justify-start'
                           }`}
                         >
@@ -5779,7 +6012,7 @@ export default function Messages() {
                           )}
 
                           {isMe && !m.isDeletedForEveryone && (
-                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity flex items-center gap-1 mb-1 shrink-0 relative`}>
+                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100 flex' : 'hidden md:flex opacity-0 md:group-hover:opacity-100'} transition-opacity items-center gap-1 mb-1 shrink-0 relative`}>
                               {/* Reaction trigger */}
                               <div className="relative">
                                 <button
@@ -5913,7 +6146,7 @@ export default function Messages() {
                           )}
 
                           {isMe && m.isDeletedForEveryone && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                            <div className="hidden md:flex opacity-0 md:group-hover:opacity-100 transition-opacity items-center gap-1 mb-1 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => setDeletingMessage(m)}
@@ -5926,9 +6159,21 @@ export default function Messages() {
                           )}
 
                           {/* Bubble */}
-                          <div className="flex flex-col max-w-[80%] sm:max-w-[70%] relative">
+                          <div
+                            onTouchStart={() => handleBubbleTouchStart(m, 'direct')}
+                            onTouchEnd={handleBubbleTouchEnd}
+                            onTouchMove={handleBubbleTouchMove}
+                            className="flex flex-col max-w-[85%] sm:max-w-[70%] min-w-0 relative select-none"
+                          >
                             <div
-                              className={`px-3.5 py-2 rounded-2xl text-sm sm:text-base leading-relaxed flex flex-col gap-1 shadow-2xs relative transition-all ${
+                              onClick={(e) => {
+                                if (isLongPressTriggeredRef.current) {
+                                  e.stopPropagation();
+                                  isLongPressTriggeredRef.current = false;
+                                  return;
+                                }
+                              }}
+                              className={`px-3 sm:px-3.5 py-2 rounded-2xl text-sm sm:text-base leading-relaxed flex flex-col gap-1 shadow-2xs relative transition-all break-words min-w-0 ${
                                 isSelected ? 'ring-2 ring-purple-500 shadow-md ring-offset-2' : ''
                               } ${
                                 isMe
@@ -5966,7 +6211,49 @@ export default function Messages() {
                               )}
 
                               {/* Message content: poll, voice, media, or text */}
-                              {!m.isDeletedForEveryone && m.messageType === 'poll' && m.poll ? (
+                              {!m.isDeletedForEveryone && (m.messageType === 'call' || ('callLog' in m && Boolean((m as any).callLog))) ? (
+                                <div>
+                                  <CallMessageCard
+                                    callLog={'callLog' in m ? (m as any).callLog : null}
+                                    content={m.content}
+                                    isMe={isMe}
+                                    onCallBack={
+                                      activeUser
+                                        ? () =>
+                                            startVoiceCall({
+                                              id: activeUser.id,
+                                              fullName: activeUser.fullName,
+                                              username: activeUser.username,
+                                              avatarUrl: activeUser.avatarUrl,
+                                              isPrivate: activeUser.isPrivate,
+                                            })
+                                        : undefined
+                                    }
+                                  />
+                                  <div className="flex items-center gap-1.5 ml-auto justify-end select-none pb-0.5 leading-none mt-1">
+                                    {m.starredBy?.includes(currentUser?.id || '') && (
+                                      <HiStar
+                                        className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0"
+                                        title="Starred message"
+                                      />
+                                    )}
+                                    {m.isPinned && (
+                                      <span title="Pinned message" className="text-purple-400">
+                                        <PinIcon className="w-3 h-3 shrink-0" filled={true} />
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-slate-400">
+                                      {new Date(m.createdAt).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </span>
+                                    {isMe && !m.isDeletedForEveryone && (
+                                      <MessageTicks status={m.status} isRead={m.isRead} />
+                                    )}
+                                  </div>
+                                </div>
+                              ) : !m.isDeletedForEveryone && m.messageType === 'poll' && m.poll ? (
                                 <ChatPollWidget
                                   poll={m.poll}
                                   currentUserId={currentUser?.id}
@@ -6188,7 +6475,7 @@ export default function Messages() {
                           </div>
 
                           {!isMe && !m.isDeletedForEveryone && (
-                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity flex items-center gap-1 mb-1 shrink-0 relative`}>
+                            <div className={`${activeReactionPickerMessageId === m.id ? 'opacity-100 flex' : 'hidden md:flex opacity-0 md:group-hover:opacity-100'} transition-opacity items-center gap-1 mb-1 shrink-0 relative`}>
                               {/* Reaction trigger */}
                               <div className="relative">
                                 <button
@@ -6311,7 +6598,7 @@ export default function Messages() {
                           )}
 
                           {!isMe && m.isDeletedForEveryone && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mb-1 shrink-0">
+                            <div className="hidden md:flex opacity-0 md:group-hover:opacity-100 transition-opacity items-center gap-1 mb-1 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => setDeletingMessage(m)}
@@ -6587,7 +6874,7 @@ export default function Messages() {
 
       {/* Delete Confirmation Modal (Direct or Group, Single or Batch) */}
       {deletingMessages.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-2xl border border-slate-100 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900">
@@ -6641,7 +6928,7 @@ export default function Messages() {
 
       {/* Forward Modal (Direct and Group, Single or Batch) */}
       {forwardingMessages.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85vh]">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -6827,7 +7114,7 @@ export default function Messages() {
 
       {/* Clear Chat Confirmation Modal */}
       {isClearModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-100 p-6 flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-2xl bg-rose-50 text-rose-600 shrink-0">
@@ -6939,6 +7226,215 @@ export default function Messages() {
           question={pollVotersModal.question}
           loadVoters={pollVotersModal.loader}
         />
+      )}
+
+      {/* Mobile Message Action Sheet (Long-Press on message bubble) */}
+      {mobileActionMsg && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 backdrop-blur-xs md:hidden animate-in fade-in duration-150"
+          onClick={() => setMobileActionMsg(null)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-t-3xl p-4 shadow-2xl flex flex-col gap-3 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Grab handle */}
+            <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto -mt-1 mb-1" />
+
+            {/* Quick Emoji Reactions */}
+            <div className="flex items-center justify-around py-2 px-1 bg-slate-50 rounded-2xl border border-slate-100">
+              {['❤️', '👍', '😂', '😮', '😢', '🔥'].map((emoji) => {
+                const currentReaction = mobileActionMsg.item.reactions?.find(
+                  (r) => r.userId === currentUser?.id
+                )?.emoji;
+                const isSelected = currentReaction === emoji;
+
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => {
+                      handleToggleMessageReaction(mobileActionMsg.item.id, emoji);
+                      setMobileActionMsg(null);
+                    }}
+                    className={`w-11 h-11 rounded-full flex items-center justify-center text-2xl transition-transform active:scale-125 cursor-pointer ${
+                      isSelected
+                        ? 'bg-purple-100 ring-2 ring-purple-500 scale-110 shadow-xs'
+                        : 'hover:bg-white hover:scale-115'
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Action options */}
+            <div className="grid grid-cols-4 gap-2 pt-1 text-slate-700">
+              {/* Reply */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (mobileActionMsg.type === 'group') {
+                    setReplyingToGroupMsg(mobileActionMsg.item as GroupMessageItem);
+                  } else {
+                    setReplyingTo(mobileActionMsg.item as MessageItem);
+                  }
+                  setMobileActionMsg(null);
+                }}
+                className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-slate-50 active:bg-slate-100 cursor-pointer text-xs font-medium"
+              >
+                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-700">
+                  <HiOutlineArrowUturnLeft className="w-5 h-5" />
+                </div>
+                <span>Reply</span>
+              </button>
+
+              {/* Copy (if text) */}
+              {mobileActionMsg.item.content && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(mobileActionMsg.item.content || '');
+                    showSuccess('Copied to clipboard');
+                    setMobileActionMsg(null);
+                  }}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-slate-50 active:bg-slate-100 cursor-pointer text-xs font-medium"
+                >
+                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-700">
+                    <HiOutlineClipboardDocument className="w-5 h-5" />
+                  </div>
+                  <span>Copy</span>
+                </button>
+              )}
+
+              {/* Star */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleToggleStarMessage(mobileActionMsg.item.id);
+                  setMobileActionMsg(null);
+                }}
+                className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-slate-50 active:bg-slate-100 cursor-pointer text-xs font-medium"
+              >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  mobileActionMsg.item.starredBy?.includes(currentUser?.id || '')
+                    ? 'bg-amber-50 text-amber-500'
+                    : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {mobileActionMsg.item.starredBy?.includes(currentUser?.id || '') ? (
+                    <HiStar className="w-5 h-5 fill-amber-400 text-amber-500" />
+                  ) : (
+                    <HiOutlineStar className="w-5 h-5" />
+                  )}
+                </div>
+                <span>Star</span>
+              </button>
+
+              {/* Pin */}
+              <button
+                type="button"
+                onClick={() => {
+                  handleTogglePinMessage(mobileActionMsg.item.id);
+                  setMobileActionMsg(null);
+                }}
+                className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-slate-50 active:bg-slate-100 cursor-pointer text-xs font-medium"
+              >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  mobileActionMsg.item.isPinned
+                    ? 'bg-purple-50 text-purple-600'
+                    : 'bg-slate-100 text-slate-700'
+                }`}>
+                  <PinIcon className="w-5 h-5" filled={Boolean(mobileActionMsg.item.isPinned)} />
+                </div>
+                <span>Pin</span>
+              </button>
+
+              {/* Forward */}
+              <button
+                type="button"
+                onClick={() => {
+                  setForwardingMessage(mobileActionMsg.item as MessageItem);
+                  setMobileActionMsg(null);
+                }}
+                className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-slate-50 active:bg-slate-100 cursor-pointer text-xs font-medium"
+              >
+                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-700">
+                  <HiOutlineArrowUturnRight className="w-5 h-5" />
+                </div>
+                <span>Forward</span>
+              </button>
+
+              {/* Select Mode */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSelectionMode(true);
+                  toggleSelectMessage(mobileActionMsg.item.id);
+                  setMobileActionMsg(null);
+                }}
+                className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-slate-50 active:bg-slate-100 cursor-pointer text-xs font-medium"
+              >
+                <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                  <HiOutlineCheckCircle className="w-5 h-5" />
+                </div>
+                <span>Select</span>
+              </button>
+
+              {/* Edit (if editable) */}
+              {isMessageEditable(mobileActionMsg.item) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (mobileActionMsg.type === 'group') {
+                      handleStartGroupEdit(mobileActionMsg.item as GroupMessageItem);
+                    } else {
+                      handleStartEdit(mobileActionMsg.item as MessageItem);
+                    }
+                    setMobileActionMsg(null);
+                  }}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-slate-50 active:bg-slate-100 cursor-pointer text-xs font-medium"
+                >
+                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-700">
+                    <HiOutlinePencilSquare className="w-5 h-5" />
+                  </div>
+                  <span>Edit</span>
+                </button>
+              )}
+
+              {/* Delete (if can delete) */}
+              {(mobileActionMsg.item.senderId === currentUser?.id ||
+                (activeGroup && activeGroup.currentUserRole === 'admin')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (mobileActionMsg.type === 'group') {
+                      setDeletingGroupMsg(mobileActionMsg.item as GroupMessageItem);
+                    } else {
+                      setDeletingMessage(mobileActionMsg.item as MessageItem);
+                    }
+                    setMobileActionMsg(null);
+                  }}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-rose-50 active:bg-rose-100 cursor-pointer text-xs font-medium text-rose-600"
+                >
+                  <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+                    <HiOutlineTrash className="w-5 h-5" />
+                  </div>
+                  <span>Delete</span>
+                </button>
+              )}
+            </div>
+
+            {/* Cancel Button */}
+            <button
+              type="button"
+              onClick={() => setMobileActionMsg(null)}
+              className="w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition-colors cursor-pointer mt-1"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
     </div>

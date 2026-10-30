@@ -1,15 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import {
   HiOutlineSparkles,
   HiOutlineUserGroup,
   HiOutlineArrowPath,
   HiOutlineChatBubbleLeftRight,
+  HiOutlineBell,
 } from 'react-icons/hi2';
-import CreatePostCard from '../components/CreatePostCard';
-import PostCard from '../components/PostCard';
-import WhoToFollow from '../components/WhoToFollow';
-import Stories from '../components/Stories';
+import CreatePostCard from '../components/post/CreatePostCard';
+import PostCard from '../components/post/PostCard';
+import WhoToFollow from '../components/common/WhoToFollow';
+import Stories from '../components/story/Stories';
 import { useMessage } from '../context/MessageContext';
 import postService, { type Post } from '../services/postService';
 import type { User } from '../services/authService';
@@ -22,8 +23,12 @@ export default function Home() {
 
   const [feedType, setFeedType] = useState<'for-you' | 'following'>('for-you');
   const [posts, setPosts] = useState<Post[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const showToast = useCallback(
     (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -46,8 +51,10 @@ export default function Home() {
       else setLoading(true);
 
       try {
-        const data = await postService.getFeed(type);
+        const data = await postService.getFeed(type, 1, 10);
         setPosts(data.posts || []);
+        setPage(1);
+        setHasMore(Boolean(data.hasMore));
       } catch (err) {
         console.error('Failed to load feed:', err);
         showToast('Could not refresh feed. Check your connection.', 'error');
@@ -59,9 +66,46 @@ export default function Home() {
     [showToast]
   );
 
+  const loadMorePosts = useCallback(async () => {
+    if (loadingMore || !hasMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const data = await postService.getFeed(feedType, nextPage, 10);
+      const newPosts = data.posts || [];
+      setPosts((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        const filtered = newPosts.filter((p) => !existingIds.has(p.id));
+        return [...prev, ...filtered];
+      });
+      setPage(nextPage);
+      setHasMore(Boolean(data.hasMore));
+    } catch (err) {
+      console.error('Failed to load more feed:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, loading, page, feedType]);
+
   useEffect(() => {
     fetchFeed(feedType);
   }, [feedType, fetchFeed]);
+
+  useEffect(() => {
+    if (!hasMore || loading || loadingMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (sentinelRef.current) {
+      observer.observe(sentinelRef.current);
+    }
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, loadMorePosts]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -108,7 +152,7 @@ export default function Home() {
     <div className="w-full flex-1 relative select-none">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8">
-          <div className="sticky top-14 md:top-6 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-2.5 sm:p-3.5 mb-4 sm:mb-5 flex items-center justify-between transition-all">
+          <div className="sticky top-2 md:top-6 z-20 bg-white/90 backdrop-blur-md rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-xs p-2.5 sm:p-3.5 mb-4 sm:mb-5 flex items-center justify-between transition-all">
             <div className="bg-slate-100/90 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/60">
               <button
                 type="button"
@@ -137,17 +181,27 @@ export default function Home() {
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => fetchFeed(feedType, true)}
-              disabled={refreshing}
-              className="p-2.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-2xl transition-all cursor-pointer disabled:opacity-40"
-              title="Refresh feed"
-            >
-              <HiOutlineArrowPath
-                className={`w-4 h-4 ${refreshing ? 'animate-spin text-slate-900' : ''}`}
-              />
-            </button>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Link
+                to="/notifications"
+                className="md:hidden p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all cursor-pointer relative"
+                title="Notifications"
+              >
+                <HiOutlineBell className="w-5 h-5 stroke-[1.8]" />
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => fetchFeed(feedType, true)}
+                disabled={refreshing}
+                className="p-2 sm:p-2.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl sm:rounded-2xl transition-all cursor-pointer disabled:opacity-40"
+                title="Refresh feed"
+              >
+                <HiOutlineArrowPath
+                  className={`w-4 h-4 ${refreshing ? 'animate-spin text-slate-900' : ''}`}
+                />
+              </button>
+            </div>
           </div>
 
           <div className="block lg:hidden">
@@ -206,6 +260,18 @@ export default function Home() {
                   showToast={showToast}
                 />
               ))}
+
+              {/* Incremental Lazy Load Sentinel */}
+              {hasMore && (
+                <div ref={sentinelRef} className="py-5 flex justify-center items-center">
+                  {loadingMore && (
+                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-slate-200/90 shadow-2xs">
+                      <HiOutlineArrowPath className="w-4 h-4 animate-spin text-purple-600" />
+                      <span>Retrieving more echoes...</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
