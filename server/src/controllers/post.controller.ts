@@ -20,6 +20,7 @@ import {
   emitPostPollVoted,
   emitNotification,
 } from '../socket';
+import { supabaseStorage } from '../services/supabaseStorage.service';
 
 /**
  * Helper to calculate expiration date from expiresIn duration or explicit expiresAt date
@@ -212,17 +213,17 @@ export const createPost = async (
         });
         return;
       }
-    } else if (hasMedia) {
-      computedMediaType = mediaType || 'image';
+    }
 
-      // Enforce 1MB image payload limit on backend
+    let processedMediaUrls: string[] | null = null;
+    if (hasMedia) {
+      computedMediaType = mediaType || 'image';
+      processedMediaUrls = [];
+
       for (const url of mediaUrls) {
-        if (typeof url === 'string' && url.startsWith('data:image/') && url.length > 2 * 1024 * 1024) {
-          res.status(400).json({
-            status: 'error',
-            message: 'Image size exceeds the 1MB limit. Please choose a smaller image.',
-          });
-          return;
+        if (typeof url === 'string') {
+          const finalUrl = await supabaseStorage.uploadBase64(currentUserId, url, 'posts');
+          processedMediaUrls.push(finalUrl);
         }
       }
     }
@@ -238,7 +239,7 @@ export const createPost = async (
     const newPost = new Post();
     newPost.userId = currentUserId;
     newPost.content = trimmedContent;
-    newPost.mediaUrls = hasMedia ? mediaUrls : null;
+    newPost.mediaUrls = processedMediaUrls;
     newPost.mediaType = computedMediaType;
     newPost.pollOptions = formattedPollOptions;
     newPost.pollExpiresAt = calculatedPollExpiresAt;
@@ -293,7 +294,7 @@ export const getFeedPosts = async (
     const currentUserId = req.user?.id;
     const feedType = (req.query.feedType as string) || 'for-you';
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 10));
     const skip = (page - 1) * limit;
 
     const postRepo = AppDataSource.getRepository(Post);
@@ -429,9 +430,13 @@ export const getUserPosts = async (
       }
     }
 
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 15));
+    const skip = (page - 1) * limit;
+
     const postRepo = AppDataSource.getRepository(Post);
 
-    let posts: Post[] = [];
+    let rawPosts: Post[] = [];
 
     if (type === 'likes') {
       // Likes are strictly private! A user's liked posts are never exposed to public visitors.
@@ -444,19 +449,23 @@ export const getUserPosts = async (
             fullName: targetUser.fullName,
           },
           type: 'likes',
+          page,
+          limit,
+          hasMore: false,
           posts: [],
         });
         return;
       }
 
-      posts = await postRepo
+      rawPosts = await postRepo
         .createQueryBuilder('post')
         .innerJoin(PostLike, 'pl', 'pl.postId = post.id AND pl.userId = :targetUserId', {
           targetUserId: targetUser.id,
         })
         .leftJoinAndSelect('post.user', 'user')
         .orderBy('pl.createdAt', 'DESC')
-        .take(50)
+        .skip(skip)
+        .take(limit + 1)
         .getMany();
     } else {
       let qb = postRepo
@@ -464,15 +473,18 @@ export const getUserPosts = async (
         .leftJoinAndSelect('post.user', 'user')
         .where('post.userId = :userId', { userId: targetUser.id })
         .orderBy('post.createdAt', 'DESC')
-        .take(50);
+        .skip(skip)
+        .take(limit + 1);
 
       if (type === 'media') {
         qb = qb.andWhere('post.mediaUrls IS NOT NULL');
       }
 
-      posts = await qb.getMany();
+      rawPosts = await qb.getMany();
     }
 
+    const hasMore = rawPosts.length > limit;
+    const posts = hasMore ? rawPosts.slice(0, limit) : rawPosts;
     const enrichedPosts = await enrichPostsWithUserData(posts, currentUserId);
 
     res.json({
@@ -483,6 +495,9 @@ export const getUserPosts = async (
         fullName: targetUser.fullName,
       },
       type,
+      page,
+      limit,
+      hasMore,
       posts: enrichedPosts,
     });
   } catch (error) {
@@ -584,6 +599,12 @@ export const deletePost = async (
         message: 'You are not authorized to delete this post',
       });
       return;
+    }
+
+    if (post.mediaUrls && Array.isArray(post.mediaUrls)) {
+      for (const url of post.mediaUrls) {
+        await supabaseStorage.deleteFileByUrl(currentUserId, url);
+      }
     }
 
     await postRepo.remove(post);
