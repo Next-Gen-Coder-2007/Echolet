@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import Avatar from './Avatar';
-import Modal from './Modal';
+import Avatar from '../common/Avatar';
+import Modal from '../common/Modal';
 import { HiXMark, HiOutlineChartBar, HiOutlineArrowPath } from 'react-icons/hi2';
-import type { PollVotersData } from '../services/postService';
+import type { PollVotersData } from '../../services/postService';
 
 interface PollVotersModalProps {
   isOpen: boolean;

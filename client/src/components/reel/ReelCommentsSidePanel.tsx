@@ -15,10 +15,10 @@ import {
   HiOutlineChatBubbleOvalLeftEllipsis,
 } from 'react-icons/hi2';
 import { BsPinAngle, BsPinAngleFill } from 'react-icons/bs';
-import reelService, { type Reel, type ReelComment } from '../services/reelService';
-import type { User } from '../services/authService';
-import { useMessage } from '../context/MessageContext';
-import Avatar from './Avatar';
+import reelService, { type Reel, type ReelComment } from '../../services/reelService';
+import type { User } from '../../services/authService';
+import { useMessage } from '../../context/MessageContext';
+import Avatar from '../common/Avatar';
 
 interface ReelCommentsSidePanelProps {
   isOpen: boolean;

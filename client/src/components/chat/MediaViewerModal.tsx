@@ -8,7 +8,7 @@ import {
   HiOutlineArrowPath,
   HiXMark,
 } from 'react-icons/hi2';
-import Modal, { type BackdropVariant } from './Modal';
+import Modal, { type BackdropVariant } from '../common/Modal';
 
 export interface MediaViewerModalProps {
   isOpen: boolean;

@@ -12,13 +12,13 @@ import {
   HiOutlineXMark,
   HiOutlineEllipsisVertical,
 } from 'react-icons/hi2';
-import Modal from './Modal';
-import Avatar from './Avatar';
+import Modal from '../common/Modal';
+import Avatar from '../common/Avatar';
 import groupService, {
   type GroupDetails,
   type GroupItem,
-} from '../services/groupService';
-import userService, { type ConnectedUser } from '../services/userService';
+} from '../../services/groupService';
+import userService, { type ConnectedUser } from '../../services/userService';
 
 interface GroupInfoModalProps {
   isOpen: boolean;

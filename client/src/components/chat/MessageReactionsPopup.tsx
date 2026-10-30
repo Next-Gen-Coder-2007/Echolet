@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 import { HiXMark, HiOutlineFaceSmile, HiPlus, HiOutlineTrash } from 'react-icons/hi2';
-import type { MessageReactionItem } from '../services/messageService';
+import type { MessageReactionItem } from '../../services/messageService';
 import MessageReactionPicker from './MessageReactionPicker';
-import Avatar from './Avatar';
+import Avatar from '../common/Avatar';
 
 interface MessageReactionsPopupProps {
   reactions: MessageReactionItem[];

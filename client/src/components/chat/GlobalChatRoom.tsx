@@ -17,10 +17,10 @@ import {
 import EmojiPicker, { type EmojiClickData } from 'emoji-picker-react';
 import globalChatService, {
   type GlobalMessageItem,
-} from '../services/globalChatService';
-import type { User } from '../services/authService';
-import getSocket from '../services/socket';
-import { useMessage } from '../context/MessageContext';
+} from '../../services/globalChatService';
+import type { User } from '../../services/authService';
+import getSocket from '../../services/socket';
+import { useMessage } from '../../context/MessageContext';
 import ChatPollWidget from './ChatPollWidget';
 import ChatMediaAttachment from './ChatMediaAttachment';
 import ChatAttachmentMenu from './ChatAttachmentMenu';
@@ -28,7 +28,7 @@ import CreateChatPollModal from './CreateChatPollModal';
 import ReelMessageCard from './ReelMessageCard';
 import PostMessageCard from './PostMessageCard';
 import StoryMessageCard from './StoryMessageCard';
-import Avatar from './Avatar';
+import Avatar from '../common/Avatar';
 
 // Distinct sender colors identical to group messages
 const SENDER_COLORS = [

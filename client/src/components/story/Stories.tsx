@@ -6,15 +6,15 @@ import {
   HiOutlineSparkles,
   HiOutlineVideoCamera,
 } from 'react-icons/hi2';
-import type { User } from '../services/authService';
+import type { User } from '../../services/authService';
 import storyService, {
   type StoryItem as ApiStoryItem,
   type UserStoryGroup,
-} from '../services/storyService';
-import getSocket from '../services/socket';
+} from '../../services/storyService';
+import getSocket from '../../services/socket';
 import CreateStoryModal from './CreateStoryModal';
 import StoryViewerModal from './StoryViewerModal';
-import Avatar from './Avatar';
+import Avatar from '../common/Avatar';
 
 export interface StoryItem {
   id: string;

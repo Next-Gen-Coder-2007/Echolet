@@ -26,18 +26,18 @@ import postService, {
   type PostComment,
   type PollOptionItem,
   type PostReactionItem,
-} from '../services/postService';
-import collectionService, { type BookmarkCollection } from '../services/collectionService';
-import type { User } from '../services/authService';
-import { useMessage } from '../context/MessageContext';
-import MediaViewerModal from './MediaViewerModal';
+} from '../../services/postService';
+import collectionService, { type BookmarkCollection } from '../../services/collectionService';
+import type { User } from '../../services/authService';
+import { useMessage } from '../../context/MessageContext';
+import MediaViewerModal from '../chat/MediaViewerModal';
 import SaveToCollectionModal from './SaveToCollectionModal';
 import SharePostModal from './SharePostModal';
 import PostReactionPicker from './PostReactionPicker';
 import PostReactionsModal from './PostReactionsModal';
-import PollVotersModal from './PollVotersModal';
-import Avatar from './Avatar';
-import getSocket from '../services/socket';
+import PollVotersModal from '../chat/PollVotersModal';
+import Avatar from '../common/Avatar';
+import getSocket from '../../services/socket';
 
 interface PostCardProps {
   post: Post;

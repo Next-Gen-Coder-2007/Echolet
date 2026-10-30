@@ -1,6 +1,6 @@
 import React from 'react';
-import Avatar from './Avatar';
-import { useVoiceCall } from '../context/CallContext';
+import Avatar from '../common/Avatar';
+import { useVoiceCall } from '../../context/CallContext';
 import {
   HiOutlinePhone,
   HiOutlinePhoneXMark,

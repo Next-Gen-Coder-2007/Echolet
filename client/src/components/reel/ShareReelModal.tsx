@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import Avatar from './Avatar';
+import Avatar from '../common/Avatar';
 import {
   HiXMark,
   HiCheck,
@@ -17,12 +17,12 @@ import {
   FaFacebook,
   FaEnvelope,
 } from 'react-icons/fa6';
-import reelService, { type Reel } from '../services/reelService';
-import { messageService } from '../services/messageService';
-import { groupService, type GroupItem } from '../services/groupService';
-import { userService } from '../services/userService';
-import type { User } from '../services/authService';
-import { useMessage } from '../context/MessageContext';
+import reelService, { type Reel } from '../../services/reelService';
+import { messageService } from '../../services/messageService';
+import { groupService, type GroupItem } from '../../services/groupService';
+import { userService } from '../../services/userService';
+import type { User } from '../../services/authService';
+import { useMessage } from '../../context/MessageContext';
 
 interface ShareReelModalProps {
   reel: Reel | null;

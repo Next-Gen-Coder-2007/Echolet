@@ -6,10 +6,10 @@ import {
   HiOutlineCheck,
   HiOutlinePhoto,
 } from 'react-icons/hi2';
-import Modal from './Modal';
-import Avatar from './Avatar';
-import userService, { type ConnectedUser } from '../services/userService';
-import groupService, { type GroupItem } from '../services/groupService';
+import Modal from '../common/Modal';
+import Avatar from '../common/Avatar';
+import userService, { type ConnectedUser } from '../../services/userService';
+import groupService, { type GroupItem } from '../../services/groupService';
 
 interface CreateGroupModalProps {
   isOpen: boolean;

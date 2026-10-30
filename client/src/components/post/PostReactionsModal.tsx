@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import Avatar from './Avatar';
-import Modal from './Modal';
+import Avatar from '../common/Avatar';
+import Modal from '../common/Modal';
 import { HiXMark, HiOutlineTrash, HiOutlineFaceSmile } from 'react-icons/hi2';
-import type { PostReactionItem } from '../services/postService';
+import type { PostReactionItem } from '../../services/postService';
 
 interface PostReactionsModalProps {
   isOpen: boolean;

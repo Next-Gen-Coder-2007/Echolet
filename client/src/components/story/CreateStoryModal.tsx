@@ -12,9 +12,10 @@ import {
   HiOutlineArrowsPointingOut,
   HiOutlineArrowsPointingIn,
 } from 'react-icons/hi2';
-import Modal from './Modal';
-import type { User } from '../services/authService';
-import storyService, { type StoryItem } from '../services/storyService';
+import Modal from '../common/Modal';
+import type { User } from '../../services/authService';
+import storyService, { type StoryItem } from '../../services/storyService';
+import uploadService from '../../services/uploadService';
 
 interface CreateStoryModalProps {
   isOpen: boolean;
@@ -156,6 +157,7 @@ export default function CreateStoryModal({
   const [selectedFont, setSelectedFont] = useState(FONTS[0]);
   const [textColor, setTextColor] = useState<'light' | 'dark'>('dark');
   const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -166,6 +168,7 @@ export default function CreateStoryModal({
     setImagePreview(null);
     setVideoPreview(null);
     setVideoDuration(null);
+    setAttachedFile(null);
     setCaption('');
     setTextContent('');
     setSelectedGradient(GRADIENTS[0]);
@@ -188,6 +191,7 @@ export default function CreateStoryModal({
     }
 
     try {
+      setAttachedFile(file);
       const dataUrl = await optimizeImageFile(file);
       setImagePreview(dataUrl);
     } catch (err) {
@@ -203,6 +207,7 @@ export default function CreateStoryModal({
     }
 
     try {
+      setAttachedFile(file);
       const video = document.createElement('video');
       video.preload = 'metadata';
       const objUrl = URL.createObjectURL(file);
@@ -216,6 +221,7 @@ export default function CreateStoryModal({
             `Video duration is ${Math.round(duration)}s. Stories can only be within 1 minute (60s).`,
             'error'
           );
+          setAttachedFile(null);
           return;
         }
 
@@ -271,14 +277,23 @@ export default function CreateStoryModal({
 
     setIsSubmitting(true);
     try {
+      let finalMediaUrl: string | undefined = undefined;
+      if (tab === 'image' || tab === 'video') {
+        if (attachedFile) {
+          try {
+            const uploadRes = await uploadService.uploadFile(attachedFile, 'stories');
+            finalMediaUrl = uploadRes.url;
+          } catch {
+            finalMediaUrl = tab === 'image' ? (imagePreview || undefined) : (videoPreview || undefined);
+          }
+        } else {
+          finalMediaUrl = tab === 'image' ? (imagePreview || undefined) : (videoPreview || undefined);
+        }
+      }
+
       const res = await storyService.createStory({
         mediaType: tab,
-        mediaUrl:
-          tab === 'image'
-            ? (imagePreview || undefined)
-            : tab === 'video'
-            ? (videoPreview || undefined)
-            : undefined,
+        mediaUrl: finalMediaUrl,
         duration:
           tab === 'video' && videoDuration
             ? Math.min(60, Math.round(videoDuration))

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import Avatar from './Avatar';
+import Avatar from '../common/Avatar';
 import {
   HiOutlinePhoto,
   HiXMark,
@@ -12,9 +12,10 @@ import {
   HiOutlineClock,
   HiOutlineTrash,
 } from 'react-icons/hi2';
-import postService, { type Post } from '../services/postService';
-import type { User } from '../services/authService';
-import { useMessage } from '../context/MessageContext';
+import postService, { type Post } from '../../services/postService';
+import uploadService from '../../services/uploadService';
+import type { User } from '../../services/authService';
+import { useMessage } from '../../context/MessageContext';
 
 export const POLL_TIMER_DURATIONS = [
   { value: 'none', label: 'No timer (Never ends)' },
@@ -38,6 +39,7 @@ interface SelectedImage {
   url: string;
   name: string;
   sizeText: string;
+  file?: File;
 }
 
 const MAX_IMAGE_BYTES = 1 * 1024 * 1024;
@@ -164,6 +166,7 @@ export default function CreatePostCard({
           url: optimizedUrl,
           name: file.name,
           sizeText: `${kbSize} KB`,
+          file,
         });
       } catch (err) {
         console.error('Failed to optimize image:', file.name, err);
@@ -264,9 +267,29 @@ export default function CreatePostCard({
 
     setSubmitting(true);
     try {
+      let uploadedMediaUrls: string[] | undefined = undefined;
+      if (hasImages) {
+        uploadedMediaUrls = await Promise.all(
+          images.map(async (img) => {
+            if (img.url.startsWith('http://') || img.url.startsWith('https://')) {
+              return img.url;
+            }
+            try {
+              if (img.file) {
+                const res = await uploadService.uploadFile(img.file, 'posts');
+                return res.url;
+              }
+            } catch {
+              // fallback to img.url which backend automatically uploads
+            }
+            return img.url;
+          })
+        );
+      }
+
       const createdPost = await postService.createPost({
         content: trimmed,
-        mediaUrls: hasImages ? images.map((img) => img.url) : undefined,
+        mediaUrls: uploadedMediaUrls,
         mediaType: showPoll ? 'poll' : hasImages ? 'image' : 'text',
         pollOptions: showPoll ? trimmedPollOptions : undefined,
         pollDuration: showPoll && pollTimer !== 'none' ? pollTimer : undefined,

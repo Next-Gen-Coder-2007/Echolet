@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Avatar from './Avatar';
+import Avatar from '../common/Avatar';
 import {
   HiArrowTopRightOnSquare,
   HiOutlineChatBubbleOvalLeftEllipsis,
@@ -8,7 +8,7 @@ import {
   HiOutlineFilm,
   HiOutlineChartBar,
 } from 'react-icons/hi2';
-import postService, { type Post } from '../services/postService';
+import postService, { type Post } from '../../services/postService';
 
 interface PostMessageCardProps {
   content: string;

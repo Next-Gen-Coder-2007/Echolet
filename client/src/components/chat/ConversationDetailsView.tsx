@@ -29,18 +29,18 @@ import {
   HiOutlineLockClosed,
 } from 'react-icons/hi2';
 import { BsPinAngleFill } from 'react-icons/bs';
-import type { User } from '../services/authService';
-import userService, { type UserProfileResponse, type ConnectedUser } from '../services/userService';
-import messageService from '../services/messageService';
+import type { User } from '../../services/authService';
+import userService, { type UserProfileResponse, type ConnectedUser } from '../../services/userService';
+import messageService from '../../services/messageService';
 import groupService, {
   type GroupDetails,
   type GroupItem,
   type GroupMemberItem,
-} from '../services/groupService';
-import { useVoiceCall } from '../context/CallContext';
+} from '../../services/groupService';
+import { useVoiceCall } from '../../context/CallContext';
 import MediaViewerModal from './MediaViewerModal';
-import Modal from './Modal';
-import Avatar from './Avatar';
+import Modal from '../common/Modal';
+import Avatar from '../common/Avatar';
 
 export interface ConversationDetailsViewProps {
   user?: UserProfileResponse | User | null;
@@ -630,13 +630,13 @@ export default function ConversationDetailsView({
               type: typeParam,
               search: mediaSearchQuery.trim() || undefined,
               page: pageToFetch,
-              limit: 40,
+              limit: 20,
             })
           : await messageService.getConversationMedia(targetId, {
               type: typeParam,
               search: mediaSearchQuery.trim() || undefined,
               page: pageToFetch,
-              limit: 40,
+              limit: 20,
             });
 
         if (res?.status === 'success') {

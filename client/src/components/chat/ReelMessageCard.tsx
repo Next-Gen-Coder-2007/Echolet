@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HiPlay, HiArrowTopRightOnSquare } from 'react-icons/hi2';
-import Avatar from './Avatar';
-import { reelService, type Reel } from '../services/reelService';
+import Avatar from '../common/Avatar';
+import { reelService, type Reel } from '../../services/reelService';
 
 interface ReelMessageCardProps {
   content: string;

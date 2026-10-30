@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Avatar from './Avatar';
+import Avatar from '../common/Avatar';
 import {
   HiOutlinePlay,
   HiHeart,
@@ -10,9 +10,9 @@ import {
   HiOutlineChatBubbleOvalLeftEllipsis,
   HiOutlineMusicalNote,
 } from 'react-icons/hi2';
-import reelService, { type Reel } from '../services/reelService';
-import type { User } from '../services/authService';
-import { useMessage } from '../context/MessageContext';
+import reelService, { type Reel } from '../../services/reelService';
+import type { User } from '../../services/authService';
+import { useMessage } from '../../context/MessageContext';
 
 interface ReelGridCardProps {
   reel: Reel;

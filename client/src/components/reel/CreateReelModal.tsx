@@ -13,9 +13,10 @@ import {
   HiOutlineCamera,
   HiCheck,
 } from 'react-icons/hi2';
-import Modal from './Modal';
-import reelService, { type Reel } from '../services/reelService';
-import type { User } from '../services/authService';
+import Modal from '../common/Modal';
+import reelService, { type Reel } from '../../services/reelService';
+import uploadService from '../../services/uploadService';
+import type { User } from '../../services/authService';
 
 interface CreateReelModalProps {
   isOpen: boolean;
@@ -308,8 +309,15 @@ export default function CreateReelModal({
     setUploadProgress('Preparing video...');
 
     try {
-      setUploadProgress('Encoding video data...');
-      const videoDataUrl = await readFileAsDataURL(videoFile);
+      setUploadProgress('Uploading video to Supabase Storage...');
+      let finalVideoUrl: string;
+      try {
+        const uploadRes = await uploadService.uploadFile(videoFile, 'reels');
+        finalVideoUrl = uploadRes.url;
+      } catch {
+        setUploadProgress('Encoding video data...');
+        finalVideoUrl = await readFileAsDataURL(videoFile);
+      }
 
       setUploadProgress('Publishing reel...');
       const finalThumbnail =
@@ -318,7 +326,7 @@ export default function CreateReelModal({
           : videoThumbnail || null;
 
       const newReel = await reelService.createReel({
-        videoUrl: videoDataUrl,
+        videoUrl: finalVideoUrl,
         thumbnailUrl: finalThumbnail,
         caption: caption.trim() || undefined,
         audioTitle: audioTitle.trim() || undefined,

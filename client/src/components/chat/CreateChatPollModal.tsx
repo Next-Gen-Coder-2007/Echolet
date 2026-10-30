@@ -6,7 +6,7 @@ import {
   HiOutlineExclamationCircle,
   HiOutlineClock,
 } from 'react-icons/hi2';
-import Modal from './Modal';
+import Modal from '../common/Modal';
 
 export const CHAT_POLL_TIMER_DURATIONS = [
   { value: 'none', label: 'No timer (Never ends)' },

@@ -13,12 +13,12 @@ import {
   HiHeart,
   HiOutlineHeart,
 } from 'react-icons/hi2';
-import Modal from './Modal';
-import Avatar from './Avatar';
-import type { User } from '../services/authService';
-import storyService, { type UserStoryGroup, markOwnStoryAsViewed } from '../services/storyService';
-import messageService from '../services/messageService';
-import getSocket from '../services/socket';
+import Modal from '../common/Modal';
+import Avatar from '../common/Avatar';
+import type { User } from '../../services/authService';
+import storyService, { type UserStoryGroup, markOwnStoryAsViewed } from '../../services/storyService';
+import messageService from '../../services/messageService';
+import getSocket from '../../services/socket';
 
 interface StoryViewerModalProps {
   isOpen: boolean;

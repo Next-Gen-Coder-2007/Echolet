@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import Avatar from './Avatar';
+import Avatar from '../common/Avatar';
 import {
   HiCheck,
   HiOutlineClipboardDocument,
@@ -21,13 +21,13 @@ import {
   FaFacebook,
   FaEnvelope,
 } from 'react-icons/fa6';
-import postService, { type Post } from '../services/postService';
-import { messageService } from '../services/messageService';
-import { groupService, type GroupItem } from '../services/groupService';
-import { userService } from '../services/userService';
-import type { User } from '../services/authService';
-import { useMessage } from '../context/MessageContext';
-import Modal from './Modal';
+import postService, { type Post } from '../../services/postService';
+import { messageService } from '../../services/messageService';
+import { groupService, type GroupItem } from '../../services/groupService';
+import { userService } from '../../services/userService';
+import type { User } from '../../services/authService';
+import { useMessage } from '../../context/MessageContext';
+import Modal from '../common/Modal';
 
 export interface SharePostModalProps {
   post: Post | null;

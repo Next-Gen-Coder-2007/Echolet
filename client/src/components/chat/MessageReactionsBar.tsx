@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { MessageReactionItem } from '../services/messageService';
+import type { MessageReactionItem } from '../../services/messageService';
 
 interface MessageReactionsBarProps {
   reactions?: MessageReactionItem[];

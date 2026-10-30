@@ -6,7 +6,7 @@ import {
   HiOutlinePhoto,
   HiOutlineVideoCamera,
 } from 'react-icons/hi2';
-import type { StoryMessageData } from '../services/messageService';
+import type { StoryMessageData } from '../../services/messageService';
 
 interface StoryMessageCardProps {
   story?: StoryMessageData | null;

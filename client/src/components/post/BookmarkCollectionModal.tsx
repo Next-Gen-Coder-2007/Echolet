@@ -7,8 +7,8 @@ import {
   HiOutlineExclamationCircle,
   HiOutlineArrowLeft,
 } from 'react-icons/hi2';
-import Modal from './Modal';
-import type { BookmarkCollection } from '../services/collectionService';
+import Modal from '../common/Modal';
+import type { BookmarkCollection } from '../../services/collectionService';
 
 export interface BookmarkCollectionModalProps {
   isOpen: boolean;
