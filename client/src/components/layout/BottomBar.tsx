@@ -8,7 +8,7 @@ import {
   HiOutlineFilm,
   HiFilm,
 } from 'react-icons/hi2';
-import Avatar from './Avatar';
+import Avatar from '../common/Avatar';
 
 interface BottomBarProps {
   avatarUrl?: string;

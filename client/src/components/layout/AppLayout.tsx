@@ -3,12 +3,12 @@ import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import BottomBar from './BottomBar';
 import MobileTopBar from './MobileTopBar';
-import authService, { type User } from '../services/authService';
-import messageService from '../services/messageService';
-import notificationService from '../services/notificationService';
-import getSocket, { joinUserRoom } from '../services/socket';
-import { CallProvider } from '../context/CallContext';
-import VoiceCallModal from './VoiceCallModal';
+import authService, { type User } from '../../services/authService';
+import messageService from '../../services/messageService';
+import notificationService from '../../services/notificationService';
+import getSocket, { joinUserRoom } from '../../services/socket';
+import { CallProvider } from '../../context/CallContext';
+import VoiceCallModal from '../chat/VoiceCallModal';
 
 interface AppLayoutProps {
   children?: React.ReactNode;

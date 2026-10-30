@@ -11,7 +11,7 @@ import {
   HiOutlineCog6Tooth,
   HiOutlineFilm,
 } from 'react-icons/hi2';
-import Avatar from './Avatar';
+import Avatar from '../common/Avatar';
 
 export type SidebarTab =
   | 'home'

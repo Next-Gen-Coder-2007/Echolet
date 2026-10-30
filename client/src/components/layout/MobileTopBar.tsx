@@ -10,9 +10,9 @@ import {
   HiOutlineArrowRightOnRectangle,
   HiOutlineUser,
 } from 'react-icons/hi2';
-import Logo from './Logo';
-import Avatar from './Avatar';
-import type { User } from '../services/authService';
+import Logo from '../common/Logo';
+import Avatar from '../common/Avatar';
+import type { User } from '../../services/authService';
 
 interface MobileTopBarProps {
   user?: User | null;
