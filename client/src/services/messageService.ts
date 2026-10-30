@@ -44,6 +44,12 @@ export interface MessageReactionItem {
   createdAt?: string;
 }
 
+export interface CallLogData {
+  duration: number; // in seconds
+  status: 'completed' | 'missed' | 'declined' | 'busy' | 'cancelled';
+  callType?: 'voice' | 'video';
+}
+
 export interface MessageItem {
   id: string;
   senderId: string;
@@ -60,11 +66,13 @@ export interface MessageItem {
     | 'reel'
     | 'post'
     | 'story_reply'
-    | 'system';
+    | 'system'
+    | 'call';
   mediaUrl?: string;
   fileName?: string;
   fileSize?: string | number;
   poll?: MessagePoll;
+  callLog?: CallLogData | null;
   audioUrl?: string;
   audioDuration?: number;
   isRead: boolean;
@@ -99,6 +107,12 @@ export interface ConversationItem {
   unreadCount: number;
 }
 
+export interface MessagesResponse {
+  messages: MessageItem[];
+  hasMore: boolean;
+  nextCursor?: string | null;
+}
+
 export const messageService = {
   async getConversations(): Promise<ConversationItem[]> {
     const response = await api.get<{ status: string; conversations: ConversationItem[] }>(
@@ -107,11 +121,27 @@ export const messageService = {
     return response.data.conversations || [];
   },
 
-  async getMessages(userId: string): Promise<MessageItem[]> {
-    const response = await api.get<{ status: string; messages: MessageItem[] }>(
-      `/messages/${encodeURIComponent(userId)}`
-    );
-    return response.data.messages || [];
+  async getMessages(
+    userId: string,
+    options?: { limit?: number; before?: string }
+  ): Promise<MessagesResponse> {
+    const q = new URLSearchParams();
+    if (options?.limit) q.append('limit', String(options.limit));
+    if (options?.before) q.append('before', options.before);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+
+    const response = await api.get<{
+      status: string;
+      messages: MessageItem[];
+      hasMore?: boolean;
+      nextCursor?: string | null;
+    }>(`/messages/${encodeURIComponent(userId)}${qs}`);
+
+    return {
+      messages: response.data.messages || [],
+      hasMore: Boolean(response.data.hasMore),
+      nextCursor: response.data.nextCursor || null,
+    };
   },
 
   async getUnreadCount(): Promise<number> {
@@ -143,7 +173,8 @@ export const messageService = {
         | 'reel'
         | 'post'
         | 'story_reply'
-        | 'system';
+        | 'system'
+        | 'call';
       mediaUrl?: string;
       fileName?: string;
       fileSize?: string | number;
@@ -153,6 +184,7 @@ export const messageService = {
         expiresAt?: string | null;
         duration?: string | null;
       };
+      callLog?: CallLogData | null;
       audioUrl?: string;
       audioDuration?: number;
     }
@@ -169,6 +201,7 @@ export const messageService = {
         fileName: options?.fileName,
         fileSize: options?.fileSize,
         poll: options?.poll,
+        callLog: options?.callLog,
         audioUrl: options?.audioUrl,
         audioDuration: options?.audioDuration,
       }

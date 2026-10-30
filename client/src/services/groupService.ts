@@ -1,5 +1,5 @@
 import api from './api';
-import type { StoryMessageData, MessageReactionItem } from './messageService';
+import type { StoryMessageData, MessageReactionItem, CallLogData } from './messageService';
 import type { PollVotersData } from './postService';
 
 export interface GroupMemberUser {
@@ -47,10 +47,12 @@ export interface GroupMessageItem {
     | 'reel'
     | 'post'
     | 'story_reply'
-    | 'system';
+    | 'system'
+    | 'call';
   mediaUrl?: string;
   fileName?: string;
   fileSize?: string | number;
+  callLog?: CallLogData | null;
   poll?: GroupPoll;
   audioUrl?: string;
   audioDuration?: number;
@@ -103,6 +105,12 @@ export interface GroupDetails {
   members: GroupMemberItem[];
 }
 
+export interface GroupMessagesResponse {
+  messages: GroupMessageItem[];
+  hasMore: boolean;
+  nextCursor?: string | null;
+}
+
 export const groupService = {
   async getGroups(): Promise<GroupItem[]> {
     const response = await api.get<{ status: string; groups: GroupItem[] }>('/groups');
@@ -137,11 +145,27 @@ export const groupService = {
     return response.data.group;
   },
 
-  async getGroupMessages(groupId: string): Promise<GroupMessageItem[]> {
-    const response = await api.get<{ status: string; messages: GroupMessageItem[] }>(
-      `/groups/${encodeURIComponent(groupId)}/messages`
-    );
-    return response.data.messages || [];
+  async getGroupMessages(
+    groupId: string,
+    options?: { limit?: number; before?: string }
+  ): Promise<GroupMessagesResponse> {
+    const q = new URLSearchParams();
+    if (options?.limit) q.append('limit', String(options.limit));
+    if (options?.before) q.append('before', options.before);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+
+    const response = await api.get<{
+      status: string;
+      messages: GroupMessageItem[];
+      hasMore?: boolean;
+      nextCursor?: string | null;
+    }>(`/groups/${encodeURIComponent(groupId)}/messages${qs}`);
+
+    return {
+      messages: response.data.messages || [],
+      hasMore: Boolean(response.data.hasMore),
+      nextCursor: response.data.nextCursor || null,
+    };
   },
 
   async sendGroupMessage(
