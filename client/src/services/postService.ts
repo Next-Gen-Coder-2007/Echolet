@@ -117,9 +117,14 @@ export const postService = {
     return res.data.post;
   },
 
-  async getUserPosts(username: string, type: 'echoes' | 'media' | 'likes' = 'echoes'): Promise<Post[]> {
+  async getUserPosts(
+    username: string,
+    type: 'echoes' | 'media' | 'likes' = 'echoes',
+    page = 1,
+    limit = 15
+  ): Promise<Post[]> {
     const res = await api.get<{ status: string; posts: Post[] }>(
-      `/posts/user/${encodeURIComponent(username)}?type=${type}`
+      `/posts/user/${encodeURIComponent(username)}?type=${type}&page=${page}&limit=${limit}`
     );
     return res.data.posts || [];
   },
