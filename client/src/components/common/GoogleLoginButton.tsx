@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import authService from '../services/authService';
-import { useMessage } from '../context/MessageContext';
+import authService from '../../services/authService';
+import { useMessage } from '../../context/MessageContext';
 
 declare global {
   interface Window {

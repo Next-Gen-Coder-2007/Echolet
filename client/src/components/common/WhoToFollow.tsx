@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { HiOutlineUserPlus, HiOutlineCheck } from 'react-icons/hi2';
-import userService, { type UserProfileResponse } from '../services/userService';
-import type { User } from '../services/authService';
-import { useMessage } from '../context/MessageContext';
+import userService, { type UserProfileResponse } from '../../services/userService';
+import type { User } from '../../services/authService';
+import { useMessage } from '../../context/MessageContext';
 import Avatar from './Avatar';
 
 interface WhoToFollowProps {

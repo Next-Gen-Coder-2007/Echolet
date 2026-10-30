@@ -11,9 +11,9 @@ import {
 } from 'react-icons/hi2';
 import Modal from './Modal';
 import Avatar from './Avatar';
-import userService, { type FollowUserItem } from '../services/userService';
-import type { User } from '../services/authService';
-import { useMessage } from '../context/MessageContext';
+import userService, { type FollowUserItem } from '../../services/userService';
+import type { User } from '../../services/authService';
+import { useMessage } from '../../context/MessageContext';
 
 export interface FollowListModalProps {
   isOpen: boolean;
