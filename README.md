@@ -205,125 +205,274 @@ The application uses PostgreSQL managed through TypeORM entities:
 
 ```mermaid
 erDiagram
-    User ||--o{ Post : creates
-    User ||--o{ Reel : uploads
-    User ||--o{ Story : shares
-    User ||--o{ Comment : writes
-    User ||--o{ Message : sends
-    User ||--o{ GroupMember : participates
-    User ||--o{ BookmarkCollection : organizes
-    User ||--o{ Notification : receives
-    User ||--o{ Follow : follows
-
-    User {
+    USER {
         uuid id PK
-        string username UK
-        string email UK
-        string passwordHash
-        string fullName
-        string bio
-        string avatarUrl
-        string bannerUrl
+        varchar username UK
+        varchar email UK
+        varchar password
+        varchar googleId
+        varchar fullName
+        text bio
+        date birthday
+        varchar gender
+        text avatarUrl
+        text bannerUrl
         boolean isPrivate
-        datetime createdAt
+        json archivedChats
+        json mutedChats
+        json pinnedChats
+        json blockedUsers
+        timestamp createdAt
+        timestamp updatedAt
     }
 
-    Post {
+    FOLLOW {
+        uuid id PK
+        uuid followerId FK
+        uuid followingId FK
+        timestamp createdAt
+    }
+
+    FOLLOW_REQUEST {
+        uuid id PK
+        uuid requesterId FK
+        uuid recipientId FK
+        varchar status
+        timestamp createdAt
+    }
+
+    NOTIFICATION {
+        uuid id PK
+        uuid actorId FK
+        uuid recipientId FK
+        varchar entityType
+        uuid entityId
+        varchar type
+        boolean isRead
+        timestamp createdAt
+    }
+
+    POST {
         uuid id PK
         uuid userId FK
         text content
         json mediaUrls
-        string postType
-        json pollData
+        varchar mediaType
+        json pollOptions
+        timestamp pollExpiresAt
         int likesCount
         int commentsCount
+        int repostsCount
         int bookmarksCount
-        datetime createdAt
+        timestamp createdAt
+        timestamp updatedAt
     }
 
-    Reel {
+    POST_LIKE {
         uuid id PK
         uuid userId FK
-        string videoUrl
-        string thumbnailUrl
-        text caption
-        int duration
-        int likesCount
-        int commentsCount
-        int viewsCount
-        datetime createdAt
+        uuid postId FK
+        timestamp createdAt
     }
 
-    Story {
+    POST_BOOKMARK {
         uuid id PK
         uuid userId FK
-        string mediaUrl
-        string mediaType
-        text caption
-        datetime expiresAt
-        datetime createdAt
+        uuid postId FK
+        uuid collectionId FK
+        timestamp createdAt
     }
 
-    Comment {
+    COMMENT {
         uuid id PK
         uuid postId FK
         uuid userId FK
         uuid parentId FK
         text content
         int likesCount
-        datetime createdAt
+        timestamp createdAt
+        timestamp updatedAt
     }
 
-    Message {
+    COMMENT_LIKE {
+        uuid id PK
+        uuid userId FK
+        uuid commentId FK
+        timestamp createdAt
+    }
+
+    POLL_VOTE {
+        uuid id PK
+        uuid userId FK
+        uuid postId FK
+        uuid optionId
+        timestamp createdAt
+    }
+
+    REEL {
+        uuid id PK
+        uuid userId FK
+        text videoUrl
+        text thumbnailUrl
+        text caption
+        float duration
+        int viewsCount
+        int likesCount
+        int commentsCount
+        timestamp createdAt
+    }
+
+    REEL_LIKE {
+        uuid id PK
+        uuid userId FK
+        uuid reelId FK
+        timestamp createdAt
+    }
+
+    REEL_BOOKMARK {
+        uuid id PK
+        uuid userId FK
+        uuid reelId FK
+        uuid collectionId FK
+        timestamp createdAt
+    }
+
+    REEL_COMMENT {
+        uuid id PK
+        uuid userId FK
+        uuid reelId FK
+        uuid parentId FK
+        text content
+        boolean isPinned
+        timestamp createdAt
+    }
+
+    REEL_COMMENT_REACTION {
+        uuid id PK
+        uuid userId FK
+        uuid commentId FK
+        varchar reaction
+        timestamp createdAt
+    }
+
+    STORY {
+        uuid id PK
+        uuid userId FK
+        text mediaUrl
+        varchar mediaType
+        text caption
+        timestamp expiresAt
+        int viewsCount
+        int likesCount
+        timestamp createdAt
+    }
+
+    BOOKMARK_COLLECTION {
+        uuid id PK
+        uuid userId FK
+        varchar name
+        varchar color
+        int itemsCount
+        timestamp createdAt
+    }
+
+    MESSAGE {
         uuid id PK
         uuid senderId FK
         uuid receiverId FK
         text content
-        string messageType
-        string mediaUrl
+        varchar messageType
+        text mediaUrl
         json callLog
         boolean isRead
         boolean isEdited
         boolean isDeleted
-        datetime createdAt
+        boolean isStarred
+        boolean isPinned
+        timestamp createdAt
     }
 
-    Group {
+    GROUP_CHAT {
         uuid id PK
-        string name
-        string avatarUrl
+        varchar name
+        text avatarUrl
         uuid createdById FK
-        datetime createdAt
+        timestamp createdAt
     }
 
-    GroupMember {
+    GROUP_MEMBER {
         uuid id PK
         uuid groupId FK
         uuid userId FK
-        string role
-        datetime joinedAt
+        varchar role
+        timestamp joinedAt
     }
 
-    BookmarkCollection {
+    GROUP_MESSAGE {
+        uuid id PK
+        uuid groupId FK
+        uuid senderId FK
+        text content
+        varchar messageType
+        text mediaUrl
+        timestamp createdAt
+    }
+
+    GLOBAL_MESSAGE {
         uuid id PK
         uuid userId FK
-        string name
-        string color
-        int itemsCount
-        datetime createdAt
+        text content
+        json reactions
+        timestamp createdAt
     }
 
-    Notification {
-        uuid id PK
-        uuid recipientId FK
-        uuid actorId FK
-        string type
-        string entityType
-        uuid entityId
-        text message
-        boolean isRead
-        datetime createdAt
-    }
+    USER ||--o{ FOLLOW : initiates
+    USER ||--o{ FOLLOW : receives
+    USER ||--o{ FOLLOW_REQUEST : requests
+    USER ||--o{ FOLLOW_REQUEST : receives
+    USER ||--o{ NOTIFICATION : generates
+    USER ||--o{ NOTIFICATION : receives
+
+    USER ||--o{ POST : publishes
+    POST ||--o{ POST_LIKE : receives
+    USER ||--o{ POST_LIKE : likes
+    POST ||--o{ COMMENT : contains
+    USER ||--o{ COMMENT : writes
+    COMMENT o|--o{ COMMENT : replies_to
+    COMMENT ||--o{ COMMENT_LIKE : receives
+    USER ||--o{ COMMENT_LIKE : likes
+    POST ||--o{ POLL_VOTE : collects
+    USER ||--o{ POLL_VOTE : casts
+
+    USER ||--o{ BOOKMARK_COLLECTION : owns
+    USER ||--o{ POST_BOOKMARK : saves
+    POST ||--o{ POST_BOOKMARK : bookmarked
+    BOOKMARK_COLLECTION o|--o{ POST_BOOKMARK : organizes
+
+    USER ||--o{ REEL : publishes
+    REEL ||--o{ REEL_LIKE : receives
+    USER ||--o{ REEL_LIKE : likes
+    REEL ||--o{ REEL_COMMENT : contains
+    USER ||--o{ REEL_COMMENT : writes
+    REEL_COMMENT o|--o{ REEL_COMMENT : replies_to
+    REEL_COMMENT ||--o{ REEL_COMMENT_REACTION : receives
+    USER ||--o{ REEL_COMMENT_REACTION : reacts
+    USER ||--o{ REEL_BOOKMARK : saves
+    REEL ||--o{ REEL_BOOKMARK : bookmarked
+    BOOKMARK_COLLECTION o|--o{ REEL_BOOKMARK : organizes
+
+    USER ||--o{ STORY : publishes
+
+    USER ||--o{ MESSAGE : sends
+    USER ||--o{ MESSAGE : receives
+
+    USER ||--o{ GROUP_CHAT : creates
+    GROUP_CHAT ||--o{ GROUP_MEMBER : has
+    USER ||--o{ GROUP_MEMBER : joins
+    GROUP_CHAT ||--o{ GROUP_MESSAGE : contains
+    USER ||--o{ GROUP_MESSAGE : sends
+
+    USER ||--o{ GLOBAL_MESSAGE : writes
 ```
 
 ---
