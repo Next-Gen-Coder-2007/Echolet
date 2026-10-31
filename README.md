@@ -2,7 +2,7 @@
 
 # Echolet
 
-<img src="client/public/logo.png" width="110" height="110" alt="Echolet Logo" />
+<img src="logo.png" width="110" height="110" alt="Echolet Logo" />
 
 ### Next-Generation Social Media, Reels & Real-Time Communication Platform
 
@@ -10,7 +10,10 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript_5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite_8-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vite.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![Express.js](https://img.shields.io/badge/Express_5-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
+[![Lenis](https://img.shields.io/badge/Lenis_Scroll-000000?style=for-the-badge&logo=scroll&logoColor=white)](https://github.com/darkroomengineering/lenis)
+[![Emoji Picker](https://img.shields.io/badge/Emoji_Picker_React-FFCC4D?style=for-the-badge&logo=smile&logoColor=black)](https://github.com/ealush/emoji-picker-react)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![TypeORM](https://img.shields.io/badge/TypeORM-FE0803?style=for-the-badge&logo=typeorm&logoColor=white)](https://typeorm.io/)
 [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
@@ -39,6 +42,9 @@
   - [WebRTC P2P Voice Calling](#8-webrtc-p2p-voice-calling)
   - [Notifications & Universal Search](#9-notifications--universal-search)
   - [Cloud Media Pipeline (Supabase Storage)](#10-cloud-media-pipeline-supabase-storage)
+  - [Node.js Runtime & Server Architecture](#11-nodejs-runtime--server-architecture)
+  - [Lenis Kinetic Smooth Scrolling](#12-lenis-kinetic-smooth-scrolling)
+  - [Emoji Picker React Integration](#13-emoji-picker-react-integration)
 - [Database Schema & Data Model](#database-schema--data-model)
 - [WebSockets & WebRTC Signaling](#websockets--webrtc-signaling)
 - [REST API Reference](#rest-api-reference)
@@ -171,6 +177,25 @@ flowchart TD
   - `stories/{userId}/{filename}` — Ephemeral story content
   - `chat/{userId}/{filename}` — Chat attachments and voice recordings
 - **Security & Ownership**: Uploads stream through backend memory buffers where file type, payload sizes (up to 125MB), and user credentials are validated before persisting to Supabase via secret backend service role keys.
+
+### 11. Node.js Runtime & Server Architecture
+- **High-Throughput Asynchronous Core**: Built on the Node.js (>=18) V8 runtime utilizing non-blocking asynchronous event loops to process thousands of concurrent WebSocket messages and REST requests.
+- **Express 5 Engine**: Leverages modern Express 5 with native Promise-based route handlers, robust global error boundaries, and strict CORS configuration for cross-origin security.
+- **Streaming In-Memory Buffers**: Handles high-performance media uploads with Multer in-memory buffers up to 125MB per file, bypassing disk writes on serverless environments (e.g. Vercel) and piping streams directly to Supabase cloud storage.
+- **Cryptographic Security**: Enforces salt-hashed passwords using `bcryptjs` and signs cryptographically secure JWT authentication tokens with timed expiration (`7d`).
+
+### 12. Lenis Kinetic Smooth Scrolling
+- **Fluid Viewport Dynamics**: Integrated `@studio-freight/lenis` (`lenis`) provides continuous, inertia-based kinetic scrolling across the entire web application.
+- **Refresh-Rate Normalization**: Automatically interpolates at 60Hz and high-refresh-rate 120Hz/144Hz displays for consistent smoothness.
+- **Scroll Hijack Prevention**: Configured with `data-lenis-prevent` attributes across all interactive overlays (such as `ShareReelModal`, `MediaUploadPreviewModal`, `ReelCommentsSidePanel`, and message detail drawers) to prevent background page scroll bleed while users scroll nested comments or media lists.
+
+### 13. Emoji Picker React Integration
+- **Full-Spectrum Unicode Picker**: Integrated `emoji-picker-react` delivers a native, searchable emoji suite complete with categories (Smileys, Animals, Food, Activities, Travel, Objects, Symbols, Flags) and skin tone customizers.
+- **Universal Chat & Composer Studio**:
+  - Embedded into the direct and group chat composer inputs for fast one-tap insertions.
+  - Built into the **Media Upload Preview Studio** to allow users to attach expressive emoji-rich captions directly to photos and videos before publishing.
+  - Powers interactive message reaction drawers and comments response fields.
+- **Smart Responsive Positioning**: Dynamically calculates viewport boundaries with elevated `z-[9999]` stacking to ensure popover trays never clip or render off-screen.
 
 ---
 
