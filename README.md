@@ -55,42 +55,42 @@ Echolet utilizes a modern decoupled architecture combining a reactive React 19 s
 
 ```mermaid
 flowchart TD
-    subgraph Client["Client (React 19 + TypeScript + Vite + Tailwind v4)"]
-        UI["Modern UI / Lenis Smooth Scroll / Lucide & Heroicons"]
+    subgraph Client ["Client Tier (React 19 + Vite + Tailwind v4)"]
+        UI["Modern UI / Lenis Smooth Scroll"]
         State["Context Layer (CallContext, MessageContext)"]
-        SocketClient["Socket.io Client (Real-time events)"]
-        WebRTCClient["WebRTC Native Audio API (P2P Audio Stream)"]
-        AudioEngine["Web Audio API (Synthesizers & Waveform Visualizer)"]
+        SocketClient["Socket.io Real-time Client"]
+        WebRTCClient["WebRTC Native Audio API"]
+        AudioEngine["Web Audio API Waveform Visualizer"]
     end
 
-    subgraph Gateway["Reverse Proxy / Edge Layer"]
-        Vercel["Vercel / Nginx / Cloudflare Edge"]
+    subgraph Gateway ["Reverse Proxy and Edge Layer"]
+        EdgeProxy["Vercel / Nginx / Cloudflare Edge"]
     end
 
-    subgraph Backend["Echolet Server (Node.js + Express 5 + TypeORM)"]
-        ExpressApp["Express Application & Middleware"]
-        AuthMiddleware["JWT & Cookie Auth Guard"]
-        UploadMulter["Multer Memory Buffer / Validation"]
-        SocketServer["Socket.io Server (Rooms, Presence, Call Signaling)"]
+    subgraph Backend ["Backend Tier (Node.js + Express 5 + TypeORM)"]
+        ExpressApp["Express API and Middleware"]
+        AuthMiddleware["JWT and Cookie Auth Guard"]
+        UploadMulter["Multer Memory Buffer Validation"]
+        SocketServer["Socket.io Server (Rooms, Presence, Signaling)"]
     end
 
-    subgraph Persistence["Storage & Data Tier"]
-        Postgres[("Supabase PostgreSQL / Connection Pooler")]
-        SupabaseStorage[("Supabase Storage CDN ('echolet-media' Bucket)")]
+    subgraph Persistence ["Persistence and Cloud Storage Tier"]
+        Postgres[("Supabase PostgreSQL Database")]
+        SupabaseStorage[("Supabase Storage CDN - echolet-media")]
     end
 
     UI --> State
     State --> SocketClient
     State --> WebRTCClient
-    Client --> Gateway
-    Gateway --> ExpressApp
-    SocketClient <-->|Bi-directional WebSocket| SocketServer
-    WebRTCClient <-->|Direct P2P Audio (Opus)| WebRTCClient
+    UI -->|"HTTPS REST Requests"| EdgeProxy
+    EdgeProxy -->|"Reverse Proxy"| ExpressApp
+    SocketClient <-->|"Bi-directional WebSocket"| SocketServer
+    WebRTCClient <-->|"Direct P2P Opus Audio Stream"| RemotePeer["Remote Peer WebRTC"]
     ExpressApp --> AuthMiddleware
     ExpressApp --> UploadMulter
-    UploadMulter -->|S3/REST Upload (Service Role)| SupabaseStorage
-    ExpressApp -->|TypeORM Connection Pool| Postgres
-    SocketServer -->|State & Message Sync| Postgres
+    UploadMulter -->|"Service-Role S3 REST Upload"| SupabaseStorage
+    ExpressApp -->|"TypeORM Connection Pool"| Postgres
+    SocketServer -->|"State and Message Sync"| Postgres
 ```
 
 ---
